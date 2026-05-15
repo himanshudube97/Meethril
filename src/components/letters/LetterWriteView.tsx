@@ -56,8 +56,8 @@ export default function LetterWriteView({ onBack, onSealed }: Props) {
     autosave.trigger({
       text: bodyHtml,
       song: null,
-      photos: [],
-      doodles: [],
+      // photos and doodles intentionally omitted — see ComposeView for the
+      // full explanation. Passing [] triggers a destructive server replace.
       entryType: mapping.entryType,
       recipientEmail: mapping.recipientEmail,
       recipientName: mapping.recipientName,

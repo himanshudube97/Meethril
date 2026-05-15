@@ -136,8 +136,10 @@ export default function ComposeView() {
     autosave.trigger({
       text: joined,
       song: null,
-      photos: [],
-      doodles: [],
+      // photos and doodles intentionally omitted — the server interprets a
+      // present (even empty) array as "replace this set", which would wipe any
+      // photos the user uploaded via PostcardBack's CollagePhoto components.
+      // Omitting the keys tells the server to leave the existing rows alone.
       entryType: isSelf ? 'letter' : 'unsent_letter',
       recipientEmail: null,
       recipientName: isSelf ? 'future me' : recipient.name,
