@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useThemeStore } from '@/store/theme'
 import { useE2EE } from '@/hooks/useE2EE'
@@ -46,25 +46,28 @@ export default function DraftsSection() {
   const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
 
   const [drafts, setDrafts] = useState<DraftItem[]>([])
-
-  const fetchDrafts = useCallback(async () => {
-    try {
-      const res = await fetch('/api/letters/drafts')
-      const data = await res.json()
-      const raw = (data.drafts ?? []) as DraftItem[]
-      // Decrypt via the same pattern as SentView / InboxView
-      const decrypted = (await decryptEntriesFromServer(
-        raw as unknown as JournalEntry[]
-      )) as unknown as DraftItem[]
-      setDrafts(decrypted)
-    } catch {
-      // Silently fail — don't block the Sent tab
-    }
-  }, [decryptEntriesFromServer])
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
-    fetchDrafts()
-  }, [fetchDrafts, isE2EEReady])
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/letters/drafts')
+        const data = await res.json()
+        const raw = (data.drafts ?? []) as DraftItem[]
+        // Decrypt via the same pattern as SentView / InboxView
+        const decrypted = (await decryptEntriesFromServer(
+          raw as unknown as JournalEntry[]
+        )) as unknown as DraftItem[]
+        if (cancelled) return
+        setDrafts(decrypted)
+      } catch {
+        // Silently fail — don't block the Sent tab
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [decryptEntriesFromServer, isE2EEReady, refreshTick])
 
   if (drafts.length === 0) return null
 
@@ -73,7 +76,9 @@ export default function DraftsSection() {
     if (!ok) return
     try {
       await fetch(`/api/entries/${id}`, { method: 'DELETE' })
-      setDrafts((prev) => prev.filter((d) => d.id !== id))
+      // Re-fetch from server instead of optimistic filter to avoid race with
+      // any in-flight load() call overwriting state with stale data.
+      setRefreshTick((t) => t + 1)
     } catch {
       // Silently ignore — draft will still show; user can retry
     }
@@ -141,6 +146,8 @@ export default function DraftsSection() {
           return (
             <div
               key={draft.id}
+              role="button"
+              tabIndex={0}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -153,6 +160,12 @@ export default function DraftsSection() {
                 transition: 'background 0.2s',
               }}
               onClick={() => router.push(`/letters/write?id=${draft.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  router.push(`/letters/write?id=${draft.id}`)
+                }
+              }}
               onMouseEnter={(e) => {
                 ;(e.currentTarget as HTMLDivElement).style.backgroundColor =
                   `${theme.accent.primary}18`
