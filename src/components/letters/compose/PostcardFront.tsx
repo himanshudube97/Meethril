@@ -38,32 +38,14 @@ export function PostcardFront({
   onBodyChange,
   onTurnOver,
   onCancel,
-  // onClose is the old prop name; onCancel is the new one.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onClose,
   createdAt,
-  // Legacy props from old API — ignored in new layout (Task 7 removes these from caller)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  recipient: _recipient,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onRecipientChange: _onRecipientChange,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  closeName: _closeName,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onCloseNameChange: _onCloseNameChange,
 }: {
   salutationName?: string
   body?: string
   onBodyChange?: (next: string) => void
   onTurnOver: () => void
   onCancel?: () => void
-  onClose?: () => void
   createdAt: Date
-  // Legacy props — kept for TS compat until Task 7 updates the caller
-  recipient?: unknown
-  onRecipientChange?: unknown
-  closeName?: string
-  onCloseNameChange?: (s: string) => void
 }) {
   const theme = useThemeStore((s) => s.theme)
 
@@ -141,11 +123,11 @@ export function PostcardFront({
           {formatDateLabel(createdAt)}
         </div>
 
-        {/* Hearth stamp — preserved from prior PostcardFront */}
+        {/* Hearth stamp */}
         <div
           style={{
-            width: 52,
-            height: 44,
+            width: 64,
+            height: 74,
             border: '2px dashed rgba(120, 90, 50, 0.45)',
             borderRadius: 4,
             display: 'flex',
@@ -159,7 +141,7 @@ export function PostcardFront({
           <span
             style={{
               fontFamily: 'Caveat, cursive',
-              fontSize: 14,
+              fontSize: 18,
               color: theme.accent.primary,
               lineHeight: 1,
             }}
@@ -169,7 +151,7 @@ export function PostcardFront({
           <span
             style={{
               fontFamily: 'Cormorant Garamond, Georgia, serif',
-              fontSize: 7,
+              fontSize: 8,
               letterSpacing: 2.5,
               textTransform: 'uppercase',
               color: 'rgba(120, 90, 50, 0.55)',
@@ -242,7 +224,7 @@ export function PostcardFront({
       >
         <button
           type="button"
-          onClick={onCancel ?? onClose}
+          onClick={onCancel}
           style={{
             padding: '7px 18px',
             borderRadius: 999,
@@ -291,5 +273,3 @@ export function PostcardFront({
   )
 }
 
-// Backward-compat default export — Task 7 will switch ComposeView to the named export.
-export default PostcardFront

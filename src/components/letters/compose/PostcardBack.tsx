@@ -10,7 +10,6 @@ import CollagePhoto from '@/components/CollagePhoto'
 import SongEmbed from '@/components/SongEmbed'
 import DoodleCanvas from '@/components/DoodleCanvas'
 import type { StrokeData } from '@/store/journal'
-import type { LetterRecipient, UnlockChoice } from '../letterTypes'
 
 // ~9 lines × ~36 chars per line (matches PostcardFront)
 export const BACK_CHAR_LIMIT = 324
@@ -28,60 +27,19 @@ const PAPER_INK = '#3d342a'
 const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
 
 export function PostcardBack({
-  // New API (Task 6)
   entryId = null,
   body = '',
   onBodyChange,
   onTurnBack,
   onSeal,
   canSeal,
-  // Legacy props from old API — kept for TS compat until Task 7 updates caller
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  recipient: _recipient,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  closeName: _closeName,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  unlock: _unlock,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onUnlockChange: _onUnlockChange,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  sealing: _sealing,
-  // Legacy media props — local state now owns these; legacy values ignored
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  photos: _photosLegacy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onPhotosChange: _onPhotosChangeLegacy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  song: _songLegacy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onSongChange: _onSongChangeLegacy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  doodleStrokes: _doodleStrokesLegacy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onDoodleChange: _onDoodleChangeLegacy,
-  // onBack is the old prop name; onTurnBack is the new one
-  onBack,
 }: {
-  // New API
   entryId?: string | null
   body?: string
   onBodyChange?: (next: string) => void
   onTurnBack?: () => void
   onSeal?: () => void
   canSeal?: boolean
-  // Legacy props — kept for TS compat until Task 7 updates the caller
-  recipient?: LetterRecipient
-  closeName?: string
-  unlock?: UnlockChoice
-  onUnlockChange?: (u: UnlockChoice) => void
-  sealing?: boolean
-  photos?: [string | null, string | null]
-  onPhotosChange?: (photos: [string | null, string | null]) => void
-  song?: string | null
-  onSongChange?: (s: string | null) => void
-  doodleStrokes?: StrokeData[]
-  onDoodleChange?: (strokes: StrokeData[]) => void
-  onBack?: () => void
 }) {
   const theme = useThemeStore((s) => s.theme)
 
@@ -144,8 +102,7 @@ export function PostcardBack({
     setSongConfirmed(null)
   }
 
-  // Resolve the effective callbacks (new API preferred; fall back to legacy)
-  const handleTurnBack = onTurnBack ?? onBack
+  const handleTurnBack = onTurnBack
   const sealEnabled = canSeal ?? true
 
   return (
@@ -483,5 +440,3 @@ export function PostcardBack({
   )
 }
 
-// Backward-compat default export — Task 7 will switch ComposeView to the named export.
-export default PostcardBack
