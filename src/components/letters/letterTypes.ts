@@ -96,3 +96,7 @@ export interface SentStamp {
 }
 
 export type LettersTab = 'inbox' | 'sent' | 'lights'
+
+export type RecipientChoice =
+  | { recipient: 'self' }
+  | { recipient: 'friend'; name: string }
