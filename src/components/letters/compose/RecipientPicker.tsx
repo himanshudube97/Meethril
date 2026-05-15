@@ -15,6 +15,7 @@ export function RecipientPicker({
   const theme = useThemeStore((s) => s.theme)
   const [mode, setMode] = useState<'idle' | 'friend-name'>('idle')
   const [name, setName] = useState('')
+  const [hovered, setHovered] = useState<'self' | 'friend' | null>(null)
 
   function handleFriendSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +27,7 @@ export function RecipientPicker({
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center px-6"
-      style={{ color: theme.text.primary }}
+      style={{ color: theme.text.primary, backgroundColor: theme.bg.primary }}
     >
       <div className="w-full max-w-xl text-center">
         <motion.h2
@@ -52,10 +53,14 @@ export function RecipientPicker({
               <button
                 type="button"
                 onClick={() => onSubmit({ recipient: 'self' })}
-                className="rounded-2xl p-7 transition-colors hover:bg-white/30 text-left"
+                onMouseEnter={() => setHovered('self')}
+                onMouseLeave={() => setHovered(null)}
+                className="rounded-2xl p-7 transition-colors text-left"
                 style={{
                   border: `1px solid ${theme.text.primary}33`,
-                  backgroundColor: `${theme.bg.primary}80`,
+                  backgroundColor: hovered === 'self'
+                    ? `${theme.accent.primary}22`
+                    : `${theme.bg.primary}80`,
                 }}
               >
                 <div className="text-lg font-serif mb-1">Future me</div>
@@ -67,10 +72,14 @@ export function RecipientPicker({
               <button
                 type="button"
                 onClick={() => setMode('friend-name')}
-                className="rounded-2xl p-7 transition-colors hover:bg-white/30 text-left"
+                onMouseEnter={() => setHovered('friend')}
+                onMouseLeave={() => setHovered(null)}
+                className="rounded-2xl p-7 transition-colors text-left"
                 style={{
                   border: `1px solid ${theme.text.primary}33`,
-                  backgroundColor: `${theme.bg.primary}80`,
+                  backgroundColor: hovered === 'friend'
+                    ? `${theme.accent.primary}22`
+                    : `${theme.bg.primary}80`,
                 }}
               >
                 <div className="text-lg font-serif mb-1">A friend</div>
