@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -119,12 +119,15 @@ export function PostcardBack({
     },
   })
 
+  const lastSeededRef = useRef<string | null>(null)
+
   // Body-sync: resume async draft without fighting user typing
   useEffect(() => {
     if (!editor) return
     if (editor.isFocused) return
-    if (editor.getText() === body) return
+    if (lastSeededRef.current === body) return
     editor.commands.setContent(body)
+    lastSeededRef.current = body
   }, [body, editor])
 
   const atCap = (editor?.storage.characterCount.characters() ?? 0) >= BACK_CHAR_LIMIT

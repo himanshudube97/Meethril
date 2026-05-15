@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -82,12 +82,14 @@ export function PostcardFront({
     },
   })
 
+  const lastSeededRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!editor) return
-    // Only sync when the prop disagrees with editor state AND user isn't typing.
     if (editor.isFocused) return
-    if (editor.getText() === body) return
+    if (lastSeededRef.current === body) return
     editor.commands.setContent(body)
+    lastSeededRef.current = body
   }, [body, editor])
 
   const atCap =
