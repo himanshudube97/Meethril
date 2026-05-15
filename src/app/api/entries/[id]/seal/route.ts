@@ -55,6 +55,10 @@ export async function POST(
     const unlockDate = body.unlockDate ? new Date(body.unlockDate) : existing.unlockDate
     const recipientEmail = body.recipientEmail ?? existing.recipientEmail ?? null
 
+    if (unlockDate && isNaN(unlockDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid unlock date.' }, { status: 400 })
+    }
+
     if (!unlockDate) {
       return NextResponse.json(
         { error: 'Choose when this letter should arrive before sealing' },
