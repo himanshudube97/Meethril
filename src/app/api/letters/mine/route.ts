@@ -1,63 +1,76 @@
 import { NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { getCurrentUser } from '@/lib/auth'
 import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
   try {
     const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const letters = await prisma.journalEntry.findMany({
+    const letters = await listLettersForRead({
+      userId: user.id,
       where: {
-        userId: user.id,
         entryType: 'letter',
         isReceivedLetter: false,
       },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        unlockDate: true,
-        isSealed: true,
-        letterLocation: true,
-        recipientEmail: true,
-        recipientName: true,
-        isViewed: true,
-        song: true,
-        encryptionType: true,
-        e2eeIVs: true,
-        photos: {
-          select: { url: true, position: true, spread: true, rotation: true }
-        },
-        doodles: {
-          select: { strokes: true, positionInEntry: true, spread: true }
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
-    // For E2EE letters, return ciphertext + IVs untouched so the client can
-    // decrypt with its master key. For server-encrypted, decrypt server-side.
+    if (letters.length === 0) {
+      return NextResponse.json({ letters: [] })
+    }
+
+    const journalIds = letters.map((l) => l.id)
+    const [photoRows, doodleRows, songRows] = await Promise.all([
+      prisma.entryPhoto.findMany({
+        where: { entryId: { in: journalIds } },
+        select: { entryId: true, url: true, position: true, spread: true, rotation: true },
+      }),
+      prisma.doodle.findMany({
+        where: { journalEntryId: { in: journalIds } },
+        select: { journalEntryId: true, strokes: true, positionInEntry: true, spread: true },
+      }),
+      prisma.journalEntry.findMany({
+        where: { id: { in: journalIds } },
+        select: { id: true, song: true },
+      }),
+    ])
+
+    const photosByEntry = new Map<string, Array<{ url: string | null; position: number; spread: number; rotation: number }>>()
+    for (const p of photoRows) {
+      const list = photosByEntry.get(p.entryId) ?? []
+      list.push({ url: p.url, position: p.position, spread: p.spread, rotation: p.rotation })
+      photosByEntry.set(p.entryId, list)
+    }
+    const doodlesByEntry = new Map<string, Array<{ strokes: unknown; positionInEntry: number; spread: number }>>()
+    for (const d of doodleRows) {
+      const list = doodlesByEntry.get(d.journalEntryId) ?? []
+      list.push({ strokes: d.strokes, positionInEntry: d.positionInEntry, spread: d.spread })
+      doodlesByEntry.set(d.journalEntryId, list)
+    }
+    const songByEntry = new Map(songRows.map((s) => [s.id, s.song]))
+
     const now = new Date()
-    const lettersWithStatus = letters.map(letter => {
+    const lettersWithStatus = letters.map((letter) => {
       const isE2EE = letter.encryptionType === 'e2ee'
       return {
-        ...letter,
+        id: letter.id,
         text: isE2EE ? letter.text : safeDecrypt(letter.text),
-        letterLocation: isE2EE ? letter.letterLocation : safeDecrypt(letter.letterLocation),
-        recipientName: isE2EE ? letter.recipientName : safeDecrypt(letter.recipientName),
         createdAt: letter.createdAt.toISOString(),
         unlockDate: letter.unlockDate?.toISOString() || null,
-        hasArrived: letter.unlockDate && new Date(letter.unlockDate) <= now && !letter.recipientEmail,
-        song: letter.song,
-        photos: letter.photos || [],
-        doodles: letter.doodles || [],
+        isSealed: letter.isSealed,
+        letterLocation: isE2EE ? letter.letterLocation : safeDecrypt(letter.letterLocation),
+        recipientEmail: letter.recipientEmail,
+        recipientName: isE2EE ? letter.recipientName : safeDecrypt(letter.recipientName),
+        isViewed: letter.isViewed,
+        song: songByEntry.get(letter.id) ?? null,
+        encryptionType: letter.encryptionType,
+        e2eeIVs: letter.e2eeIVs,
+        photos: photosByEntry.get(letter.id) ?? [],
+        doodles: doodlesByEntry.get(letter.id) ?? [],
+        hasArrived: letter.unlockDate && letter.unlockDate <= now && !letter.recipientEmail,
       }
     })
 
