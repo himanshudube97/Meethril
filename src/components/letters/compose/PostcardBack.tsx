@@ -346,6 +346,7 @@ export function PostcardBack({
                     position="top-right"
                     photo={photo1}
                     onPhotoChange={(url) => setPhoto1(url)}
+                    compact
                   />
                 </div>
                 <div
@@ -362,6 +363,7 @@ export function PostcardBack({
                     position="bottom-left"
                     photo={photo2}
                     onPhotoChange={(url) => setPhoto2(url)}
+                    compact
                   />
                 </div>
               </div>

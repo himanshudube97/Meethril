@@ -9,6 +9,10 @@ interface CollagePhotoProps {
   position: 'top-right' | 'bottom-left'
   photo: string | null
   onPhotoChange: (dataUrl: string | null) => void
+  /** Compact / letter-slot mode: renders in normal flow instead of using
+   *  the large absolute offsets tuned for the journal desk layout.
+   *  Existing callers that omit this prop are unaffected. */
+  compact?: boolean
 }
 
 const MAX_WIDTH = 1200
@@ -70,7 +74,7 @@ async function processImage(file: File): Promise<string> {
   })
 }
 
-export default function CollagePhoto({ position, photo, onPhotoChange }: CollagePhotoProps) {
+export default function CollagePhoto({ position, photo, onPhotoChange, compact = false }: CollagePhotoProps) {
   const { theme } = useThemeStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -78,9 +82,15 @@ export default function CollagePhoto({ position, photo, onPhotoChange }: Collage
 
   const rotation = position === 'top-right' ? 7 : -7
 
-  const positionStyle: React.CSSProperties = position === 'top-right'
-    ? { top: -30, right: -110, zIndex: 10, position: 'absolute' }
-    : { bottom: -30, left: -110, zIndex: 10, position: 'absolute' }
+  // Journal desk layout: large absolute offsets so the polaroid overlaps the
+  // page edge for a scattered effect.
+  // Compact / letter-slot mode: in-flow positioning so the component fills its
+  // parent container without overflowing it.
+  const positionStyle: React.CSSProperties = compact
+    ? { position: 'relative', width: '100%', height: '100%', zIndex: 10 }
+    : position === 'top-right'
+      ? { top: -30, right: -110, zIndex: 10, position: 'absolute' }
+      : { bottom: -30, left: -110, zIndex: 10, position: 'absolute' }
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -103,7 +113,7 @@ export default function CollagePhoto({ position, photo, onPhotoChange }: Collage
       <motion.div
         style={positionStyle}
         initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
-        animate={{ opacity: 1, scale: 1, rotate: rotation }}
+        animate={{ opacity: 1, scale: 1, rotate: compact ? 0 : rotation }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       >
         <div
@@ -112,14 +122,16 @@ export default function CollagePhoto({ position, photo, onPhotoChange }: Collage
             background: theme.glass.bg,
             backdropFilter: `blur(12px)`,
             border: `1px solid ${theme.glass.border}`,
-            padding: '6px 6px 20px 6px',
-            width: 120,
+            padding: compact ? '4px 4px 14px 4px' : '6px 6px 20px 6px',
+            width: compact ? '100%' : 120,
+            height: compact ? '100%' : undefined,
+            boxSizing: compact ? 'border-box' : 'content-box',
             boxShadow: '0 6px 20px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.15)',
           }}
           onClick={() => onPhotoChange(null)}
           title="Remove photo"
         >
-          <div className="w-full overflow-hidden rounded-sm" style={{ aspectRatio: '4/5' }}>
+          <div className="w-full overflow-hidden rounded-sm" style={{ height: compact ? 'calc(100% - 14px)' : undefined, aspectRatio: compact ? undefined : '4/5' }}>
             <img src={photo} alt="Collage photo" className="w-full h-full object-cover" />
           </div>
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-sm">
@@ -146,15 +158,17 @@ export default function CollagePhoto({ position, photo, onPhotoChange }: Collage
       />
 
       <motion.div
-        animate={{ rotate: rotation }}
+        animate={{ rotate: compact ? 0 : rotation }}
         className="flex flex-col items-center justify-center"
         style={{
-          width: 100,
-          aspectRatio: '4/5',
+          width: compact ? '100%' : 100,
+          height: compact ? '100%' : undefined,
+          aspectRatio: compact ? undefined : '4/5',
           border: `2px dashed ${theme.accent.warm}60`,
           borderRadius: '4px',
           background: `${theme.glass.bg}`,
           padding: '6px 6px 18px 6px',
+          boxSizing: compact ? 'border-box' : 'content-box',
         }}
       >
         {isProcessing ? (
