@@ -144,7 +144,7 @@ export default function ComposeView() {
       recipientEmail: null,
       recipientName: isSelf ? 'future me' : recipient.name,
     })
-  }, [bodyFront, bodyBack, recipient, phase, loading, autosave])
+  }, [bodyFront, bodyBack, recipient, phase, loading, autosave.trigger])
 
   if (loading) {
     return (
