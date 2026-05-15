@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 
@@ -82,12 +82,21 @@ export function SealModal({
     if (recipient === 'self') {
       if (selfPill !== 'custom') return dateForSelf(selfPill)
       if (!selfCustom) return null
-      return new Date(selfCustom)
+      return new Date(selfCustom + 'T12:00:00')
     }
     if (friendPill !== 'custom') return dateForFriend(friendPill)
     if (!friendCustom) return null
-    return new Date(friendCustom)
+    return new Date(friendCustom + 'T12:00:00')
   }
+
+  useEffect(() => {
+    if (phase !== 'form') return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase, onClose])
 
   async function handleConfirm() {
     setError(null)
@@ -133,9 +142,12 @@ export function SealModal({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
         style={{ backgroundColor: 'rgba(0,0,0,0.30)' }}
-        onClick={onClose}
+        onClick={phase === 'form' ? onClose : undefined}
       >
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label={recipient === 'self' ? 'Seal letter to self' : 'Seal letter to friend'}
           initial={{ y: 60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 60, opacity: 0 }}
@@ -261,7 +273,7 @@ export function SealModal({
               <div className="mt-4 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={phase === 'form' && !busy ? onClose : undefined}
                   className="text-sm"
                   style={{ color: theme.text.primary, opacity: 0.7 }}
                 >
