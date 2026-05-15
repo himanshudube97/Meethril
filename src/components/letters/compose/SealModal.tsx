@@ -74,7 +74,11 @@ export function SealModal({
 
   const maxFriendDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   const maxFriendIso = maxFriendDate.toISOString().split('T')[0]
-  const minIso = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  // Both self and friend letters enforce a 1-week minimum — friend letters
+  // additionally have a 30-day ceiling enforced separately. The seal API
+  // accepts whatever the client sends, so this min= attribute is the only
+  // client-side floor for custom dates.
+  const minIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split('T')[0]
 
