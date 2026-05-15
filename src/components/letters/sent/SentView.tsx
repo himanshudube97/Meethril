@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import JarSentView from './JarSentView'
+import DraftsSection from './DraftsSection'
 import type { SentStamp } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
 import type { JournalEntry } from '@/store/journal'
@@ -26,5 +27,5 @@ export default function SentView() {
     return () => { cancelled = true }
   }, [decryptEntriesFromServer, isE2EEReady])
 
-  return <JarSentView stamps={stamps} />
+  return <JarSentView stamps={stamps} topSlot={<DraftsSection />} />
 }

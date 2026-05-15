@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import Stamp from './Stamp'
 import ReceiptModal from './ReceiptModal'
 import type { SentStamp } from '../letterTypes'
@@ -26,6 +27,8 @@ interface JarSentViewProps {
   /** First valid (year, month) — defaults to (2026, 0) i.e. Jan 2026 (Hearth launch). */
   launchYear?: number
   launchMonth?: number
+  /** Rendered at the very top of the section, inside the nav-avoiding padding. */
+  topSlot?: ReactNode
 }
 
 function todayYM() {
@@ -37,6 +40,7 @@ export default function JarSentView({
   stamps,
   launchYear = 2026,
   launchMonth = 0,
+  topSlot,
 }: JarSentViewProps) {
   const [open, setOpen] = useState<SentStamp | null>(null)
   const [opened, setOpened] = useState(false)
@@ -137,6 +141,8 @@ export default function JarSentView({
         flexDirection: 'column',
       }}
     >
+      {topSlot}
+
       <header style={{ textAlign: 'center', marginBottom: 22 }}>
         <h2
           style={{
