@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RecipientPicker } from './RecipientPicker'
@@ -10,8 +10,9 @@ import { SealModal } from './SealModal'
 import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
 import { useE2EE } from '@/hooks/useE2EE'
 import { useProfileStore } from '@/store/profile'
+import type { Photo } from '@/components/desk/PhotoBlock'
 import type { RecipientChoice } from '../letterTypes'
-import type { JournalEntry } from '@/store/journal'
+import type { JournalEntry, StrokeData } from '@/store/journal'
 
 type Phase = 'picker' | 'front' | 'back'
 
@@ -60,6 +61,12 @@ export default function ComposeView() {
   const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
   const [bodyFront, setBodyFront] = useState('')
   const [bodyBack, setBodyBack] = useState('')
+  // Photo refs + doodle strokes are owned here so PhotoBlock's encrypted
+  // {url | encryptedRef + encryptedRefIV} survive autosave and draft resume.
+  // Previously these lived inside PostcardBack as local data: URLs and
+  // were silently lost on refresh.
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
   const [createdAt, setCreatedAt] = useState<Date>(() => new Date())
   const [showSeal, setShowSeal] = useState(false)
   const [loading, setLoading] = useState(Boolean(draftId))
@@ -112,6 +119,27 @@ export default function ComposeView() {
         const { front, back } = splitBody(decrypted.text ?? '')
         setBodyFront(front)
         setBodyBack(back)
+
+        // Hydrate photo refs from the persisted entry. The server-side shape
+        // uses `position: number` and includes `spread`; PhotoBlock's Photo
+        // type uses `position: 1 | 2` and omits spread. Normalise here so the
+        // round-trip through autosave (which re-adds spread:1) is stable.
+        const hydratedPhotos: Photo[] = (decrypted.photos ?? [])
+          .filter((p) => p.position === 1 || p.position === 2)
+          .map((p) => ({
+            id: p.id,
+            url: p.url,
+            encryptedRef: p.encryptedRef,
+            encryptedRefIV: p.encryptedRefIV,
+            rotation: p.rotation,
+            position: p.position as 1 | 2,
+          }))
+        setPhotos(hydratedPhotos)
+
+        // Hydrate doodle strokes from the persisted entry (spread 1 only).
+        const hydratedDoodle = decrypted.doodles?.[0]?.strokes ?? []
+        setDoodleStrokes(hydratedDoodle)
+
         setLoading(false)
       } catch (err) {
         console.error('Failed to resume letter draft:', err)
@@ -120,9 +148,32 @@ export default function ComposeView() {
     })()
   }, [draftId, router, decryptEntryFromServer, isE2EEEnabled, isE2EEInitialized, isE2EEReady])
 
+  // ── Photo + doodle handlers — bubble up to autosave via state setters.
+  const handlePhotoAdd = useCallback(
+    (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => {
+      setPhotos((prev) => {
+        const filtered = prev.filter((p) => p.position !== position)
+        const next: Photo = {
+          url: photo.url,
+          encryptedRef: photo.encryptedRef,
+          encryptedRefIV: photo.encryptedRefIV,
+          rotation: position === 1 ? -7 : 7,
+          position,
+        }
+        return [...filtered, next]
+      })
+    },
+    [],
+  )
+
+  const handlePhotoRemove = useCallback((position: 1 | 2) => {
+    setPhotos((prev) => prev.filter((p) => p.position !== position))
+  }, [])
+
   // Autosave wiring. The hook is imperative (`trigger(draft)` + debounce),
-  // so we re-trigger whenever the two body slices or the recipient mapping
-  // change. The hook handles the POST→PUT lifecycle and E2EE encryption.
+  // so we re-trigger whenever the two body slices, recipient mapping,
+  // photos, or doodle strokes change. The hook handles the POST→PUT
+  // lifecycle and E2EE encryption.
   useEffect(() => {
     if (!recipient) return
     if (phase === 'picker') return
@@ -136,15 +187,27 @@ export default function ComposeView() {
     autosave.trigger({
       text: joined,
       song: null,
-      // photos and doodles intentionally omitted — the server interprets a
-      // present (even empty) array as "replace this set", which would wipe any
-      // photos the user uploaded via PostcardBack's CollagePhoto components.
-      // Omitting the keys tells the server to leave the existing rows alone.
+      // Photos + doodles are now owned by ComposeView (lifted out of
+      // PostcardBack) so they survive autosave + draft resume. The server's
+      // destructive replace block only runs when these keys are present,
+      // which is exactly what we want now that ComposeView is the source
+      // of truth.
+      photos: photos.map((p) => ({
+        url: p.url,
+        encryptedRef: p.encryptedRef,
+        encryptedRefIV: p.encryptedRefIV,
+        position: p.position,
+        rotation: p.rotation,
+        spread: 1,
+      })),
+      doodles: doodleStrokes.length > 0
+        ? [{ strokes: doodleStrokes, spread: 1 }]
+        : [],
       entryType: isSelf ? 'letter' : 'unsent_letter',
       recipientEmail: null,
       recipientName: isSelf ? 'future me' : recipient.name,
     })
-  }, [bodyFront, bodyBack, recipient, phase, loading, autosave.trigger])
+  }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, autosave.trigger])
 
   if (loading) {
     return (
@@ -265,6 +328,11 @@ export default function ComposeView() {
             entryId={autosave.entryId}
             body={bodyBack}
             onBodyChange={setBodyBack}
+            photos={photos}
+            onPhotoAdd={handlePhotoAdd}
+            onPhotoRemove={handlePhotoRemove}
+            doodleStrokes={doodleStrokes}
+            onDoodleStrokesChange={setDoodleStrokes}
             onTurnBack={() => setPhase('front')}
             onSeal={() => setShowSeal(true)}
             canSeal={canSeal}

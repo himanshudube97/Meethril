@@ -6,9 +6,9 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import { useThemeStore } from '@/store/theme'
-import CollagePhoto from '@/components/CollagePhoto'
 import SongEmbed from '@/components/SongEmbed'
-import DoodleCanvas from '@/components/DoodleCanvas'
+import PhotoBlock, { type Photo } from '@/components/desk/PhotoBlock'
+import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import type { StrokeData } from '@/store/journal'
 
 // ~9 lines × ~36 chars per line (matches PostcardFront)
@@ -26,10 +26,21 @@ const PAPER_BG = `
 const PAPER_INK = '#3d342a'
 const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
 
+// Doodle canvas colours — tuned to the paper aesthetic instead of theme-driven
+// so the doodle area reads as "drawn on the postcard".
+const DOODLE_BG = 'rgba(120, 90, 50, 0.05)'
+const DOODLE_BORDER = 'rgba(120, 90, 50, 0.22)'
+const DOODLE_COLORS = ['#3d342a', '#b34a3a', '#5a7a5a', '#7a5a3a']
+
 export function PostcardBack({
   entryId = null,
   body = '',
   onBodyChange,
+  photos = [],
+  onPhotoAdd,
+  onPhotoRemove,
+  doodleStrokes = [],
+  onDoodleStrokesChange,
   onTurnBack,
   onSeal,
   canSeal,
@@ -37,18 +48,22 @@ export function PostcardBack({
   entryId?: string | null
   body?: string
   onBodyChange?: (next: string) => void
+  photos?: Photo[]
+  onPhotoAdd?: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
+  onPhotoRemove?: (position: 1 | 2) => void
+  doodleStrokes?: StrokeData[]
+  onDoodleStrokesChange?: (strokes: StrokeData[]) => void
   onTurnBack?: () => void
   onSeal?: () => void
   canSeal?: boolean
 }) {
   const theme = useThemeStore((s) => s.theme)
 
-  // ── Local media state (owned here; legacy props are ignored) ─────────────
-  const [photo1, setPhoto1] = useState<string | null>(null)
-  const [photo2, setPhoto2] = useState<string | null>(null)
+  // ── Local media state — song still lives here (out of scope for the
+  // photo/doodle storage fix). Photos + doodle strokes are lifted to
+  // ComposeView so they round-trip through autosave + draft resume.
   const [songInput, setSongInput] = useState('')
   const [songConfirmed, setSongConfirmed] = useState<string | null>(null)
-  const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
 
   // ── TipTap editor ─────────────────────────────────────────────────────────
   const editor = useEditor({
@@ -285,45 +300,17 @@ export function PostcardBack({
                 photos
               </div>
               {/*
-               * CollagePhoto uses absolute positioning anchored to its parent.
-               * We give each slot a relative container to contain the polaroid.
+               * PhotoBlock is the journal's polaroid orchestrator. It owns the
+               * full upload pipeline (compress → encrypt-if-E2EE → POST
+               * /api/photos → emit {url | encryptedRef + encryptedRefIV}).
+               * State lives in ComposeView so refs survive autosave + draft
+               * resume — see CLAUDE.md's "Photo / Image Storage Flow".
                */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    aspectRatio: '4/5',
-                    overflow: 'hidden',
-                    borderRadius: 6,
-                    border: photo1 ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
-                  }}
-                >
-                  <CollagePhoto
-                    position="top-right"
-                    photo={photo1}
-                    onPhotoChange={(url) => setPhoto1(url)}
-                    compact
-                  />
-                </div>
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    aspectRatio: '4/5',
-                    overflow: 'hidden',
-                    borderRadius: 6,
-                    border: photo2 ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
-                  }}
-                >
-                  <CollagePhoto
-                    position="bottom-left"
-                    photo={photo2}
-                    onPhotoChange={(url) => setPhoto2(url)}
-                    compact
-                  />
-                </div>
-              </div>
+              <PhotoBlock
+                photos={photos}
+                onPhotoAdd={onPhotoAdd}
+                onPhotoRemove={onPhotoRemove}
+              />
             </div>
 
             {/* ── Doodle (bottom) ───────────────────────────────────────── */}
@@ -343,16 +330,21 @@ export function PostcardBack({
                 doodle
               </div>
               {/*
-               * DoodleCanvas with inline=true fills its parent (position: relative,
-               * width/height: 100%). We give it a flex:1 container to consume the
-               * remaining column space.
+               * CompactDoodleCanvas mirrors the journal new-entry doodle:
+               * fires onStrokesChange on every stroke (no manual "save"),
+               * which is what we want for autosave. The previous DoodleCanvas
+               * inline mode only persisted on explicit save click — silently
+               * dropping strokes on navigation.
                */}
-              <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                <DoodleCanvas
-                  inline
-                  initialStrokes={doodleStrokes}
-                  onSave={(strokes) => setDoodleStrokes(strokes)}
-                  onClose={() => {}}
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <CompactDoodleCanvas
+                  strokes={doodleStrokes}
+                  onStrokesChange={(s) => onDoodleStrokesChange?.(s)}
+                  doodleColors={DOODLE_COLORS}
+                  canvasBackground={DOODLE_BG}
+                  canvasBorder={DOODLE_BORDER}
+                  textColor={PAPER_INK}
+                  mutedColor="rgba(120, 90, 50, 0.5)"
                 />
               </div>
             </div>
