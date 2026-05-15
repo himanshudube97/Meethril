@@ -46,7 +46,7 @@ export async function GET() {
       l.recipientEmail && l.encryptionType === 'server'
         ? safeDecrypt(l.recipientEmail)
         : l.recipientEmail,
-    text: l.text,
+    text: l.encryptionType === 'server' ? safeDecrypt(l.text) : l.text,
     encryptionType: l.encryptionType,
     e2eeIV: l.e2eeIV,
     e2eeIVs: l.e2eeIVs,
