@@ -43,16 +43,57 @@ export async function POST(
     if (existing.isSealed) {
       return NextResponse.json({ error: 'Already sealed' }, { status: 400 })
     }
-    if (!existing.unlockDate) {
+    // Parse the request body to get the unlock date and optional recipient email
+    // that the client is confirming at seal time.
+    let body: { unlockDate?: string; recipientEmail?: string } = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Body is optional — fall through and use the DB value
+    }
+
+    const unlockDate = body.unlockDate ? new Date(body.unlockDate) : existing.unlockDate
+    const recipientEmail = body.recipientEmail ?? existing.recipientEmail ?? null
+
+    if (!unlockDate) {
       return NextResponse.json(
         { error: 'Choose when this letter should arrive before sealing' },
         { status: 400 },
       )
     }
 
+    // Friend letters: must have a well-formed email AND be within 30 days.
+    if (existing.entryType === 'unsent_letter') {
+      if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        return NextResponse.json(
+          { error: 'A valid recipient email is required for friend letters.' },
+          { status: 400 },
+        )
+      }
+      const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      if (unlockDate > maxDate) {
+        return NextResponse.json(
+          { error: 'Friend letters must arrive within 30 days.' },
+          { status: 400 },
+        )
+      }
+    }
+
+    // Self letters: no recipient email permitted.
+    if (existing.entryType === 'letter' && recipientEmail) {
+      return NextResponse.json(
+        { error: 'Self letters cannot have a recipient email.' },
+        { status: 400 },
+      )
+    }
+
     await prisma.journalEntry.update({
       where: { id },
-      data: { isSealed: true },
+      data: {
+        isSealed: true,
+        unlockDate,
+        ...(existing.entryType === 'unsent_letter' ? { recipientEmail } : {}),
+      },
     })
 
     return NextResponse.json({ success: true })
