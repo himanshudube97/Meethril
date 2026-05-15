@@ -1,115 +1,149 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
+import { useThemeStore } from '@/store/theme'
 import CollagePhoto from '@/components/CollagePhoto'
 import SongEmbed from '@/components/SongEmbed'
 import DoodleCanvas from '@/components/DoodleCanvas'
-import SomedayDatePicker from './SomedayDatePicker'
-import { format } from 'date-fns'
 import type { StrokeData } from '@/store/journal'
 import type { LetterRecipient, UnlockChoice } from '../letterTypes'
 
-const CHAR_LIMIT = 800
+// ~9 lines × ~36 chars per line (matches PostcardFront)
+export const BACK_CHAR_LIMIT = 324
+const BACK_LINES = 9
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+// Intrinsic postcard paper colours — constant by design (not theme-driven)
+const PAPER_BG = `
+  repeating-linear-gradient(
+    transparent, transparent 36px,
+    rgba(120, 90, 50, 0.09) 36px, rgba(120, 90, 50, 0.09) 37px
+  ),
+  linear-gradient(160deg, #fff6f2 0%, #fbe6dd 100%)
+`
+const PAPER_INK = '#3d342a'
+const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
 
-interface Props {
-  recipient: LetterRecipient
-  closeName: string
-  body: string
-  onBodyChange: (html: string) => void
-  unlock: UnlockChoice
-  onUnlockChange: (u: UnlockChoice) => void
-  photos: [string | null, string | null]
-  onPhotosChange: (photos: [string | null, string | null]) => void
-  song: string | null
-  onSongChange: (s: string | null) => void
-  doodleStrokes: StrokeData[]
-  onDoodleChange: (strokes: StrokeData[]) => void
-  onBack: () => void
-  onSeal: () => void
-  canSeal: boolean
-  sealing: boolean
-}
+export function PostcardBack({
+  // New API (Task 6)
+  entryId = null,
+  body = '',
+  onBodyChange,
+  onTurnBack,
+  onSeal,
+  canSeal,
+  // Legacy props from old API — kept for TS compat until Task 7 updates caller
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  recipient: _recipient,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  closeName: _closeName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  unlock: _unlock,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onUnlockChange: _onUnlockChange,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  sealing: _sealing,
+  // Legacy media props — local state now owns these; legacy values ignored
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  photos: _photosLegacy,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onPhotosChange: _onPhotosChangeLegacy,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  song: _songLegacy,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onSongChange: _onSongChangeLegacy,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  doodleStrokes: _doodleStrokesLegacy,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onDoodleChange: _onDoodleChangeLegacy,
+  // onBack is the old prop name; onTurnBack is the new one
+  onBack,
+}: {
+  // New API
+  entryId?: string | null
+  body?: string
+  onBodyChange?: (next: string) => void
+  onTurnBack?: () => void
+  onSeal?: () => void
+  canSeal?: boolean
+  // Legacy props — kept for TS compat until Task 7 updates the caller
+  recipient?: LetterRecipient
+  closeName?: string
+  unlock?: UnlockChoice
+  onUnlockChange?: (u: UnlockChoice) => void
+  sealing?: boolean
+  photos?: [string | null, string | null]
+  onPhotosChange?: (photos: [string | null, string | null]) => void
+  song?: string | null
+  onSongChange?: (s: string | null) => void
+  doodleStrokes?: StrokeData[]
+  onDoodleChange?: (strokes: StrokeData[]) => void
+  onBack?: () => void
+}) {
+  const theme = useThemeStore((s) => s.theme)
 
-const UNLOCK_PILLS: { label: string; kind: string }[] = [
-  { label: '1 week',  kind: '1_week' },
-  { label: '14 days', kind: '14_days' },
-  { label: '1 month', kind: '1_month' },
-  { label: 'someday', kind: 'someday' },
-]
+  // ── Local media state (owned here; legacy props are ignored) ─────────────
+  const [photo1, setPhoto1] = useState<string | null>(null)
+  const [photo2, setPhoto2] = useState<string | null>(null)
+  const [songInput, setSongInput] = useState('')
+  const [songConfirmed, setSongConfirmed] = useState<string | null>(null)
+  const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
 
-function unlockPillLabel(unlock: UnlockChoice): string {
-  if (unlock.kind === 'someday' && unlock.date) {
-    return format(unlock.date, 'MMM d, yyyy')
-  }
-  return 'someday'
-}
-
-export default function PostcardBack(p: Props) {
-  const [songInput, setSongInput] = useState(p.song ?? '')
-  const [songConfirmed, setSongConfirmed] = useState<string | null>(p.song)
-  const [showDatePicker, setShowDatePicker] = useState(p.unlock.kind === 'someday')
-  const somedayPillRef = useRef<HTMLButtonElement>(null)
-
+  // ── TipTap editor ─────────────────────────────────────────────────────────
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: false }),
-      Placeholder.configure({ placeholder: 'i wanted to tell you something…' }),
-      CharacterCount.configure({ limit: CHAR_LIMIT }),
+      Placeholder.configure({ placeholder: 'keep writing…' }),
+      CharacterCount.configure({ limit: BACK_CHAR_LIMIT }),
     ],
-    content: p.body,
-    onUpdate: ({ editor }) => p.onBodyChange(editor.getHTML()),
+    content: body,
+    onUpdate({ editor }) {
+      onBodyChange?.(editor.getText())
+    },
     editorProps: {
       attributes: {
-        class: 'letter-body-editor focus:outline-none',
+        class: 'letter-back-editor focus:outline-none',
         style: [
           'font-family: Caveat, cursive',
           'font-size: 19px',
           'line-height: 36px',
-          'color: var(--text-primary, #3a2025)',
+          'color: #3d342a',
           'overflow: hidden',
-          'min-height: 0',
           'height: 100%',
-          'max-height: 100%',
         ].join(';'),
       },
     },
   })
 
-  const charCount = editor?.storage?.characterCount?.characters?.() ?? 0
+  // Body-sync: resume async draft without fighting user typing
+  useEffect(() => {
+    if (!editor) return
+    if (editor.isFocused) return
+    if (editor.getText() === body) return
+    editor.commands.setContent(body)
+  }, [body, editor])
 
+  const atCap = (editor?.storage.characterCount.characters() ?? 0) >= BACK_CHAR_LIMIT
+
+  // ── Song handlers ─────────────────────────────────────────────────────────
   const handleSongSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = songInput.trim()
-    if (trimmed) {
-      setSongConfirmed(trimmed)
-      p.onSongChange(trimmed)
-    }
+    if (trimmed) setSongConfirmed(trimmed)
   }
 
   const handleSongClear = () => {
     setSongInput('')
     setSongConfirmed(null)
-    p.onSongChange(null)
   }
 
-  function handlePillClick(kind: string) {
-    if (kind === 'someday') {
-      setShowDatePicker(true)
-      if (p.unlock.kind !== 'someday') {
-        p.onUnlockChange({ kind: 'someday', date: null })
-      }
-    } else {
-      setShowDatePicker(false)
-      p.onUnlockChange({ kind: kind as '1_week' | '14_days' | '1_month' })
-    }
-  }
+  // Resolve the effective callbacks (new API preferred; fall back to legacy)
+  const handleTurnBack = onTurnBack ?? onBack
+  const sealEnabled = canSeal ?? true
 
   return (
     <>
@@ -117,7 +151,6 @@ export default function PostcardBack(p: Props) {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          padding: '22px 28px 20px',
           height: '100%',
           boxSizing: 'border-box',
           backfaceVisibility: 'hidden',
@@ -125,141 +158,80 @@ export default function PostcardBack(p: Props) {
           position: 'absolute',
           inset: 0,
           transform: 'rotateY(180deg)',
-          background: `
-            repeating-linear-gradient(
-              transparent, transparent 36px,
-              rgba(120, 90, 50, 0.09) 36px, rgba(120, 90, 50, 0.09) 37px
-            ),
-            linear-gradient(160deg, var(--paper-1, #fff6f2) 0%, var(--paper-2, #fbe6dd) 100%)
-          `,
+          background: PAPER_BG,
           borderRadius: 8,
           border: '1px solid rgba(80, 55, 40, 0.16)',
-          boxShadow: '0 20px 56px rgba(0,0,0,0.40), 0 4px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.55)',
+          boxShadow:
+            '0 20px 56px rgba(0,0,0,0.40), 0 4px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.55)',
           overflow: 'hidden',
+          color: PAPER_INK,
         }}
       >
-        {/* Two-column content area */}
+        {/* ── Two-column content area ─────────────────────────────────────── */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 24,
+            gridTemplateColumns: '60% 40%',
             flex: 1,
             minHeight: 0,
             overflow: 'hidden',
           }}
         >
-          {/* LEFT: writing column — no salutation, just lined editor */}
+          {/* LEFT 60% — writing continuation */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
+              padding: '22px 20px 0 28px',
               overflow: 'hidden',
-              borderRight: '1px solid rgba(120, 90, 50, 0.10)',
-              paddingRight: 20,
+              borderRight: `1px solid ${LINE_COLOR}`,
             }}
           >
-            {/* Editor on lined paper — overflow hidden, no scroll */}
+            {/* Lined writing area */}
             <div
               onClick={() => editor?.commands.focus()}
               style={{
-                flex: 1,
-                minHeight: 0,
+                cursor: 'text',
+                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0px, transparent 35px, ${LINE_COLOR} 35px, ${LINE_COLOR} 36px)`,
+                height: `${BACK_LINES * 36}px`,
+                flexShrink: 0,
                 overflow: 'hidden',
                 position: 'relative',
-                cursor: 'text',
               }}
             >
               <EditorContent
                 editor={editor}
-                style={{
-                  height: '100%',
-                  overflow: 'hidden',
-                }}
+                style={{ height: '100%', overflow: 'hidden' }}
               />
             </div>
 
-            {/* Character counter */}
-            <div
-              style={{
-                flexShrink: 0,
-                textAlign: 'right',
-                fontFamily: 'Cormorant Garamond, Georgia, serif',
-                fontStyle: 'italic',
-                fontSize: 11,
-                color: charCount >= CHAR_LIMIT
-                  ? 'var(--accent-primary, #9a4555)'
-                  : 'rgba(120, 90, 50, 0.45)',
-                marginTop: 4,
-              }}
-            >
-              {charCount}/{CHAR_LIMIT}
-            </div>
+            {/* "your letter is full." whisper */}
+            {atCap && (
+              <p
+                style={{
+                  marginTop: 8,
+                  fontFamily: 'Cormorant Garamond, Georgia, serif',
+                  fontStyle: 'italic',
+                  fontSize: 12,
+                  color: 'rgba(120, 90, 50, 0.5)',
+                }}
+              >
+                your letter is full.
+              </p>
+            )}
           </div>
 
-          {/* RIGHT: attachments column — CollagePhoto + SongEmbed + inline DoodleCanvas */}
+          {/* RIGHT 40% — media stack: song top, 2 photos middle, doodle bottom */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
               gap: 10,
+              padding: '16px 16px 8px 14px',
               overflow: 'hidden',
             }}
           >
-            {/* Photo slots — using CollagePhoto directly, 2 side by side */}
-            <div style={{ flexShrink: 0 }}>
-              <div
-                style={{
-                  fontFamily: 'Cormorant Garamond, Georgia, serif',
-                  fontStyle: 'italic',
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  color: 'rgba(120, 90, 50, 0.5)',
-                  textTransform: 'lowercase',
-                  marginBottom: 6,
-                }}
-              >
-                photos
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {/* Wrap each CollagePhoto in a relative container so its absolute
-                    positioning is anchored within the slot rather than the page */}
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    aspectRatio: '4/5',
-                    overflow: 'hidden',
-                    borderRadius: 6,
-                    border: p.photos[0] ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
-                  }}
-                >
-                  <CollagePhoto
-                    position="top-right"
-                    photo={p.photos[0]}
-                    onPhotoChange={url => p.onPhotosChange([url, p.photos[1]])}
-                  />
-                </div>
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    aspectRatio: '4/5',
-                    overflow: 'hidden',
-                    borderRadius: 6,
-                    border: p.photos[1] ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
-                  }}
-                >
-                  <CollagePhoto
-                    position="bottom-left"
-                    photo={p.photos[1]}
-                    onPhotoChange={url => p.onPhotosChange([p.photos[0], url])}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Song — using SongEmbed with full controls (not compact) */}
+            {/* ── Song slot (top) ───────────────────────────────────────── */}
             <div style={{ flexShrink: 0 }}>
               <div
                 style={{
@@ -276,8 +248,10 @@ export default function PostcardBack(p: Props) {
               </div>
               {songConfirmed ? (
                 <div>
-                  {/* Full SongEmbed — not compact */}
-                  <SongEmbed url={songConfirmed} />
+                  {/* SongEmbed — reused verbatim, wrapped to cap height */}
+                  <div style={{ height: 64, overflow: 'hidden', borderRadius: 8 }}>
+                    <SongEmbed url={songConfirmed} compact />
+                  </div>
                   <button
                     onClick={handleSongClear}
                     style={{
@@ -301,30 +275,32 @@ export default function PostcardBack(p: Props) {
                     type="url"
                     placeholder="paste a song URL…"
                     value={songInput}
-                    onChange={e => setSongInput(e.target.value)}
+                    onChange={(e) => setSongInput(e.target.value)}
                     style={{
                       flex: 1,
                       background: 'rgba(120, 90, 50, 0.06)',
                       border: '1px solid rgba(120, 90, 50, 0.22)',
                       borderRadius: 6,
-                      padding: '6px 10px',
+                      padding: '5px 8px',
                       fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 12,
-                      color: 'var(--text-primary, #3a2025)',
+                      fontSize: 11,
+                      color: PAPER_INK,
                       outline: 'none',
+                      minWidth: 0,
                     }}
                   />
                   <button
                     type="submit"
                     style={{
-                      padding: '5px 10px',
+                      padding: '4px 8px',
                       borderRadius: 6,
-                      border: '1px solid var(--accent-primary, #9a4555)',
+                      border: `1px solid ${theme.accent.primary}`,
                       background: 'transparent',
-                      color: 'var(--accent-primary, #9a4555)',
+                      color: theme.accent.primary,
                       fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 12,
+                      fontSize: 11,
                       cursor: 'pointer',
+                      flexShrink: 0,
                     }}
                   >
                     add
@@ -333,7 +309,62 @@ export default function PostcardBack(p: Props) {
               )}
             </div>
 
-            {/* Doodle — inline DoodleCanvas, always visible on the card */}
+            {/* ── 2 photo slots (middle) ────────────────────────────────── */}
+            <div style={{ flexShrink: 0 }}>
+              <div
+                style={{
+                  fontFamily: 'Cormorant Garamond, Georgia, serif',
+                  fontStyle: 'italic',
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  color: 'rgba(120, 90, 50, 0.5)',
+                  textTransform: 'lowercase',
+                  marginBottom: 6,
+                }}
+              >
+                photos
+              </div>
+              {/*
+               * CollagePhoto uses absolute positioning anchored to its parent.
+               * We give each slot a relative container to contain the polaroid.
+               */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '4/5',
+                    overflow: 'hidden',
+                    borderRadius: 6,
+                    border: photo1 ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
+                  }}
+                >
+                  <CollagePhoto
+                    position="top-right"
+                    photo={photo1}
+                    onPhotoChange={(url) => setPhoto1(url)}
+                  />
+                </div>
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '4/5',
+                    overflow: 'hidden',
+                    borderRadius: 6,
+                    border: photo2 ? 'none' : '1.5px dashed rgba(120, 90, 50, 0.28)',
+                  }}
+                >
+                  <CollagePhoto
+                    position="bottom-left"
+                    photo={photo2}
+                    onPhotoChange={(url) => setPhoto2(url)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Doodle (bottom) ───────────────────────────────────────── */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <div
                 style={{
@@ -349,11 +380,16 @@ export default function PostcardBack(p: Props) {
               >
                 doodle
               </div>
+              {/*
+               * DoodleCanvas with inline=true fills its parent (position: relative,
+               * width/height: 100%). We give it a flex:1 container to consume the
+               * remaining column space.
+               */}
               <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <DoodleCanvas
                   inline
-                  initialStrokes={p.doodleStrokes}
-                  onSave={(strokes) => p.onDoodleChange(strokes)}
+                  initialStrokes={doodleStrokes}
+                  onSave={(strokes) => setDoodleStrokes(strokes)}
                   onClose={() => {}}
                 />
               </div>
@@ -361,154 +397,75 @@ export default function PostcardBack(p: Props) {
           </div>
         </div>
 
-        {/* Bottom row: opens when + pills */}
+        {/* ── FOOTER BAND ─────────────────────────────────────────────────── */}
         <div
           style={{
             flexShrink: 0,
-            borderTop: '1px solid rgba(120, 90, 50, 0.10)',
-            paddingTop: 12,
-            marginTop: 10,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontFamily: 'Cormorant Garamond, Georgia, serif',
-                fontStyle: 'italic',
-                fontSize: 11,
-                letterSpacing: 2,
-                color: 'rgba(120, 90, 50, 0.5)',
-                textTransform: 'lowercase',
-                flexShrink: 0,
-              }}
-            >
-              opens · when
-            </span>
-
-            {/* Pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', position: 'relative' }}>
-              {UNLOCK_PILLS.map(({ label, kind }) => {
-                const isActive = p.unlock.kind === kind
-                const displayLabel = (kind === 'someday' && isActive)
-                  ? unlockPillLabel(p.unlock)
-                  : label
-
-                return (
-                  <button
-                    key={kind}
-                    ref={kind === 'someday' ? somedayPillRef : undefined}
-                    onClick={() => handlePillClick(kind)}
-                    style={{
-                      padding: '5px 13px 6px',
-                      borderRadius: 999,
-                      border: '1.5px solid var(--accent-primary, #9a4555)',
-                      background: isActive ? 'var(--accent-primary, #9a4555)' : 'transparent',
-                      color: isActive ? '#fff' : 'var(--accent-primary, #9a4555)',
-                      fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 12,
-                      letterSpacing: 0.5,
-                      cursor: 'pointer',
-                      transition: 'background 0.2s, color 0.2s',
-                    }}
-                  >
-                    {displayLabel}
-                  </button>
-                )
-              })}
-
-              {/* Someday date picker popover */}
-              {showDatePicker && p.unlock.kind === 'someday' && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 'calc(100% + 8px)',
-                    right: 0,
-                    zIndex: 50,
-                  }}
-                >
-                  <SomedayDatePicker
-                    selectedDate={p.unlock.date}
-                    onSelect={(date) => {
-                      p.onUnlockChange({ kind: 'someday', date })
-                      setShowDatePicker(false)
-                    }}
-                    onClose={() => {
-                      setShowDatePicker(false)
-                      // If no date selected, revert to 1_week
-                      if (p.unlock.kind !== 'someday' || !p.unlock.date) {
-                        p.onUnlockChange({ kind: '1_week' })
-                      }
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Action row */}
-        <div
-          style={{
-            flexShrink: 0,
+            height: 56,
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            paddingTop: 12,
-            marginTop: 8,
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            borderTop: `1px solid ${LINE_COLOR}`,
           }}
         >
           <button
-            onClick={p.onBack}
+            type="button"
+            onClick={handleTurnBack}
             style={{
               padding: '7px 18px',
               borderRadius: 999,
               border: '1.5px solid rgba(120, 90, 50, 0.3)',
               background: 'transparent',
-              color: 'var(--text-secondary, #6a4048)',
+              color: PAPER_INK,
               fontFamily: 'Cormorant Garamond, Georgia, serif',
               fontSize: 13,
               letterSpacing: 0.4,
               cursor: 'pointer',
+              fontStyle: 'italic',
+              opacity: 0.8,
             }}
           >
-            ← back
+            ← turn back
           </button>
+
           <button
-            onClick={p.onSeal}
-            disabled={!p.canSeal}
+            type="button"
+            disabled={!sealEnabled}
+            onClick={onSeal}
             style={{
               padding: '7px 22px 8px',
               borderRadius: 999,
               border: 'none',
-              background: p.canSeal ? 'var(--accent-primary, #9a4555)' : 'rgba(120, 90, 50, 0.25)',
-              color: p.canSeal ? '#fff' : 'rgba(120, 90, 50, 0.45)',
+              background: sealEnabled ? theme.accent.primary : 'rgba(120, 90, 50, 0.25)',
+              color: sealEnabled ? '#fff' : 'rgba(120, 90, 50, 0.45)',
               fontFamily: 'Caveat, cursive',
               fontSize: 19,
-              cursor: p.canSeal ? 'pointer' : 'not-allowed',
-              boxShadow: p.canSeal ? '0 4px 14px rgba(0,0,0,0.18)' : 'none',
+              cursor: sealEnabled ? 'pointer' : 'not-allowed',
+              boxShadow: sealEnabled ? '0 4px 14px rgba(0,0,0,0.18)' : 'none',
               letterSpacing: 0.2,
               transition: 'background 0.2s, color 0.2s',
             }}
           >
-            {p.sealing ? 'sealing…' : 'fold & seal ✦'}
+            fold and seal →
           </button>
         </div>
       </div>
 
       <style jsx global>{`
-        .letter-body-editor .ProseMirror {
+        .letter-back-editor .ProseMirror {
           outline: none;
           height: 100%;
           overflow: hidden;
           font-family: Caveat, cursive;
           font-size: 19px;
           line-height: 36px;
-          color: var(--text-primary, #3a2025);
+          color: #3d342a;
         }
-        .letter-body-editor .ProseMirror p {
+        .letter-back-editor .ProseMirror p {
           margin: 0;
         }
-        .letter-body-editor .ProseMirror p.is-editor-empty:first-child::before {
+        .letter-back-editor .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           color: rgba(120, 90, 50, 0.38);
           pointer-events: none;
@@ -520,3 +477,6 @@ export default function PostcardBack(p: Props) {
     </>
   )
 }
+
+// Backward-compat default export — Task 7 will switch ComposeView to the named export.
+export default PostcardBack
