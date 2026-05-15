@@ -280,8 +280,8 @@ export function SealModal({
                   {busy
                     ? 'sealing...'
                     : recipient === 'self'
-                    ? 'seal it'
-                    : 'seal and send'}
+                    ? 'seal it.'
+                    : 'seal and send.'}
                 </button>
               </div>
             </>
