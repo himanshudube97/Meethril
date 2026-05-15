@@ -50,6 +50,7 @@ export function PostcardFront({
   const theme = useThemeStore((s) => s.theme)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: false }),
       Placeholder.configure({ placeholder: '' }),
