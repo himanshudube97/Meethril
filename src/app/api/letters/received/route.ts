@@ -1,60 +1,74 @@
 import { NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { getCurrentUser } from '@/lib/auth'
 import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
   try {
     const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const letters = await prisma.journalEntry.findMany({
+    const letters = await listLettersForRead({
+      userId: user.id,
       where: {
-        userId: user.id,
         entryType: 'letter',
         isReceivedLetter: true,
       },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        unlockDate: true,
-        isSealed: true,
-        letterLocation: true,
-        senderName: true,
-        originalSenderId: true,
-        isViewed: true,
-        isDelivered: true,
-        deliveredAt: true,
-        song: true,
-        photos: {
-          select: { url: true, position: true, spread: true, rotation: true }
-        },
-        doodles: {
-          select: { strokes: true, positionInEntry: true, spread: true }
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
-    // Determine if letters have arrived and decrypt sensitive fields
+    if (letters.length === 0) {
+      return NextResponse.json({ letters: [] })
+    }
+
+    const journalIds = letters.map((l) => l.id)
+    const [photoRows, doodleRows, songRows] = await Promise.all([
+      prisma.entryPhoto.findMany({
+        where: { entryId: { in: journalIds } },
+        select: { entryId: true, url: true, position: true, spread: true, rotation: true },
+      }),
+      prisma.doodle.findMany({
+        where: { journalEntryId: { in: journalIds } },
+        select: { journalEntryId: true, strokes: true, positionInEntry: true, spread: true },
+      }),
+      prisma.journalEntry.findMany({
+        where: { id: { in: journalIds } },
+        select: { id: true, song: true },
+      }),
+    ])
+
+    const photosByEntry = new Map<string, Array<{ url: string | null; position: number; spread: number; rotation: number }>>()
+    for (const p of photoRows) {
+      const list = photosByEntry.get(p.entryId) ?? []
+      list.push({ url: p.url, position: p.position, spread: p.spread, rotation: p.rotation })
+      photosByEntry.set(p.entryId, list)
+    }
+    const doodlesByEntry = new Map<string, Array<{ strokes: unknown; positionInEntry: number; spread: number }>>()
+    for (const d of doodleRows) {
+      const list = doodlesByEntry.get(d.journalEntryId) ?? []
+      list.push({ strokes: d.strokes, positionInEntry: d.positionInEntry, spread: d.spread })
+      doodlesByEntry.set(d.journalEntryId, list)
+    }
+    const songByEntry = new Map(songRows.map((s) => [s.id, s.song]))
+
     const now = new Date()
-    const lettersWithStatus = letters.map(letter => ({
-      ...letter,
-      // Decrypt sensitive fields
+    const lettersWithStatus = letters.map((letter) => ({
+      id: letter.id,
       text: safeDecrypt(letter.text),
-      letterLocation: safeDecrypt(letter.letterLocation),
-      senderName: safeDecrypt(letter.senderName),
-      // Format dates
       createdAt: letter.createdAt.toISOString(),
       unlockDate: letter.unlockDate?.toISOString() || null,
+      isSealed: letter.isSealed,
+      letterLocation: safeDecrypt(letter.letterLocation),
+      senderName: safeDecrypt(letter.senderName),
+      originalSenderId: letter.originalSenderId,
+      isViewed: letter.isViewed,
+      isDelivered: letter.isDelivered,
       deliveredAt: letter.deliveredAt?.toISOString() || null,
-      hasArrived: letter.unlockDate ? new Date(letter.unlockDate) <= now : true,
+      song: songByEntry.get(letter.id) ?? null,
+      photos: photosByEntry.get(letter.id) ?? [],
+      doodles: doodlesByEntry.get(letter.id) ?? [],
+      hasArrived: letter.unlockDate ? letter.unlockDate <= now : true,
     }))
 
     return NextResponse.json({ letters: lettersWithStatus })
