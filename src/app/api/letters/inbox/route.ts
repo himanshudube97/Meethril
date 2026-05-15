@@ -1,8 +1,8 @@
 // src/app/api/letters/inbox/route.ts
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
 import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,33 +21,25 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const now = new Date()
-  const letters = await prisma.journalEntry.findMany({
+  const letters = await listLettersForRead({
+    userId: user.id,
     where: {
-      userId: user.id,
       OR: [
         { entryType: 'letter', isSealed: true, unlockDate: { lte: now } },
         { isReceivedLetter: true },
       ],
     },
     orderBy: { unlockDate: 'desc' },
-    select: {
-      id: true,
-      recipientName: true,
-      createdAt: true,
-      unlockDate: true,
-      isViewed: true,
-      encryptionType: true,
-      e2eeIVs: true,
-    },
   })
 
   // For E2EE, return ciphertext + IVs so the client can decrypt with its master key.
   // For server-encrypted, decrypt server-side as before.
-  const result: InboxLetter[] = letters.map(l => ({
+  const result: InboxLetter[] = letters.map((l) => ({
     id: l.id,
-    recipientName: l.recipientName && l.encryptionType === 'server'
-      ? safeDecrypt(l.recipientName)
-      : l.recipientName,
+    recipientName:
+      l.recipientName && l.encryptionType === 'server'
+        ? safeDecrypt(l.recipientName)
+        : l.recipientName,
     sealedAt: l.createdAt.toISOString(),
     unlockDate: l.unlockDate ? l.unlockDate.toISOString() : null,
     isViewed: l.isViewed,
