@@ -67,6 +67,7 @@ export default function ComposeView() {
   // were silently lost on refresh.
   const [photos, setPhotos] = useState<Photo[]>([])
   const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
+  const [song, setSong] = useState<string | null>(null)
   const [createdAt, setCreatedAt] = useState<Date>(() => new Date())
   const [showSeal, setShowSeal] = useState(false)
   const [loading, setLoading] = useState(Boolean(draftId))
@@ -140,6 +141,9 @@ export default function ComposeView() {
         const hydratedDoodle = decrypted.doodles?.[0]?.strokes ?? []
         setDoodleStrokes(hydratedDoodle)
 
+        // Hydrate song URL from the persisted entry.
+        setSong(decrypted.song ?? null)
+
         setLoading(false)
       } catch (err) {
         console.error('Failed to resume letter draft:', err)
@@ -186,7 +190,7 @@ export default function ComposeView() {
 
     autosave.trigger({
       text: joined,
-      song: null,
+      song,
       // Photos + doodles are now owned by ComposeView (lifted out of
       // PostcardBack) so they survive autosave + draft resume. The server's
       // destructive replace block only runs when these keys are present,
@@ -207,7 +211,7 @@ export default function ComposeView() {
       recipientEmail: null,
       recipientName: isSelf ? 'future me' : recipient.name,
     })
-  }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, autosave.trigger])
+  }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
 
   if (loading) {
     return (
@@ -333,6 +337,8 @@ export default function ComposeView() {
             onPhotoRemove={handlePhotoRemove}
             doodleStrokes={doodleStrokes}
             onDoodleStrokesChange={setDoodleStrokes}
+            song={song}
+            onSongChange={setSong}
             onTurnBack={() => setPhase('front')}
             onSeal={() => setShowSeal(true)}
             canSeal={canSeal}

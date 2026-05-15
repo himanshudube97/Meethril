@@ -41,6 +41,8 @@ export function PostcardBack({
   onPhotoRemove,
   doodleStrokes = [],
   onDoodleStrokesChange,
+  song = null,
+  onSongChange,
   onTurnBack,
   onSeal,
   canSeal,
@@ -53,17 +55,17 @@ export function PostcardBack({
   onPhotoRemove?: (position: 1 | 2) => void
   doodleStrokes?: StrokeData[]
   onDoodleStrokesChange?: (strokes: StrokeData[]) => void
+  song?: string | null
+  onSongChange?: (next: string | null) => void
   onTurnBack?: () => void
   onSeal?: () => void
   canSeal?: boolean
 }) {
   const theme = useThemeStore((s) => s.theme)
 
-  // ── Local media state — song still lives here (out of scope for the
-  // photo/doodle storage fix). Photos + doodle strokes are lifted to
-  // ComposeView so they round-trip through autosave + draft resume.
+  // ── Local input buffer for the song URL form (not persisted — only
+  // songConfirmed / the `song` prop is the source of truth).
   const [songInput, setSongInput] = useState('')
-  const [songConfirmed, setSongConfirmed] = useState<string | null>(null)
 
   // ── TipTap editor ─────────────────────────────────────────────────────────
   const editor = useEditor({
@@ -109,12 +111,15 @@ export function PostcardBack({
   const handleSongSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = songInput.trim()
-    if (trimmed) setSongConfirmed(trimmed)
+    if (trimmed) {
+      onSongChange?.(trimmed)
+      setSongInput('')
+    }
   }
 
   const handleSongClear = () => {
     setSongInput('')
-    setSongConfirmed(null)
+    onSongChange?.(null)
   }
 
   const handleTurnBack = onTurnBack
@@ -221,11 +226,11 @@ export function PostcardBack({
               >
                 music
               </div>
-              {songConfirmed ? (
+              {song ? (
                 <div>
                   {/* SongEmbed — reused verbatim, wrapped to cap height */}
                   <div style={{ height: 64, overflow: 'hidden', borderRadius: 8 }}>
-                    <SongEmbed url={songConfirmed} compact />
+                    <SongEmbed url={song} compact />
                   </div>
                   <button
                     onClick={handleSongClear}
