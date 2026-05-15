@@ -17,11 +17,12 @@ model User {
   profile   Json? // Stores answers to thoughtful "about me" questions
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-  entries        JournalEntry[]
-  scrapbooks     Scrapbook[]
-  encryptedBlobs EncryptedBlob[]
-  orphanedBlobs  OrphanedBlob[]
+  entries           JournalEntry[]
+  scrapbooks        Scrapbook[]
+  encryptedBlobs    EncryptedBlob[]
+  orphanedBlobs     OrphanedBlob[]
   pushSubscriptions PushSubscription[]
+  letters           Letter[]
 
   // A Small Light counters & rate limit (anonymous notes to strangers)
   strangerNotesSent       Int       @default(0)
@@ -131,6 +132,97 @@ model LetterAccessToken {
 
   @@index([letterId])
   @@map("letter_access_tokens")
+}
+
+model Letter {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Phase 2 backfill traceability. Set on rows backfilled from JournalEntry;
+  // null on natively-created rows (Phase 3+). Drops in Phase 7.
+  sourceJournalEntryId String? @unique
+
+  // Letter classification per target architecture
+  letterType String // "self" | "friend" | "received-friend"
+
+  // Owner's encrypted content (mirrored from JournalEntry.text in Phase 2)
+  contentCiphertext String? @db.Text
+  contentIVs        Json?
+  title             String?
+  titleIV           String?
+
+  // Transitional encryption metadata — preserves legacy server/e2ee dispatch
+  // during the migration window. Drops in Phase 7.
+  encryptionType String  @default("server") // "server" | "e2ee"
+  e2eeIV         String?
+  e2eeIVs        Json?
+
+  // Plaintext metadata
+  recipientEmail String?
+  recipientName  String?
+  senderName     String?
+  letterLocation String?
+  scheduledFor   DateTime?
+
+  // Provenance
+  originalSenderId String?
+  originalLetterId String?
+
+  // Status snapshot at backfill time. NOT kept in sync by Phase 2 mutations;
+  // dual-read joins fresh state from JournalEntry. Phase 3+ migrates to authoritative.
+  isSealed         Boolean   @default(true)
+  isDelivered      Boolean   @default(false)
+  deliveredAt      DateTime?
+  isViewed         Boolean   @default(false)
+  letterPeekedAt   DateTime?
+  isArchived       Boolean   @default(false)
+  isReceivedLetter Boolean   @default(false)
+
+  // Phase 4+ fields (LetterDelivery lifecycle mirror)
+  firstReadAt        DateTime?
+  savedByRecipientAt DateTime?
+  bouncedAt          DateTime?
+  bouncedReason      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  delivery LetterDelivery?
+
+  @@index([userId, letterType, isArchived])
+  @@index([scheduledFor, deliveredAt])
+  @@index([sourceJournalEntryId])
+  @@map("letters")
+}
+
+model LetterDelivery {
+  id       String @id @default(cuid())
+  letterId String @unique
+  letter   Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+
+  // Phase 4 (friend letters): the ciphertext that gets delivered.
+  // Encrypted with a random per-letter K (NOT the master key).
+  transientCiphertext String @db.Text
+  transientIV         String
+
+  // K time-locked to letter.scheduledFor via Drand
+  tlockedKey String @db.Text
+
+  // Public token used in the URL path. Fragment carries tlockedKey.
+  publicToken String @unique
+
+  // Resend tracking
+  resendEmailId String?
+
+  // 24h read window tracking
+  firstReadAt        DateTime?
+  transientExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([transientExpiresAt])
+  @@map("letter_deliveries")
 }
 
 model Doodle {
