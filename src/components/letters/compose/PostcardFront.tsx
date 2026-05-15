@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -80,6 +81,14 @@ export function PostcardFront({
       attributes: { class: 'focus:outline-none' },
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+    // Only sync when the prop disagrees with editor state AND user isn't typing.
+    if (editor.isFocused) return
+    if (editor.getText() === body) return
+    editor.commands.setContent(body)
+  }, [body, editor])
 
   const atCap =
     (editor?.storage.characterCount.characters() ?? 0) >= FRONT_CHAR_LIMIT
