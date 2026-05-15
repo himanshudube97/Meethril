@@ -1,104 +1,219 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
-import PostcardFront from './PostcardFront'
-import PostcardBack from './PostcardBack'
-import PostcardFolded from './PostcardFolded'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { RecipientPicker } from './RecipientPicker'
+import { PostcardFront, FRONT_CHAR_LIMIT } from './PostcardFront'
+import { PostcardBack, BACK_CHAR_LIMIT } from './PostcardBack'
+import { SealModal } from './SealModal'
 import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
+import { useE2EE } from '@/hooks/useE2EE'
 import { useProfileStore } from '@/store/profile'
-import type { StrokeData } from '@/store/journal'
-import {
-  type LetterRecipient,
-  type UnlockChoice,
-  DEFAULT_UNLOCK,
-  resolveUnlockDate,
-  mapRecipientToSchema,
-} from '../letterTypes'
+import type { RecipientChoice } from '../letterTypes'
+import type { JournalEntry } from '@/store/journal'
 
-type Phase = 'front' | 'back' | 'folded' | 'sending'
+type Phase = 'picker' | 'front' | 'back'
+
+const BODY_SEPARATOR = '\n\n'
+
+/**
+ * Split a stored body into front/back slices.
+ *
+ * The compose UI keeps two strings so each editor can own its own slice.
+ * Autosave joins them with `\n\n` before writing to `JournalEntry.text` —
+ * splitBody is the inverse for draft resume.
+ *
+ * Legacy fallback (rows saved before this redesign): no separator present,
+ * everything pre-cap goes to front; the overflow tail goes to back.
+ */
+function splitBody(text: string): { front: string; back: string } {
+  if (!text) return { front: '', back: '' }
+  const sepIdx = text.indexOf(BODY_SEPARATOR)
+  if (sepIdx >= 0 && sepIdx <= FRONT_CHAR_LIMIT) {
+    return {
+      front: text.slice(0, sepIdx),
+      back: text.slice(sepIdx + BODY_SEPARATOR.length),
+    }
+  }
+  return {
+    front: text.slice(0, FRONT_CHAR_LIMIT),
+    back: text.slice(FRONT_CHAR_LIMIT, FRONT_CHAR_LIMIT + BACK_CHAR_LIMIT),
+  }
+}
+
+function joinBody(front: string, back: string): string {
+  if (!back) return front
+  return `${front}${BODY_SEPARATOR}${back}`
+}
 
 export default function ComposeView() {
   const router = useRouter()
+  const params = useSearchParams()
+  const draftId = params.get('id')
+
   const { fetchProfile } = useProfileStore()
-  const autosave = useAutosaveEntry()
+  const { decryptEntryFromServer, isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
+  const autosave = useAutosaveEntry(draftId ?? null)
 
-  const [phase, setPhase] = useState<Phase>('front')
-  const [recipient, setRecipient] = useState<LetterRecipient>('future_me')
-  const [closeName, setCloseName] = useState('')
-  const [unlock, setUnlock] = useState<UnlockChoice>(DEFAULT_UNLOCK)
-  const [body, setBody] = useState('')
-  const [photos, setPhotos] = useState<[string | null, string | null]>([null, null])
-  const [song, setSong] = useState<string | null>(null)
-  const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
-  const [createdAt] = useState<Date>(() => new Date())
-  const [sealing, setSealing] = useState(false)
+  const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
+  const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
+  const [bodyFront, setBodyFront] = useState('')
+  const [bodyBack, setBodyBack] = useState('')
+  const [createdAt, setCreatedAt] = useState<Date>(() => new Date())
+  const [showSeal, setShowSeal] = useState(false)
+  const [loading, setLoading] = useState(Boolean(draftId))
+  const hydratedRef = useRef(false)
 
-  // For the send slide-out animation
-  const sendAnimDoneRef = useRef(false)
-
-  useEffect(() => { fetchProfile() }, [fetchProfile])
-
-  const mapping = mapRecipientToSchema(recipient, closeName, null)
-  // resolveUnlockDate returns a fresh Date instance each call, so calling it
-  // inline would make `unlockDate` a different reference every render and
-  // re-fire the autosave effect (whose deps include unlockDate) on every
-  // render — debounce timer reset, autosave thrashing.
-  const unlockDate = useMemo(() => resolveUnlockDate(unlock, createdAt), [unlock, createdAt])
-
-  // Autosave whenever fields change
   useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
+
+  // Hydrate a resumed draft. The body / recipientName may be E2EE-encrypted
+  // on the wire — push them through decryptEntryFromServer (no-op for
+  // server-side rows) before splitting into front/back.
+  useEffect(() => {
+    if (!draftId || hydratedRef.current) return
+    // For E2EE rows we have to wait until either the key is loaded or we know
+    // for sure the user has E2EE disabled. Otherwise decryptEntryFromServer
+    // hands back the "[Encrypted — unlock to view]" placeholder and we'd seed
+    // the editors with that.
+    if (!isE2EEInitialized) return
+    if (isE2EEEnabled && !isE2EEReady) return
+
+    hydratedRef.current = true
+    void (async () => {
+      try {
+        const res = await fetch(`/api/entries/${draftId}`)
+        if (!res.ok) {
+          router.replace('/letters')
+          return
+        }
+        const raw = (await res.json()) as JournalEntry
+        const decrypted = raw.encryptionType === 'e2ee'
+          ? await decryptEntryFromServer(raw)
+          : raw
+
+        if (decrypted.createdAt) setCreatedAt(new Date(decrypted.createdAt))
+
+        if (decrypted.entryType === 'letter') {
+          setRecipient({ recipient: 'self' })
+        } else if (decrypted.entryType === 'unsent_letter') {
+          setRecipient({
+            recipient: 'friend',
+            name: decrypted.recipientName ?? '',
+          })
+        } else {
+          // Not a letter at all — bounce back rather than corrupt it via autosave.
+          router.replace('/letters')
+          return
+        }
+
+        const { front, back } = splitBody(decrypted.text ?? '')
+        setBodyFront(front)
+        setBodyBack(back)
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to resume letter draft:', err)
+        router.replace('/letters')
+      }
+    })()
+  }, [draftId, router, decryptEntryFromServer, isE2EEEnabled, isE2EEInitialized, isE2EEReady])
+
+  // Autosave wiring. The hook is imperative (`trigger(draft)` + debounce),
+  // so we re-trigger whenever the two body slices or the recipient mapping
+  // change. The hook handles the POST→PUT lifecycle and E2EE encryption.
+  useEffect(() => {
+    if (!recipient) return
+    if (phase === 'picker') return
+    // Don't write back the empty state while a draft is still hydrating —
+    // that would race with the GET and wipe the row.
+    if (loading) return
+
+    const joined = joinBody(bodyFront, bodyBack)
+    const isSelf = recipient.recipient === 'self'
+
     autosave.trigger({
-      text: body,
-      song: song,
-      photos: photos
-        .map((url, idx) => url ? { url, position: idx, rotation: 0, spread: 1 } : null)
-        .filter(Boolean) as { url: string; position: number; rotation: number; spread: number }[],
-      doodles: doodleStrokes.length > 0 ? [{ strokes: doodleStrokes, spread: 1 }] : [],
-      entryType: mapping.entryType,
-      recipientEmail: mapping.recipientEmail,
-      recipientName: mapping.recipientName,
-      unlockDate: unlockDate ? unlockDate.toISOString() : null,
+      text: joined,
+      song: null,
+      photos: [],
+      doodles: [],
+      entryType: isSelf ? 'letter' : 'unsent_letter',
+      recipientEmail: null,
+      recipientName: isSelf ? 'future me' : recipient.name,
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, song, photos, doodleStrokes, mapping.entryType, mapping.recipientName, mapping.recipientEmail, unlockDate])
+  }, [bodyFront, bodyBack, recipient, phase, loading, autosave])
 
-  const plainText = body.replace(/<[^>]*>/g, '').trim()
-  const canSeal =
-    plainText.length > 0 &&
-    unlockDate !== null &&
-    (recipient === 'future_me' || closeName.trim().length > 0)
-
-  async function handleFoldAndSeal() {
-    if (!canSeal || sealing) return
-    setSealing(true)
-    setPhase('folded')
-    setSealing(false)
+  if (loading) {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'Cormorant Garamond, Georgia, serif',
+          fontStyle: 'italic',
+          opacity: 0.6,
+        }}
+      >
+        opening...
+      </div>
+    )
   }
 
-  async function handleSend() {
-    setSealing(true)
-    try {
-      await autosave.flush()
-      const id = autosave.entryId
-      if (!id) return
-      const res = await fetch(`/api/entries/${id}/seal`, { method: 'POST' })
-      if (res.ok) {
-        setPhase('sending')
-        sendAnimDoneRef.current = true
-        // Wait for send animation (postcard slides up), then navigate back
-        setTimeout(() => {
-          router.push('/letters')
-        }, 900)
-      }
-    } finally {
-      setSealing(false)
+  if (phase === 'picker' || !recipient) {
+    return (
+      <RecipientPicker
+        onSubmit={(choice) => {
+          setRecipient(choice)
+          setCreatedAt(new Date())
+          setPhase('front')
+        }}
+        onCancel={() => router.push('/letters')}
+      />
+    )
+  }
+
+  const salutationName =
+    recipient.recipient === 'self' ? 'future me' : recipient.name
+
+  const canSeal =
+    bodyFront.trim().length > 0 || bodyBack.trim().length > 0
+
+  async function handleSeal({
+    unlockDate,
+    recipientEmail,
+  }: {
+    unlockDate: Date
+    recipientEmail?: string
+  }) {
+    // Flush the pending autosave so the seal request sees the final body /
+    // recipient state. autosave.entryId becomes available only after the
+    // first POST completes — if the user types and immediately taps seal,
+    // the debounce hasn't fired yet.
+    await autosave.flush()
+    const id = autosave.entryId
+    if (!id) {
+      throw new Error('Draft has not been saved yet — please add some text.')
+    }
+    const res = await fetch(`/api/entries/${id}/seal`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        unlockDate: unlockDate.toISOString(),
+        recipientEmail,
+      }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json.error ?? 'Could not seal.')
     }
   }
 
-  // Card flip control: front→back = 180 degrees
-  const cardRotateY = phase === 'front' ? 0 : 180
+  // Card flip control: front→back = 180 degrees (preserves the prior 3D flip).
+  const cardRotateY = phase === 'back' ? 180 : 0
 
   return (
     <div
@@ -113,55 +228,8 @@ export default function ComposeView() {
         perspective: 1600,
       }}
     >
-      {/* Back button — returns to the inbox */}
-      <button
-        onClick={() => router.push('/letters')}
-        style={{
-          position: 'absolute',
-          top: 90,
-          left: 32,
-          zIndex: 210,
-          padding: '7px 16px 8px 14px',
-          borderRadius: 999,
-          border: '1px solid color-mix(in oklab, var(--text-muted) 40%, transparent)',
-          background: 'var(--paper-1)',
-          color: 'var(--text-secondary)',
-          fontFamily: 'Cormorant Garamond, serif',
-          fontStyle: 'italic',
-          fontSize: 14,
-          letterSpacing: 0.4,
-          cursor: 'pointer',
-          transition: 'background 0.2s, color 0.2s, transform 0.2s',
-        }}
-        onMouseEnter={e => {
-          const el = e.currentTarget
-          el.style.background = 'var(--paper-2)'
-          el.style.color = 'var(--text-primary)'
-          el.style.transform = 'translateX(-2px)'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget
-          el.style.background = 'var(--paper-1)'
-          el.style.color = 'var(--text-secondary)'
-          el.style.transform = 'none'
-        }}
-        aria-label="back to letters"
-      >
-        ← back to letters
-      </button>
-
       {/* The postcard itself — landscape */}
       <motion.div
-        animate={
-          phase === 'sending'
-            ? { y: '-200vh', opacity: 0, scale: 0.92 }
-            : { y: 0, opacity: 1, scale: 1 }
-        }
-        transition={
-          phase === 'sending'
-            ? { duration: 0.7, ease: [0.4, 0, 0.8, 0.5] }
-            : { type: 'spring', stiffness: 280, damping: 26 }
-        }
         style={{
           width: 'min(1100px, calc(100vw - 80px))',
           height: 'min(640px, calc(100vh - 180px))',
@@ -180,61 +248,36 @@ export default function ComposeView() {
             transformStyle: 'preserve-3d',
           }}
         >
-          {/* FRONT face */}
+          {/* FRONT face — its own backfaceVisibility is set inside the component */}
           <PostcardFront
-            recipient={recipient}
-            onRecipientChange={setRecipient}
-            closeName={closeName}
-            onCloseNameChange={setCloseName}
-            createdAt={createdAt}
+            salutationName={salutationName}
+            body={bodyFront}
+            onBodyChange={setBodyFront}
             onTurnOver={() => setPhase('back')}
-            onClose={() => router.push('/letters')}
+            onCancel={() => router.push('/letters')}
+            createdAt={createdAt}
           />
 
-          {/* BACK face (visible when phase=back or folded) */}
-          {phase !== 'front' && phase !== 'sending' && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                transformStyle: 'preserve-3d',
-                pointerEvents: 'auto',
-              }}
-            >
-              {phase === 'back' ? (
-                <PostcardBack
-                  recipient={recipient}
-                  closeName={closeName}
-                  body={body}
-                  onBodyChange={setBody}
-                  unlock={unlock}
-                  onUnlockChange={setUnlock}
-                  photos={photos}
-                  onPhotosChange={setPhotos}
-                  song={song}
-                  onSongChange={setSong}
-                  doodleStrokes={doodleStrokes}
-                  onDoodleChange={setDoodleStrokes}
-                  onBack={() => setPhase('front')}
-                  onSeal={handleFoldAndSeal}
-                  canSeal={canSeal && !sealing}
-                  sealing={sealing}
-                />
-              ) : (
-                // folded phase — show folded face instead of back
-                <PostcardFolded
-                  recipient={recipient}
-                  closeName={closeName}
-                  unlock={unlock}
-                  createdAt={createdAt}
-                  sending={sealing}
-                  onSend={handleSend}
-                />
-              )}
-            </div>
-          )}
+          {/* BACK face — already applies its own rotateY(180deg) + backfaceVisibility */}
+          <PostcardBack
+            entryId={autosave.entryId}
+            body={bodyBack}
+            onBodyChange={setBodyBack}
+            onTurnBack={() => setPhase('front')}
+            onSeal={() => setShowSeal(true)}
+            canSeal={canSeal}
+          />
         </motion.div>
       </motion.div>
+
+      {showSeal && (
+        <SealModal
+          recipient={recipient.recipient}
+          onClose={() => setShowSeal(false)}
+          onSealed={() => router.push('/letters?tab=sent')}
+          onSeal={handleSeal}
+        />
+      )}
     </div>
   )
 }
