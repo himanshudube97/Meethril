@@ -25,6 +25,10 @@ export interface DualReadLetter {
   // working unchanged.
   id: string
 
+  // Distinguishes self-letters ('letter') from friend letters ('unsent_letter').
+  // Always sourced from JournalEntry.
+  entryType: string
+
   // Content (E2EE ciphertext or server-encrypted)
   text: string
   encryptionType: string // "server" | "e2ee"
@@ -103,6 +107,7 @@ export async function findLetterForRead(args: {
       select: {
         id: true,
         userId: true,
+        entryType: true,
         text: true,
         encryptionType: true,
         e2eeIV: true,
@@ -137,6 +142,7 @@ export async function findLetterForRead(args: {
     // for any letter created after the backfill ran.
     return {
       id: je.id,
+      entryType: je.entryType,
       text: je.text,
       encryptionType: je.encryptionType,
       e2eeIV: je.e2eeIV,
@@ -164,6 +170,7 @@ export async function findLetterForRead(args: {
   // Content & most metadata from Letter; mutation-prone state from JournalEntry.
   return {
     id: je.id, // expose JournalEntry.id to keep frontend stable
+    entryType: je.entryType,
     // Defence-in-depth: backfill always sets contentCiphertext, but if a future write path leaves it null
     // we fall back to je.text. Note this can mis-pair with letter.encryptionType — monitor in fixture diffs.
     text: letter.contentCiphertext ?? je.text,
@@ -213,6 +220,7 @@ export async function listLettersForRead(args: {
     orderBy,
     select: {
       id: true,
+      entryType: true,
       text: true,
       encryptionType: true,
       e2eeIV: true,
@@ -263,6 +271,7 @@ export async function listLettersForRead(args: {
     if (!letter) {
       return {
         id: je.id,
+        entryType: je.entryType,
         text: je.text,
         encryptionType: je.encryptionType,
         e2eeIV: je.e2eeIV,
@@ -288,6 +297,7 @@ export async function listLettersForRead(args: {
     }
     return {
       id: je.id,
+      entryType: je.entryType,
       // Defence-in-depth: backfill always sets contentCiphertext, but if a future write path leaves it null
       // we fall back to je.text. Note this can mis-pair with letter.encryptionType — monitor in fixture diffs.
       text: letter.contentCiphertext ?? je.text,

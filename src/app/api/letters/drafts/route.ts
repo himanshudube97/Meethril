@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 
 interface DraftStamp {
   id: string
+  entryType: 'letter' | 'unsent_letter'
   recipientName: string | null
   recipientEmail: string | null
   text: string
@@ -36,6 +37,7 @@ export async function GET() {
 
   const result: DraftStamp[] = letters.map((l) => ({
     id: l.id,
+    entryType: l.entryType as 'letter' | 'unsent_letter',
     recipientName:
       l.recipientName && l.encryptionType === 'server'
         ? safeDecrypt(l.recipientName)
