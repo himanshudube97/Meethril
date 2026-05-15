@@ -37,7 +37,7 @@ export async function GET() {
 
   const result: DraftStamp[] = letters.map((l) => ({
     id: l.id,
-    entryType: l.entryType as 'letter' | 'unsent_letter',
+    entryType: l.entryType as 'letter' | 'unsent_letter', // safe: where-clause filters to these two values
     recipientName:
       l.recipientName && l.encryptionType === 'server'
         ? safeDecrypt(l.recipientName)

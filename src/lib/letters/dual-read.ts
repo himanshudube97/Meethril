@@ -27,7 +27,7 @@ export interface DualReadLetter {
 
   // Distinguishes self-letters ('letter') from friend letters ('unsent_letter').
   // Always sourced from JournalEntry.
-  entryType: string
+  entryType: 'normal' | 'letter' | 'unsent_letter' | 'ephemeral'
 
   // Content (E2EE ciphertext or server-encrypted)
   text: string
@@ -142,7 +142,9 @@ export async function findLetterForRead(args: {
     // for any letter created after the backfill ran.
     return {
       id: je.id,
-      entryType: je.entryType,
+      // Prisma returns entryType as string; cast is safe — the DB column is an enum
+      // constrained to these four values by schema.prisma.
+      entryType: je.entryType as 'normal' | 'letter' | 'unsent_letter' | 'ephemeral',
       text: je.text,
       encryptionType: je.encryptionType,
       e2eeIV: je.e2eeIV,
@@ -170,7 +172,9 @@ export async function findLetterForRead(args: {
   // Content & most metadata from Letter; mutation-prone state from JournalEntry.
   return {
     id: je.id, // expose JournalEntry.id to keep frontend stable
-    entryType: je.entryType,
+    // Prisma returns entryType as string; cast is safe — the DB column is an enum
+    // constrained to these four values by schema.prisma.
+    entryType: je.entryType as 'normal' | 'letter' | 'unsent_letter' | 'ephemeral',
     // Defence-in-depth: backfill always sets contentCiphertext, but if a future write path leaves it null
     // we fall back to je.text. Note this can mis-pair with letter.encryptionType — monitor in fixture diffs.
     text: letter.contentCiphertext ?? je.text,
@@ -268,10 +272,13 @@ export async function listLettersForRead(args: {
 
   return journals.map((je) => {
     const letter = letterBySource.get(je.id)
+    // Prisma returns entryType as string; cast is safe — the DB column is an enum
+    // constrained to these four values by schema.prisma.
+    const entryType = je.entryType as 'normal' | 'letter' | 'unsent_letter' | 'ephemeral'
     if (!letter) {
       return {
         id: je.id,
-        entryType: je.entryType,
+        entryType,
         text: je.text,
         encryptionType: je.encryptionType,
         e2eeIV: je.e2eeIV,
@@ -297,7 +304,7 @@ export async function listLettersForRead(args: {
     }
     return {
       id: je.id,
-      entryType: je.entryType,
+      entryType,
       // Defence-in-depth: backfill always sets contentCiphertext, but if a future write path leaves it null
       // we fall back to je.text. Note this can mis-pair with letter.encryptionType — monitor in fixture diffs.
       text: letter.contentCiphertext ?? je.text,
