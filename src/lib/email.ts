@@ -487,3 +487,29 @@ export async function sendFriendLetterTransientEmail(args: {
   if (!r.data?.id) throw new Error('Resend returned no email id')
   return { id: r.data.id }
 }
+
+export async function sendSelfLetterReminderEmail(args: {
+  to: string
+  recipientName: string | null
+  writtenOn: Date
+}): Promise<void> {
+  const from = process.env.RESEND_FROM_LETTERS
+  if (!from) throw new Error('RESEND_FROM_LETTERS not set')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
+
+  const writtenStr = args.writtenOn.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  })
+  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const html = `
+    <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
+      <p>${greeting}</p>
+      <p>A letter you wrote to yourself on ${writtenStr} is ready to be read.</p>
+      <p><a href="${appUrl}/letters" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Hearth</a></p>
+      <p style="font-size: 13px; opacity: 0.7;">Open the app to unlock and read it — your phrase is the key.</p>
+    </div>
+  `
+  const r = await getResend().emails.send({ from, to: args.to, subject: 'Your letter is ready', html })
+  if (r.error) throw new Error(`Resend: ${r.error.message}`)
+}
