@@ -27,6 +27,17 @@ export async function GET(
           senderName: true,
         },
       },
+      assets: {
+        select: {
+          id: true,
+          type: true,
+          position: true,
+          spread: true,
+          rotation: true,
+          ordinal: true,
+        },
+        orderBy: { ordinal: 'asc' },
+      },
     },
   })
 
@@ -44,5 +55,6 @@ export async function GET(
     recipientName: delivery.letter.recipientName ?? null,
     alreadyExpired,
     firstReadAt: delivery.firstReadAt?.toISOString() ?? null,
+    assets: delivery.assets, // [{id, type, position, spread, rotation, ordinal}]
   })
 }
