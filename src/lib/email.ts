@@ -513,3 +513,31 @@ export async function sendSelfLetterReminderEmail(args: {
   const r = await getResend().emails.send({ from, to: args.to, subject: 'Your letter is ready', html })
   if (r.error) throw new Error(`Resend: ${r.error.message}`)
 }
+
+export async function sendAskForCopyEmail(args: {
+  to: string
+  recipientName: string | null
+  senderName: string
+}): Promise<void> {
+  const from = process.env.RESEND_FROM_LETTERS
+  if (!from) throw new Error('RESEND_FROM_LETTERS not set')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
+
+  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const html = `
+    <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
+      <p>${greeting}</p>
+      <p>${args.senderName} has been thinking about the letter you saved and would love to read it again.</p>
+      <p>If you'd like to send a copy back to them, open Hearth and find the letter in your kept letters.</p>
+      <p><a href="${appUrl}/me" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Hearth</a></p>
+    </div>
+  `
+  const r = await getResend().emails.send({
+    from,
+    to: args.to,
+    subject: `${args.senderName} is asking about a letter`,
+    html,
+  })
+  if (r.error) throw new Error(`Resend: ${r.error.message}`)
+}
