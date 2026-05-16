@@ -308,18 +308,53 @@ export default function ComposeView() {
 
     if (recipient.recipient === 'friend') {
       if (!recipientEmail) throw new Error('Recipient email missing.')
+
+      // Fetch the draft's photos and doodles so we can bundle them into
+      // the letter payload. The autosave route persisted them under the
+      // draftEntryId; the bundler will decrypt with the master key and
+      // re-encrypt under K.
+      const draftRes = await fetch(`/api/entries/${draftEntryId}`)
+      if (!draftRes.ok) throw new Error('Could not load draft for sealing.')
+      const draft = (await draftRes.json()) as {
+        photos?: Array<{
+          encryptedRef: string | null
+          encryptedRefIV: string | null
+          url: string | null
+          position: number
+          spread: number
+          rotation: number
+        }>
+        doodles?: Array<{
+          strokes: unknown
+          spread: number
+          positionInEntry: number
+        }>
+      }
+
+      const draftPhotos = (draft.photos ?? []).map((p, i) => ({
+        encryptedRef: p.encryptedRef,
+        encryptedRefIV: p.encryptedRefIV,
+        url: p.url,
+        position: p.position,
+        spread: p.spread,
+        rotation: p.rotation,
+        ordinal: i,
+      }))
+      const draftDoodles = draft.doodles ?? []
+
       const payload = await buildFriendLetterPayload({
         draft: {
           text: combinedText,
           song,
-          photos: [],
-          doodles: [],
+          photos: draftPhotos,
+          doodles: draftDoodles,
         },
         unlockDate,
         recipientEmail,
-        recipientName: recipient.name,
+        recipientName: recipient.name ?? 'Friend',
         senderName: userName,
         letterLocation: null,
+        masterKey,
       })
       const res = await fetch('/api/letters/friend', {
         method: 'POST',
