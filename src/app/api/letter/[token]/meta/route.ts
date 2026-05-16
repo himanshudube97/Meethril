@@ -43,5 +43,6 @@ export async function GET(
     senderName: delivery.letter.senderName ?? null,
     recipientName: delivery.letter.recipientName ?? null,
     alreadyExpired,
+    firstReadAt: delivery.firstReadAt?.toISOString() ?? null,
   })
 }

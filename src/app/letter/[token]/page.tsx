@@ -5,6 +5,20 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { tlockDecryptKey } from '@/lib/letters/tlock'
 import { decryptTransient } from '@/lib/letters/transient-crypto'
+import DOMPurify from 'dompurify'
+
+// TipTap output uses these — keep the allow-list tight so injected
+// tags/attrs/handlers can't execute. NO 'script', NO 'iframe', NO 'on*'.
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):)/i,
+}
+
+function sanitizeLetter(html: string): string {
+  if (typeof window === 'undefined') return ''
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG) as unknown as string
+}
 
 type LetterContent = {
   text: string
@@ -54,6 +68,7 @@ export default function LetterPage() {
           senderName: string | null
           recipientName: string | null
           alreadyExpired: boolean
+          firstReadAt: string | null
         }
         if (meta.alreadyExpired) return setState({ kind: 'expired' })
         if (!meta.scheduledFor) throw new Error('letter has no scheduledFor')
@@ -97,7 +112,9 @@ export default function LetterPage() {
           /* sessionStorage might be disabled; not fatal */
         }
 
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+        const expiresAt = meta.firstReadAt
+          ? new Date(new Date(meta.firstReadAt).getTime() + 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + 24 * 60 * 60 * 1000)
         setState({
           kind: 'ok',
           data,
@@ -151,7 +168,7 @@ export default function LetterPage() {
         <Countdown expiresAt={state.expiresAt} />
         <article
           style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 18 }}
-          dangerouslySetInnerHTML={{ __html: state.data.text }}
+          dangerouslySetInnerHTML={{ __html: sanitizeLetter(state.data.text) }}
         />
         {state.data.song && (
           <p style={{ marginTop: 32, fontSize: 14, opacity: 0.7 }}>
