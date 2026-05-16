@@ -440,3 +440,50 @@ export async function sendSelfLetterEmail({
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
+
+/**
+ * Phase 4 friend-letter transient delivery. Schedules a Resend email at
+ * unlockDate with the magic URL. Returns Resend's email id so the
+ * webhook can correlate later.
+ */
+export async function sendFriendLetterTransientEmail(args: {
+  to: string
+  recipientName: string | null
+  senderName: string
+  scheduledFor: Date
+  publicToken: string
+  tlockedKey: string
+}): Promise<{ id: string }> {
+  const from = process.env.RESEND_FROM_LETTERS
+  if (!from) throw new Error('RESEND_FROM_LETTERS not set')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
+
+  const url = `${appUrl}/letter/${args.publicToken}#k=${encodeURIComponent(args.tlockedKey)}`
+  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const html = `
+    <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
+      <p>${greeting}</p>
+      <p>${args.senderName} wrote you a letter and asked us to deliver it today.</p>
+      <p>
+        <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #3d342a; color: #f6efe2; text-decoration: none; border-radius: 999px;">
+          Open your letter
+        </a>
+      </p>
+      <p style="font-size: 13px; opacity: 0.7;">
+        The letter is yours for 24 hours after you open it, then it fades.
+        Only you can read it — even Hearth's servers cannot.
+      </p>
+    </div>
+  `
+  const r = await getResend().emails.send({
+    from,
+    to: args.to,
+    subject: `${args.senderName} sent you a letter`,
+    html,
+    scheduledAt: args.scheduledFor.toISOString(),
+  })
+  if (r.error) throw new Error(`Resend error: ${r.error.message}`)
+  if (!r.data?.id) throw new Error('Resend returned no email id')
+  return { id: r.data.id }
+}
