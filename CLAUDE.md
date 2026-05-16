@@ -98,10 +98,14 @@ src/
 - Production: Supabase OAuth with auto user creation
 
 ### Encryption Pattern
-Entry text and letter metadata are encrypted with AES-256-GCM:
-- Format: `iv:authTag:encryptedData` (hex)
-- Encrypt on save, decrypt on retrieve (see `lib/encryption.ts`)
-- Fields: `text`, `textPreview`, letter recipient info
+
+**Read [`docs/encryption-strategy.md`](docs/encryption-strategy.md) before touching any encryption code.** Hearth uses three tiers (E2EE under master key, server-encrypted under `ENCRYPTION_KEY`, plaintext) — which tier applies depends on the content type. The doc explains why and gives a decision heuristic for new content.
+
+Quick reference:
+- **Journals, letters, scrapbook items, photos, doodles** → Tier 1 (E2EE under master key, AES-256-GCM, browser-only). Server cannot decrypt.
+- **`User.profile` (nickname/birthday)** → Tier 2 (server-encrypted via `lib/encryption.ts` `encryptJson`/`decryptJson`). Used by the reminder cron.
+- **`StrangerNote.text` / `StrangerReply.text`** → Tier 2 (server-encrypted). Permanent design: moderation requires server reads.
+- **Schedules, recipient emails, status flags, IDs** → Tier 3 (plaintext).
 
 ### Photo / Image Storage Flow
 Both journal entries and scrapbook photos go through the **same storage adapter** at `POST /api/photos`. Nothing else writes image bytes — never inline a `data:` URL into an entry or scrapbook item again.
