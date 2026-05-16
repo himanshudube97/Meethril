@@ -202,9 +202,9 @@ Crypto primitives in code:
 | `/api/letters/friend` | POST | session | Native friend-letter write + schedule Resend |
 | `/api/letters/save-received` | POST | session (recipient) | Save a kept friend letter |
 | `/api/letters/[id]/ask-for-copy` | POST | session (paid sender) | Email recipient asking for a copy back |
-| `/api/letters/inbox` | GET | session | Receiver list — **does not yet surface Phase 4 self-letters** |
+| `/api/letters/inbox` | GET | session | Receiver list. Returns `text` inline for Phase 4 native rows so the reveal modal doesn't need a second fetch. |
 | `/api/letters/sent` | GET | session | Sender receipt list |
-| `/api/letters/arrived`, `/mine`, `/received` | GET | session | Other read variants — all anchor on JournalEntry |
+| `/api/letters/arrived`, `/mine`, `/received` | GET | session | Other read variants. Now surface native rows too (no associated photos/doodles/song for natives — they have no `EntryPhoto`/`Doodle` rows). |
 | `/api/letters/[id]/peek`, `/viewed`, `/read` | various | session | Single-letter mutations |
 | `/api/letter/[token]/meta` | GET | public | Drand/scheduledFor/display names — no content |
 | `/api/letter/[token]/ciphertext` | GET | public | Transient blob + IV; 24h gate |
@@ -232,7 +232,7 @@ Crypto primitives in code:
 | `src/lib/letters/self-letter-client.ts` | Self-letter payload build/decrypt |
 | `src/lib/letters/friend-letter-client.ts` | Friend-letter payload build |
 | `src/lib/letters/resend-webhook.ts` | Svix signature verification |
-| `src/lib/letters/dual-read.ts` | Phase 2 dual-read helper. Anchors on `JournalEntry`; merges `Letter` via `sourceJournalEntryId`. |
+| `src/lib/letters/dual-read.ts` | Phase 2 dual-read helper. Anchors on `JournalEntry` for legacy rows; in Phase 4 also queries native `Letter where sourceJournalEntryId IS NULL AND letterType='self'` and maps them into the same shape (IV aliased as `e2eeIVs.text` AND `e2eeIVs.content` so legacy and native decrypt consumers both work). |
 | `src/lib/letter-tokens.ts` (legacy) | Pre-Phase-4 `LetterAccessToken` — still used by the legacy route |
 | `src/lib/email.ts` | All Resend wrappers. Phase 4 helpers: `sendFriendLetterTransientEmail`, `sendSelfLetterReminderEmail`, `sendAskForCopyEmail`. Pre-Phase-4: `sendFriendLetterMagicLink` (now dead code), `sendSelfLetterEmail`, `sendSelfLetterNotification` |
 | `src/lib/billing/is-paid-user.ts` | Lemon Squeezy status gate for ask-for-copy |
@@ -262,16 +262,18 @@ NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (cur
 
 ## 8. Known bugs (as of 2026-05-16)
 
+> **Update 2026-05-16 (later):** Critical 1, Critical 2, Important 4, and Important 5 were fixed in commits `c17d550`, `6066142`, `792de0a`. Kept here for history with their original descriptions; cross out FIXED items when reading.
+
 ### 🔴 Critical
-1. **Phase 4 self-letters are unreadable.** Native `Letter` rows with `letterType='self'` are never surfaced by any read route — all routes anchor on `JournalEntry`. The cron correctly stamps `Letter.deliveredAt`, but the inbox UI queries `JournalEntry.unlockDate`/`isDelivered`. Fix: add a Phase-4-aware inbox query path that unions `JournalEntry`-shaped legacy letters with native `Letter where letterType='self' AND scheduledFor <= now()`. Likely needs a new dedicated route plus an `InboxView` update.
-2. **Stored XSS in recipient page.** [src/app/letter/[token]/page.tsx:154](../src/app/letter/[token]/page.tsx#L154) renders `state.data.text` via `dangerouslySetInnerHTML`. The text is sender-authored HTML, encrypted, so the server can't sanitize. Fix: sanitize on the client right before render with DOMPurify (`npm i dompurify @types/dompurify`).
+1. ~~**Phase 4 self-letters are unreadable.** Native `Letter` rows with `letterType='self'` are never surfaced by any read route — all routes anchor on `JournalEntry`.~~ **FIXED in `c17d550`.** `listLettersForRead` and `findLetterForRead` now also query native `Letter where letterType='self' AND sourceJournalEntryId IS NULL` and map them into the dual-read shape. The inbox route surfaces `text` (ciphertext) inline so the reveal modal decrypts without a second fetch. IV is aliased under both `e2eeIVs.text` and `e2eeIVs.content` so legacy `decryptEntryFromServer` consumers and new `decryptSelfLetterContent` consumers both find it.
+2. ~~**Stored XSS in recipient page.**~~ **FIXED in `6066142`.** `src/app/letter/[token]/page.tsx` now pipes the decrypted HTML through DOMPurify with a tight allow-list (`p, br, strong, em, u, s, a, h1-3, blockquote, code, pre, ul, ol, li, span, div`; allowed attrs `href, target, rel, class, style`; URI scheme allow-list `https?|mailto`) before `dangerouslySetInnerHTML`. No `script`, no `iframe`, no `on*` attrs.
 
 ### 🟠 Important
-3. **Master key persisted in localStorage as raw bytes.** `storeMasterKeyLocally` in `src/lib/e2ee/crypto.ts`. XSS → full account compromise. Mitigation: switch to `sessionStorage` or wrap with a device-bound key via WebCrypto `wrapKey`. (Cross-Phase concern; not Phase 4 specific.)
-4. **Non-atomic Resend rollback.** [src/app/api/letters/friend/route.ts:124-125](../src/app/api/letters/friend/route.ts#L124-L125). Two separate `.delete().catch(()=>{})` calls. Fix: `prisma.$transaction([...])`.
-5. **24h countdown client-computed.** [src/app/letter/[token]/page.tsx:100](../src/app/letter/[token]/page.tsx#L100). Reopening the page restarts the countdown visually (server math is still correct). Fix: return `firstReadAt` from `/meta` and base the countdown on `firstReadAt + 24h`.
+3. **Master key persisted in localStorage as raw bytes.** `storeMasterKeyLocally` in `src/lib/e2ee/crypto.ts`. XSS → full account compromise. Mitigation: switch to `sessionStorage` or wrap with a device-bound key via WebCrypto `wrapKey`. (Cross-Phase concern; not Phase 4 specific. **Open.**)
+4. ~~**Non-atomic Resend rollback.**~~ **FIXED in `792de0a`.** Both deletes are now wrapped in `prisma.$transaction([...])`.
+5. ~~**24h countdown client-computed.**~~ **FIXED in `6066142`.** `/api/letter/[token]/meta` now returns `firstReadAt`; the recipient page uses `firstReadAt + 24h` for the countdown when present.
 6. **E2EE photos silently dropped from friend letters.** [src/lib/letters/friend-letter-client.ts:45](../src/lib/letters/friend-letter-client.ts#L45) filters out photos without a plain `url`. Sender sees photos at compose; recipient doesn't. Fix: warn at seal time in `SealModal`.
-7. **IV-shape mismatch in `/arrived` + `/mine`.** These routes return `e2eeIVs` (JournalEntry shape: per-field `{text, textPreview, …}`) but `decryptSelfLetterContent` expects `contentIVs: {content: iv}`. Masked today because of #1 (no Phase 4 self-letter reaches these routes), but unblocks the moment #1 is fixed.
+7. ~~**IV-shape mismatch in `/arrived` + `/mine`.**~~ **FIXED in `c17d550`** alongside Critical #1. Native rows' single `contentIVs.content` is now exposed under both `e2eeIVs.content` and `e2eeIVs.text` in the dual-read response, so legacy `decryptEntryFromServer` (looking for `e2eeIVs.text`) and the new `decryptSelfLetterContent` (looking for `contentIVs.content`) both resolve the same IV.
 
 ### 🟡 Lower priority
 8. **No Svix timestamp freshness check.** Replay window is unbounded. Reject `svix-timestamp` older than ~5 min.
@@ -286,14 +288,17 @@ NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (cur
 Things you must verify or undo before going public:
 
 - [ ] Search `git grep PRELAUNCH-TEST-PILLS src/` and follow the cleanup notes (remove `5m`/`1h` pills, restore 7-day server floor).
-- [ ] Fix Critical #1 (self-letter inbox) — without it, the self-letter feature is non-functional.
-- [ ] Fix Critical #2 (XSS) — single-route fix, low effort.
-- [ ] Decide on Important #3 (localStorage master key) — minimum: sessionStorage. Recommended: WebCrypto wrapKey.
+- [x] ~~Fix Critical #1 (self-letter inbox).~~ Done in `c17d550`.
+- [x] ~~Fix Critical #2 (XSS).~~ Done in `6066142`.
+- [ ] Decide on Important #3 (localStorage master key) — minimum: `sessionStorage`. Recommended: WebCrypto `wrapKey` with a device-bound key.
 - [ ] Remove dead `sendFriendLetterMagicLink` and the legacy `/api/letter/[token]` + `/api/cron/deliver-letters` routes — Phase 5-cleanup work.
+- [ ] Decide on Important #6 (E2EE photos silently dropped) — minimum: warn the sender at seal time; longer-term: ship recipient-side photo-handle exchange.
+- [ ] Add Svix timestamp freshness check to the Resend webhook (Lower #8) — reject `svix-timestamp` older than ~5 min.
+- [ ] Strip control chars from `senderName` in the email subject line (Lower #9).
 - [ ] Confirm `RESEND_WEBHOOK_SECRET` is set in production and the Resend dashboard webhook points at `${NEXT_PUBLIC_APP_URL}/api/webhooks/resend`.
 - [ ] Confirm both crons are scheduled (Vercel Cron or external) — daily `self-letter-reminders` and daily `letter-cleanup`.
 - [ ] Confirm `RESEND_FROM_LETTERS`, `RESEND_FROM_SYSTEM`, `DRAND_CHAIN_HASH`, `DRAND_API_URLS` are set in production.
-- [ ] Pen-test a malicious sender attempting XSS in letter body once the DOMPurify fix is in.
+- [ ] Pen-test a malicious sender attempting XSS in letter body to confirm the DOMPurify allow-list is tight enough.
 
 ---
 
