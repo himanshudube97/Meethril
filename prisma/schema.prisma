@@ -185,6 +185,14 @@ model Letter {
   bouncedAt          DateTime?
   bouncedReason      String?
 
+  // Phase 4.1: when a recipient hits "Keep forever," the photos from the
+  // LetterDeliveryAsset rows get re-encrypted under their master key and
+  // uploaded to their photo storage. The resulting refs land here as a
+  // JSON array. Null for non-received letters and for received-friend
+  // letters with no photos. Drops in Phase 7 cleanup if we ever
+  // normalize this.
+  keptPhotoRefs Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

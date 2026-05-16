@@ -115,9 +115,44 @@ export default function LetterPage() {
         const json = new TextDecoder().decode(plaintextBytes)
         const data: LetterContent = JSON.parse(json)
 
-        // Cache decrypted content for the Keep-forever flow (sessionStorage,
-        // tab-scoped). Cleared after save.
+        // Cache decrypted content + K + asset blobs for the Keep-forever
+        // flow (sessionStorage, tab-scoped). Cleared after save.
+        // K is base64-encoded; asset ciphertexts are already base64 strings.
         try {
+          const Kbase64 = btoa(String.fromCharCode(...K))
+
+          // Pre-fetch each asset blob so the Save page can re-encrypt them
+          // without needing the URL fragment (which won't survive navigation).
+          const cachedAssets: Array<{
+            id: string
+            type: string
+            position: number
+            spread: number
+            rotation: number
+            ordinal: number
+            ciphertext: string
+            iv: string
+          }> = []
+          for (const a of meta.assets ?? []) {
+            try {
+              const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
+              if (!r.ok) continue
+              const j = (await r.json()) as { ciphertext: string; iv: string }
+              cachedAssets.push({
+                id: a.id,
+                type: a.type,
+                position: a.position,
+                spread: a.spread,
+                rotation: a.rotation,
+                ordinal: a.ordinal,
+                ciphertext: j.ciphertext,
+                iv: j.iv,
+              })
+            } catch {
+              /* skip — Save flow can still proceed without this asset */
+            }
+          }
+
           sessionStorage.setItem(
             `${SESSION_KEY_PREFIX}${params.token}`,
             JSON.stringify({
@@ -125,6 +160,8 @@ export default function LetterPage() {
               senderName: meta.senderName ?? 'Someone special',
               recipientName: meta.recipientName ?? 'Friend',
               scheduledFor: meta.scheduledFor,
+              K: Kbase64,
+              assets: cachedAssets,
             })
           )
         } catch {

@@ -4,15 +4,85 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useE2EEStore } from '@/store/e2ee'
-import { encryptString } from '@/lib/e2ee/crypto'
+import { encryptString, encryptBytes } from '@/lib/e2ee/crypto'
+import { decryptTransient } from '@/lib/letters/transient-crypto'
 
 const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 
 interface CachedLetter {
-  content: { text: string; song: string | null; photos: unknown[]; doodles: unknown[] }
+  content: { text: string; song: string | null; doodles: unknown[] }
   senderName: string
   recipientName: string
   scheduledFor: string
+  K?: string // base64-encoded — present for letters with photo/doodle assets
+  assets?: Array<{
+    id: string
+    type: string
+    position: number
+    spread: number
+    rotation: number
+    ordinal: number
+    ciphertext: string
+    iv: string
+  }>
+}
+
+type PhotoRef = {
+  encryptedRef: string
+  encryptedRefIV: string
+  position: number
+  spread: number
+  rotation: number
+  ordinal: number
+}
+
+/**
+ * For each photo asset cached from the read page:
+ * 1. Decrypt the asset bytes using the transient key K.
+ * 2. Re-encrypt under the recipient's master key.
+ * 3. Upload to /api/photos (raw binary body).
+ * 4. Pack the resulting handle + iv into an encryptedRef (same shape as
+ *    EntryPhoto.encryptedRef in the main journal).
+ */
+async function uploadKeptPhotos(args: {
+  K: Uint8Array
+  assets: NonNullable<CachedLetter['assets']>
+  masterKey: CryptoKey
+}): Promise<PhotoRef[]> {
+  const photoRefs: PhotoRef[] = []
+  for (const a of args.assets) {
+    if (a.type !== 'photo') continue
+    // 1. Decrypt under transient key K
+    const bytes = await decryptTransient(a.ciphertext, a.iv, args.K)
+    // 2. Re-encrypt under recipient's master key
+    const { ciphertext: photoCt, iv: photoIv } = await encryptBytes(
+      bytes.buffer as ArrayBuffer,
+      args.masterKey,
+    )
+    // 3. Upload to recipient's photo storage (raw binary body)
+    const upRes = await fetch('/api/photos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: Uint8Array.from(atob(photoCt), (c) => c.charCodeAt(0)),
+    })
+    if (!upRes.ok) throw new Error('Could not save photo to your account')
+    const { handle } = (await upRes.json()) as { handle: string }
+    // 4. Pack the ref — same shape as EntryPhoto.encryptedRef
+    const refJson = JSON.stringify({ handle, iv: photoIv })
+    const { ciphertext: encryptedRef, iv: encryptedRefIV } = await encryptString(
+      refJson,
+      args.masterKey,
+    )
+    photoRefs.push({
+      encryptedRef,
+      encryptedRefIV,
+      position: a.position,
+      spread: a.spread,
+      rotation: a.rotation,
+      ordinal: a.ordinal,
+    })
+  }
+  return photoRefs
 }
 
 export default function SavePage() {
@@ -48,6 +118,11 @@ export default function SavePage() {
       // Branch 1: already logged in + unlocked
       if (loggedInHint && masterKey) {
         setState({ kind: 'saving' })
+        const K = cached.K ? Uint8Array.from(atob(cached.K), (c) => c.charCodeAt(0)) : null
+        const photoRefs =
+          K && cached.assets && cached.assets.length > 0
+            ? await uploadKeptPhotos({ K, assets: cached.assets, masterKey })
+            : []
         const { ciphertext, iv } = await encryptString(
           JSON.stringify(cached.content),
           masterKey
@@ -59,6 +134,7 @@ export default function SavePage() {
             publicToken: params.token,
             contentCiphertext: ciphertext,
             contentIVs: { content: iv },
+            photoRefs,
           }),
         })
         if (!res.ok) {
@@ -184,6 +260,11 @@ function OtpFlow({ token }: { token: string }) {
         const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${token}`)
         if (!raw) throw new Error('Lost the decrypted letter — try reopening the original link.')
         const cached: CachedLetter = JSON.parse(raw)
+        const K = cached.K ? Uint8Array.from(atob(cached.K), (c) => c.charCodeAt(0)) : null
+        const photoRefs =
+          K && cached.assets && cached.assets.length > 0
+            ? await uploadKeptPhotos({ K, assets: cached.assets, masterKey })
+            : []
         const { ciphertext, iv } = await encryptString(JSON.stringify(cached.content), masterKey)
         const r = await fetch('/api/letters/save-received', {
           method: 'POST',
@@ -192,6 +273,7 @@ function OtpFlow({ token }: { token: string }) {
             publicToken: token,
             contentCiphertext: ciphertext,
             contentIVs: { content: iv },
+            photoRefs,
           }),
         })
         if (!r.ok) {

@@ -9,6 +9,14 @@ interface Body {
   publicToken: string
   contentCiphertext: string
   contentIVs: { content: string }
+  photoRefs?: Array<{
+    encryptedRef: string
+    encryptedRefIV: string
+    position: number
+    spread: number
+    rotation: number
+    ordinal: number
+  }>
 }
 
 export async function POST(request: NextRequest) {
@@ -75,6 +83,7 @@ export async function POST(request: NextRequest) {
         isSealed: true,
         isReceivedLetter: true,
         savedByRecipientAt: savedAt,
+        keptPhotoRefs: body.photoRefs && body.photoRefs.length > 0 ? body.photoRefs : undefined,
       },
       select: { id: true },
     }),
