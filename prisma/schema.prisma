@@ -221,8 +221,41 @@ model LetterDelivery {
 
   createdAt DateTime @default(now())
 
+  assets LetterDeliveryAsset[]
+
   @@index([transientExpiresAt])
   @@map("letter_deliveries")
+}
+
+model LetterDeliveryAsset {
+  id         String         @id @default(cuid())
+  deliveryId String
+  delivery   LetterDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  // K-encrypted asset bytes (base64). Recipient has K via the URL
+  // fragment + tlock; decrypts with K to recover the original photo
+  // or doodle bytes.
+  ciphertext String @db.Text
+  iv         String
+
+  // Asset kind. v1 stores 'photo' here. Doodles inline in the transient
+  // ciphertext for size, so 'doodle' is reserved for future per-stroke
+  // separation if a doodle ever grows large enough to warrant it.
+  type String // 'photo' | 'doodle'
+
+  // Layout metadata — plaintext on the server because it's not sensitive
+  // (position numbers, not content). Recipient renders based on these.
+  position Int @default(0)
+  spread   Int @default(1)
+  rotation Int @default(0)
+
+  // Display order within a spread. Smaller first.
+  ordinal Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([deliveryId])
+  @@map("letter_delivery_assets")
 }
 
 model Doodle {
