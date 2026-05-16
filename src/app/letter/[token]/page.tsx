@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { tlockDecryptKey } from '@/lib/letters/tlock'
 import { decryptTransient } from '@/lib/letters/transient-crypto'
 import DOMPurify from 'dompurify'
+import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
+import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
 
 // TipTap output uses these — keep the allow-list tight so injected
 // tags/attrs/handlers can't execute. NO 'script', NO 'iframe', NO 'on*'.
@@ -23,8 +25,16 @@ function sanitizeLetter(html: string): string {
 type LetterContent = {
   text: string
   song: string | null
-  photos: Array<{ url: string; position: number; spread: number; rotation: number }>
-  doodles: unknown[]
+  doodles: Array<{ strokes: unknown; spread: number; positionInEntry: number }>
+}
+
+type AssetMeta = {
+  id: string
+  type: string
+  position: number
+  spread: number
+  rotation: number
+  ordinal: number
 }
 
 type State =
@@ -33,7 +43,15 @@ type State =
   | { kind: 'expired' }
   | { kind: 'not_found' }
   | { kind: 'error'; message: string }
-  | { kind: 'ok'; data: LetterContent; senderName: string; recipientName: string; expiresAt: Date }
+  | {
+      kind: 'ok'
+      data: LetterContent
+      senderName: string
+      recipientName: string
+      expiresAt: Date
+      K: Uint8Array
+      assets: AssetMeta[]
+    }
 
 const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 
@@ -69,6 +87,7 @@ export default function LetterPage() {
           recipientName: string | null
           alreadyExpired: boolean
           firstReadAt: string | null
+          assets: AssetMeta[]
         }
         if (meta.alreadyExpired) return setState({ kind: 'expired' })
         if (!meta.scheduledFor) throw new Error('letter has no scheduledFor')
@@ -121,6 +140,8 @@ export default function LetterPage() {
           senderName: meta.senderName ?? 'Someone special',
           recipientName: meta.recipientName ?? 'Friend',
           expiresAt,
+          K,
+          assets: meta.assets ?? [],
         })
       } catch (e) {
         setState({ kind: 'error', message: e instanceof Error ? e.message : 'Unknown error' })
@@ -175,6 +196,8 @@ export default function LetterPage() {
             Song they sent: <a href={state.data.song}>{state.data.song}</a>
           </p>
         )}
+        <LetterPhotos token={params.token} assets={state.assets} K={state.K} />
+        <LetterDoodles doodles={state.data.doodles as never} />
         <KeepForeverCTA token={params.token} router={router} />
       </div>
     </div>
