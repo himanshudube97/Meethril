@@ -91,6 +91,10 @@ export interface SentStamp {
   unlockDate: string | null
   isDelivered: boolean
   letterPeekedAt: string | null
+  firstReadAt: string | null
+  savedByRecipientAt: string | null
+  bouncedAt: string | null
+  bouncedReason: string | null
   encryptionType?: string
   e2eeIVs?: unknown
 }

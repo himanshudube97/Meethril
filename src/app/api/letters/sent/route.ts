@@ -13,6 +13,10 @@ interface SentStamp {
   unlockDate: string | null
   isDelivered: boolean
   letterPeekedAt: string | null
+  firstReadAt: string | null
+  savedByRecipientAt: string | null
+  bouncedAt: string | null
+  bouncedReason: string | null
   encryptionType: string
   e2eeIVs: unknown
 }
@@ -41,6 +45,10 @@ export async function GET() {
     unlockDate: l.unlockDate ? l.unlockDate.toISOString() : null,
     isDelivered: l.isDelivered,
     letterPeekedAt: l.letterPeekedAt ? l.letterPeekedAt.toISOString() : null,
+    firstReadAt: l.firstReadAt ? l.firstReadAt.toISOString() : null,
+    savedByRecipientAt: l.savedByRecipientAt ? l.savedByRecipientAt.toISOString() : null,
+    bouncedAt: l.bouncedAt ? l.bouncedAt.toISOString() : null,
+    bouncedReason: l.bouncedReason ?? null,
     encryptionType: l.encryptionType,
     e2eeIVs: l.e2eeIVs,
   }))

@@ -53,6 +53,12 @@ export interface DualReadLetter {
   originalSenderId: string | null
   originalEntryId: string | null
 
+  // Phase 4+ delivery lifecycle fields (sourced from Letter row; null when no Letter row exists)
+  firstReadAt: Date | null
+  savedByRecipientAt: Date | null
+  bouncedAt: Date | null
+  bouncedReason: string | null
+
   // Timestamps
   createdAt: Date
   updatedAt: Date
@@ -93,6 +99,10 @@ export async function findLetterForRead(args: {
         scheduledFor: true,
         originalSenderId: true,
         originalLetterId: true,
+        firstReadAt: true,
+        savedByRecipientAt: true,
+        bouncedAt: true,
+        bouncedReason: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -163,6 +173,10 @@ export async function findLetterForRead(args: {
       isArchived: je.isArchived,
       originalSenderId: je.originalSenderId,
       originalEntryId: je.originalEntryId,
+      firstReadAt: null,
+      savedByRecipientAt: null,
+      bouncedAt: null,
+      bouncedReason: null,
       createdAt: je.createdAt,
       updatedAt: je.updatedAt,
       _source: 'je-only',
@@ -195,6 +209,10 @@ export async function findLetterForRead(args: {
     isArchived: je.isArchived,
     originalSenderId: je.originalSenderId,
     originalEntryId: je.originalEntryId,
+    firstReadAt: letter.firstReadAt,
+    savedByRecipientAt: letter.savedByRecipientAt,
+    bouncedAt: letter.bouncedAt,
+    bouncedReason: letter.bouncedReason,
     createdAt: letter.createdAt,
     updatedAt: letter.updatedAt,
     _source: 'letter+je',
@@ -263,6 +281,10 @@ export async function listLettersForRead(args: {
       senderName: true,
       letterLocation: true,
       scheduledFor: true,
+      firstReadAt: true,
+      savedByRecipientAt: true,
+      bouncedAt: true,
+      bouncedReason: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -297,6 +319,10 @@ export async function listLettersForRead(args: {
         isArchived: je.isArchived,
         originalSenderId: je.originalSenderId,
         originalEntryId: je.originalEntryId,
+        firstReadAt: null,
+        savedByRecipientAt: null,
+        bouncedAt: null,
+        bouncedReason: null,
         createdAt: je.createdAt,
         updatedAt: je.updatedAt,
         _source: 'je-only',
@@ -325,6 +351,10 @@ export async function listLettersForRead(args: {
       isArchived: je.isArchived,
       originalSenderId: je.originalSenderId,
       originalEntryId: je.originalEntryId,
+      firstReadAt: letter.firstReadAt,
+      savedByRecipientAt: letter.savedByRecipientAt,
+      bouncedAt: letter.bouncedAt,
+      bouncedReason: letter.bouncedReason,
       createdAt: letter.createdAt,
       updatedAt: letter.updatedAt,
       _source: 'letter+je',
