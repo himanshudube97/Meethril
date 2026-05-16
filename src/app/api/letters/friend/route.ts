@@ -49,8 +49,16 @@ export async function POST(request: NextRequest) {
   }
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
-  if (scheduledFor.getTime() < Date.now() + sevenDaysMs - 60_000) {
-    return NextResponse.json({ error: 'scheduledFor too soon (min 7 days)' }, { status: 400 })
+  // In dev mode the 7-day floor is relaxed to 1 minute so the 5m / 1h
+  // SealModal pills work end-to-end. Production keeps the 7-day floor.
+  // Remove this dev-mode branch when test scaffolding is no longer needed.
+  const isDevAuth = process.env.USE_DEV_AUTH === 'true'
+  const minLeadMs = isDevAuth ? 60_000 : sevenDaysMs
+  if (scheduledFor.getTime() < Date.now() + minLeadMs - 60_000) {
+    return NextResponse.json(
+      { error: isDevAuth ? 'scheduledFor too soon (min ~1 minute in dev)' : 'scheduledFor too soon (min 7 days)' },
+      { status: 400 },
+    )
   }
   if (scheduledFor.getTime() > Date.now() + thirtyDaysMs + 60_000) {
     return NextResponse.json({ error: 'scheduledFor too late (max 30 days)' }, { status: 400 })

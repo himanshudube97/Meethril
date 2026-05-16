@@ -5,7 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 
 type SelfPill = '1w' | '1m' | '6m' | '1y' | 'custom'
-type FriendPill = '1w' | '2w' | '30d' | 'custom'
+// '5m' and '1h' are TEST-ONLY pills, gated to dev mode below. Remove both
+// the pill values AND the `isDevAuth` rendering branch when test scaffolding
+// is no longer needed.
+type FriendPill = '5m' | '1h' | '1w' | '2w' | '30d' | 'custom'
+
+const isDevAuth = process.env.NEXT_PUBLIC_USE_DEV_AUTH === 'true'
 
 function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
   const now = Date.now()
@@ -18,7 +23,11 @@ function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
 
 function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
   const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  if (p === '5m') return new Date(now + 5 * minute)
+  if (p === '1h') return new Date(now + hour)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '2w') return new Date(now + 14 * day)
   return new Date(now + 30 * day)
@@ -39,7 +48,11 @@ function labelForSelf(p: SelfPill): string {
 }
 
 function labelForFriend(p: FriendPill): string {
-  return p === '1w'
+  return p === '5m'
+    ? '5 min (test)'
+    : p === '1h'
+    ? '1 hr (test)'
+    : p === '1w'
     ? '1 week'
     : p === '2w'
     ? '2 weeks'
@@ -215,7 +228,13 @@ export function SealModal({
                         {labelForSelf(p)}
                       </button>
                     ))
-                  : (['1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
+                  : ([
+                      ...(isDevAuth ? (['5m', '1h'] as FriendPill[]) : []),
+                      '1w',
+                      '2w',
+                      '30d',
+                      'custom',
+                    ] as FriendPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"
