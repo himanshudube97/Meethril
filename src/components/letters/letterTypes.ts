@@ -82,6 +82,10 @@ export interface InboxLetter {
   isViewed: boolean
   encryptionType?: string
   e2eeIVs?: unknown
+  // Ciphertext (E2EE) or decrypted text (server). Included inline so RevealModal
+  // can decrypt without a second /api/entries/[id] roundtrip — required for
+  // Phase 4 native self-letters whose id is a Letter.id with no JournalEntry.
+  text?: string
 }
 
 export interface SentStamp {

@@ -23,6 +23,26 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
     if (!letter) return
     setPhase(letter.isViewed ? 'shown' : 'sealed')
     setBody('')
+
+    // Prefer the ciphertext/text that is included inline in the inbox response
+    // (added in Phase 4). This avoids a /api/entries/[id] roundtrip that would
+    // 404 for native self-letters whose id is a Letter.id with no JournalEntry.
+    if (letter.text !== undefined) {
+      const inlineEntry = {
+        id: letter.id,
+        text: letter.text,
+        encryptionType: letter.encryptionType,
+        e2eeIVs: letter.e2eeIVs,
+      } as unknown as JournalEntry
+      decryptEntryFromServer(inlineEntry)
+        .then(decrypted => setBody((decrypted?.text || '').toString()))
+        .catch(() => setBody(''))
+      return
+    }
+
+    // Legacy fallback: fetch from /api/entries/[id] for older letters that
+    // don't carry inline text. Only applies to JournalEntry-anchored rows
+    // (where letter.id is a JournalEntry.id).
     fetch(`/api/entries/${letter.id}`)
       .then(r => r.json())
       .then(async d => {

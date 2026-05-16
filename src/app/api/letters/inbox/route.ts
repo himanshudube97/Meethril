@@ -14,6 +14,10 @@ interface InboxLetter {
   isViewed: boolean
   encryptionType: string
   e2eeIVs: unknown
+  // Included inline so RevealModal can decrypt without a second /api/entries/[id]
+  // roundtrip — required for Phase 4 native self-letters whose id is a Letter.id
+  // with no corresponding JournalEntry row.
+  text: string
 }
 
 export async function GET() {
@@ -34,6 +38,9 @@ export async function GET() {
 
   // For E2EE, return ciphertext + IVs so the client can decrypt with its master key.
   // For server-encrypted, decrypt server-side as before.
+  // text is included inline: RevealModal uses it directly for native Phase 4
+  // self-letters (Letter.id with no JournalEntry) to avoid a /api/entries/[id]
+  // roundtrip that would 404.
   const result: InboxLetter[] = letters.map((l) => ({
     id: l.id,
     recipientName:
@@ -45,6 +52,7 @@ export async function GET() {
     isViewed: l.isViewed,
     encryptionType: l.encryptionType,
     e2eeIVs: l.e2eeIVs,
+    text: l.encryptionType === 'server' ? safeDecrypt(l.text) : l.text,
   }))
 
   return NextResponse.json({ letters: result })
