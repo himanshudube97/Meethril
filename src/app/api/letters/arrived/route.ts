@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { safeDecrypt } from '@/lib/encryption'
 import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
@@ -69,22 +68,18 @@ export async function GET() {
     }
     const songByEntry = new Map(songRows.map((s) => [s.id, s.song]))
 
-    const decryptedLetters = letters.map((letter) => {
-      const isE2EE = letter.encryptionType === 'e2ee'
-      return {
-        id: letter.id,
-        text: isE2EE ? letter.text : safeDecrypt(letter.text),
-        createdAt: letter.createdAt,
-        unlockDate: letter.unlockDate,
-        letterLocation: isE2EE ? letter.letterLocation : safeDecrypt(letter.letterLocation),
-        isDelivered: letter.isDelivered,
-        song: songByEntry.get(letter.id) ?? null,
-        encryptionType: letter.encryptionType,
-        e2eeIVs: letter.e2eeIVs,
-        photos: photosByEntry.get(letter.id) ?? [],
-        doodles: doodlesByEntry.get(letter.id) ?? [],
-      }
-    })
+    const decryptedLetters = letters.map((letter) => ({
+      id: letter.id,
+      text: letter.text,
+      createdAt: letter.createdAt,
+      unlockDate: letter.unlockDate,
+      letterLocation: letter.letterLocation,
+      isDelivered: letter.isDelivered,
+      song: songByEntry.get(letter.id) ?? null,
+      e2eeIVs: letter.e2eeIVs,
+      photos: photosByEntry.get(letter.id) ?? [],
+      doodles: doodlesByEntry.get(letter.id) ?? [],
+    }))
 
     return NextResponse.json({
       letters: decryptedLetters,

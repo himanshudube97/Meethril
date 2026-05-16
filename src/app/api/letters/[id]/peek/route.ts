@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { safeDecrypt } from '@/lib/encryption'
 import { findLetterForRead } from '@/lib/letters/dual-read'
 
 export async function POST(
@@ -24,11 +23,9 @@ export async function POST(
     })
   }
 
-  // For E2EE return ciphertext + IVs so client decrypts; otherwise decrypt server-side.
-  const body = letter.encryptionType === 'server' ? safeDecrypt(letter.text) : letter.text
+  // Return ciphertext + IVs so client decrypts with its master key.
   return NextResponse.json({
-    body,
-    encryptionType: letter.encryptionType,
+    body: letter.text,
     e2eeIVs: letter.e2eeIVs,
   })
 }

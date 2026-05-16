@@ -1,7 +1,6 @@
 // src/app/api/letters/drafts/route.ts
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { safeDecrypt } from '@/lib/encryption'
 import { listLettersForRead } from '@/lib/letters/dual-read'
 import type { Prisma } from '@prisma/client'
 
@@ -13,7 +12,6 @@ interface DraftStamp {
   recipientName: string | null
   recipientEmail: string | null
   text: string
-  encryptionType: string
   e2eeIV: string | null
   e2eeIVs: Prisma.JsonValue | null
   isSealed: boolean
@@ -38,16 +36,9 @@ export async function GET() {
   const result: DraftStamp[] = letters.map((l) => ({
     id: l.id,
     entryType: l.entryType as 'letter' | 'unsent_letter', // safe: where-clause filters to these two values
-    recipientName:
-      l.recipientName && l.encryptionType === 'server'
-        ? safeDecrypt(l.recipientName)
-        : l.recipientName,
-    recipientEmail:
-      l.recipientEmail && l.encryptionType === 'server'
-        ? safeDecrypt(l.recipientEmail)
-        : l.recipientEmail,
-    text: l.encryptionType === 'server' ? safeDecrypt(l.text) : l.text,
-    encryptionType: l.encryptionType,
+    recipientName: l.recipientName,
+    recipientEmail: l.recipientEmail,
+    text: l.text,
     e2eeIV: l.e2eeIV,
     e2eeIVs: l.e2eeIVs,
     isSealed: l.isSealed,

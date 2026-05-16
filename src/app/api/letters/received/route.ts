@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { safeDecrypt } from '@/lib/encryption'
 import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
@@ -55,12 +54,12 @@ export async function GET() {
     const now = new Date()
     const lettersWithStatus = letters.map((letter) => ({
       id: letter.id,
-      text: safeDecrypt(letter.text),
+      text: letter.text,
       createdAt: letter.createdAt.toISOString(),
       unlockDate: letter.unlockDate?.toISOString() || null,
       isSealed: letter.isSealed,
-      letterLocation: safeDecrypt(letter.letterLocation),
-      senderName: safeDecrypt(letter.senderName),
+      letterLocation: letter.letterLocation,
+      senderName: letter.senderName,
       originalSenderId: letter.originalSenderId,
       isViewed: letter.isViewed,
       isDelivered: letter.isDelivered,

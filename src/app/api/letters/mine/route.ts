@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { safeDecrypt } from '@/lib/encryption'
 import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
@@ -53,26 +52,22 @@ export async function GET() {
     const songByEntry = new Map(songRows.map((s) => [s.id, s.song]))
 
     const now = new Date()
-    const lettersWithStatus = letters.map((letter) => {
-      const isE2EE = letter.encryptionType === 'e2ee'
-      return {
-        id: letter.id,
-        text: isE2EE ? letter.text : safeDecrypt(letter.text),
-        createdAt: letter.createdAt.toISOString(),
-        unlockDate: letter.unlockDate?.toISOString() || null,
-        isSealed: letter.isSealed,
-        letterLocation: isE2EE ? letter.letterLocation : safeDecrypt(letter.letterLocation),
-        recipientEmail: letter.recipientEmail,
-        recipientName: isE2EE ? letter.recipientName : safeDecrypt(letter.recipientName),
-        isViewed: letter.isViewed,
-        song: songByEntry.get(letter.id) ?? null,
-        encryptionType: letter.encryptionType,
-        e2eeIVs: letter.e2eeIVs,
-        photos: photosByEntry.get(letter.id) ?? [],
-        doodles: doodlesByEntry.get(letter.id) ?? [],
-        hasArrived: letter.unlockDate && letter.unlockDate <= now && !letter.recipientEmail,
-      }
-    })
+    const lettersWithStatus = letters.map((letter) => ({
+      id: letter.id,
+      text: letter.text,
+      createdAt: letter.createdAt.toISOString(),
+      unlockDate: letter.unlockDate?.toISOString() || null,
+      isSealed: letter.isSealed,
+      letterLocation: letter.letterLocation,
+      recipientEmail: letter.recipientEmail,
+      recipientName: letter.recipientName,
+      isViewed: letter.isViewed,
+      song: songByEntry.get(letter.id) ?? null,
+      e2eeIVs: letter.e2eeIVs,
+      photos: photosByEntry.get(letter.id) ?? [],
+      doodles: doodlesByEntry.get(letter.id) ?? [],
+      hasArrived: letter.unlockDate && letter.unlockDate <= now && !letter.recipientEmail,
+    }))
 
     return NextResponse.json({ letters: lettersWithStatus })
   } catch (error) {
