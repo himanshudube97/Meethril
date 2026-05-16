@@ -269,7 +269,7 @@ NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (cur
 2. ~~**Stored XSS in recipient page.**~~ **FIXED in `6066142`.** `src/app/letter/[token]/page.tsx` now pipes the decrypted HTML through DOMPurify with a tight allow-list (`p, br, strong, em, u, s, a, h1-3, blockquote, code, pre, ul, ol, li, span, div`; allowed attrs `href, target, rel, class, style`; URI scheme allow-list `https?|mailto`) before `dangerouslySetInnerHTML`. No `script`, no `iframe`, no `on*` attrs.
 
 ### 🟠 Important
-3. **Master key persisted in localStorage as raw bytes.** `storeMasterKeyLocally` in `src/lib/e2ee/crypto.ts`. XSS → full account compromise. Mitigation: switch to `sessionStorage` or wrap with a device-bound key via WebCrypto `wrapKey`. (Cross-Phase concern; not Phase 4 specific. **Open.**)
+3. ~~**Master key persisted in localStorage as raw bytes.**~~ **PARTIALLY FIXED in `972e617`.** The key now lives in `sessionStorage` only — tab close = key gone, exposure window is one session instead of seven days. User trades "type passphrase once a week" for "type passphrase once per session." A stronger mitigation (WebCrypto `wrapKey` with a non-extractable device-bound key) is still desirable longer-term but not blocking.
 4. ~~**Non-atomic Resend rollback.**~~ **FIXED in `792de0a`.** Both deletes are now wrapped in `prisma.$transaction([...])`.
 5. ~~**24h countdown client-computed.**~~ **FIXED in `6066142`.** `/api/letter/[token]/meta` now returns `firstReadAt`; the recipient page uses `firstReadAt + 24h` for the countdown when present.
 6. **E2EE photos silently dropped from friend letters.** [src/lib/letters/friend-letter-client.ts:45](../src/lib/letters/friend-letter-client.ts#L45) filters out photos without a plain `url`. Sender sees photos at compose; recipient doesn't. Fix: warn at seal time in `SealModal`.
@@ -279,7 +279,7 @@ NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (cur
 8. **No Svix timestamp freshness check.** Replay window is unbounded. Reject `svix-timestamp` older than ~5 min.
 9. **Email subject uses unescaped `senderName`.** Not HTML-injection, but a nickname with a newline could inject SMTP headers in legacy MTAs. Strip control chars.
 10. **`sendFriendLetterMagicLink` is dead.** Phase 3 legacy helper. Phase 5 cleanup.
-11. **CRON_SECRET only enforced when set.** `if (secret && auth !== ...)`. Make `require(secret)` explicit if production should fail-closed.
+11. ~~**CRON_SECRET only enforced when set.**~~ **FIXED in `db236db`** for the Phase 4 crons (`self-letter-reminders`, `letter-cleanup`). Both routes now return 500 in production when `CRON_SECRET` is unset. Dev keeps fail-open so local testing works. **Note:** the same pattern exists in 5 non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`, `deliver-letters`) — out of Phase 4 scope; consider applying the same pattern across the board.
 
 ---
 
@@ -290,9 +290,10 @@ Things you must verify or undo before going public:
 - [ ] Search `git grep PRELAUNCH-TEST-PILLS src/` and follow the cleanup notes (remove `5m`/`1h` pills, restore 7-day server floor).
 - [x] ~~Fix Critical #1 (self-letter inbox).~~ Done in `c17d550`.
 - [x] ~~Fix Critical #2 (XSS).~~ Done in `6066142`.
-- [ ] Decide on Important #3 (localStorage master key) — minimum: `sessionStorage`. Recommended: WebCrypto `wrapKey` with a device-bound key.
+- [x] ~~Important #3 minimum: localStorage → sessionStorage.~~ Done in `972e617`. (WebCrypto `wrapKey` upgrade is still a future improvement, not blocking.)
+- [ ] Decide on Important #6 (E2EE photos silently dropped) — planned: photos and doodles re-encrypted under K at seal time, delivered as `LetterDeliveryAsset` rows, recipient decrypts with the same K. ~8-10 hours; gets its own implementation plan.
 - [ ] Remove dead `sendFriendLetterMagicLink` and the legacy `/api/letter/[token]` + `/api/cron/deliver-letters` routes — Phase 5-cleanup work.
-- [ ] Decide on Important #6 (E2EE photos silently dropped) — minimum: warn the sender at seal time; longer-term: ship recipient-side photo-handle exchange.
+- [ ] Apply the fail-closed CRON_SECRET pattern (#11) to the 5 non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`, `deliver-letters`).
 - [ ] Add Svix timestamp freshness check to the Resend webhook (Lower #8) — reject `svix-timestamp` older than ~5 min.
 - [ ] Strip control chars from `senderName` in the email subject line (Lower #9).
 - [ ] Confirm `RESEND_WEBHOOK_SECRET` is set in production and the Resend dashboard webhook points at `${NEXT_PUBLIC_APP_URL}/api/webhooks/resend`.
