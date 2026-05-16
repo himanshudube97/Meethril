@@ -120,9 +120,15 @@ export async function POST(request: NextRequest) {
       data: { resendEmailId: id },
     })
   } catch (e) {
-    // Rollback rather than leave orphan crypto on disk.
-    await prisma.letterDelivery.delete({ where: { id: created.delivery.id } }).catch(() => {})
-    await prisma.letter.delete({ where: { id: created.letterId } }).catch(() => {})
+    // Rollback rather than leave orphan crypto on disk. Run both deletes
+    // in a single transaction so a transient DB failure during cleanup
+    // can't leave an orphan Letter ghost in the sender's sent list.
+    await prisma
+      .$transaction([
+        prisma.letterDelivery.delete({ where: { id: created.delivery.id } }),
+        prisma.letter.delete({ where: { id: created.letterId } }),
+      ])
+      .catch(() => {})
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'resend failed' },
       { status: 502 }
