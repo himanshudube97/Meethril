@@ -1,7 +1,7 @@
 // src/app/letter/[token]/save/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useE2EEStore } from '@/store/e2ee'
 import { encryptString } from '@/lib/e2ee/crypto'
@@ -123,7 +123,160 @@ function Centered({ title, sub }: { title: string; sub?: string }) {
   )
 }
 
-// Task 14 implements this component.
-function OtpFlow({ token: _ }: { token: string }) {
-  return <Centered title="Sign in to keep this letter" sub="(OTP flow not yet wired — Task 14)" />
+function OtpFlow({ token }: { token: string }) {
+  const router = useRouter()
+  const [stage, setStage] = useState<'email' | 'code' | 'onboarding' | 'saving' | 'done' | 'error'>('email')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const masterKey = useE2EEStore((s) => s.masterKey)
+  const showSetupModal = useE2EEStore((s) => s.showSetupModal)
+  const setShowSetupModal = useE2EEStore((s) => s.setShowSetupModal)
+
+  async function sendCode() {
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}))
+        throw new Error(j.error ?? 'Could not send code.')
+      }
+      setStage('code')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'unknown error')
+    } finally { setBusy(false) }
+  }
+
+  async function verifyCode() {
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'verify_otp', email, token: code }),
+      })
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}))
+        throw new Error(j.error ?? 'Invalid code.')
+      }
+      // Force E2EE onboarding modal — the new user has no master key yet.
+      setShowSetupModal(true)
+      setStage('onboarding')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'unknown error')
+    } finally { setBusy(false) }
+  }
+
+  // When onboarding completes, the e2ee store sets masterKey. Watch for it
+  // and trigger the save automatically.
+  useEffect(() => {
+    if (stage !== 'onboarding') return
+    if (!masterKey) return
+    if (showSetupModal) return // user hasn't finished yet
+    ;(async () => {
+      setStage('saving')
+      try {
+        const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${token}`)
+        if (!raw) throw new Error('Lost the decrypted letter — try reopening the original link.')
+        const cached: CachedLetter = JSON.parse(raw)
+        const { ciphertext, iv } = await encryptString(JSON.stringify(cached.content), masterKey)
+        const r = await fetch('/api/letters/save-received', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            publicToken: token,
+            contentCiphertext: ciphertext,
+            contentIVs: { content: iv },
+          }),
+        })
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}))
+          throw new Error(j.error ?? 'Save failed.')
+        }
+        sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${token}`)
+        setStage('done')
+        setTimeout(() => router.push('/me'), 1200)
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'unknown error')
+        setStage('error')
+      }
+    })()
+  }, [stage, masterKey, showSetupModal, token, router])
+
+  // Render
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f6efe2',
+        color: '#3d342a',
+        padding: 24,
+        fontFamily: 'Georgia, serif',
+      }}
+    >
+      <div style={{ maxWidth: 420, width: '100%' }}>
+        {stage === 'email' && (
+          <>
+            <h1 style={{ fontSize: 24, marginBottom: 12 }}>Sign up to keep this letter</h1>
+            <p style={{ opacity: 0.7, marginBottom: 24, fontSize: 15 }}>
+              We&apos;ll email you a 6-digit code. Saving the letter takes one minute.
+            </p>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              autoFocus
+              style={{ width: '100%', padding: '12px 16px', fontSize: 16, borderRadius: 8, border: '1px solid #3d342a33', background: '#fff' }}
+            />
+            <button onClick={sendCode} disabled={busy || !email} style={primaryBtn}>Send code</button>
+          </>
+        )}
+        {stage === 'code' && (
+          <>
+            <h1 style={{ fontSize: 24, marginBottom: 12 }}>Check your inbox.</h1>
+            <p style={{ opacity: 0.7, marginBottom: 24, fontSize: 15 }}>
+              We sent a 6-digit code to {email}.
+            </p>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="123456"
+              autoFocus
+              style={{ width: '100%', padding: '12px 16px', fontSize: 16, borderRadius: 8, border: '1px solid #3d342a33', background: '#fff' }}
+            />
+            <button onClick={verifyCode} disabled={busy || code.length < 4} style={primaryBtn}>Verify</button>
+          </>
+        )}
+        {stage === 'onboarding' && (
+          <Centered title="Set up your account..." sub="Pick a passphrase to encrypt your new letter." />
+        )}
+        {stage === 'saving' && <Centered title="Encrypting and saving..." />}
+        {stage === 'done' && <Centered title="Saved." sub="Heading to your Hearth..." />}
+        {stage === 'error' && <Centered title="Something went wrong." sub={err ?? ''} />}
+        {err && stage !== 'error' && <p style={{ color: '#a00', marginTop: 12 }}>{err}</p>}
+      </div>
+    </div>
+  )
+}
+
+const primaryBtn: CSSProperties = {
+  marginTop: 16,
+  padding: '12px 24px',
+  background: '#3d342a',
+  color: '#f6efe2',
+  border: 'none',
+  borderRadius: 999,
+  fontFamily: 'inherit',
+  fontSize: 15,
+  cursor: 'pointer',
 }
