@@ -7,26 +7,39 @@
 import { timelockEncrypt, timelockDecrypt } from 'tlock-js'
 import { HttpCachingChain, HttpChainClient, type ChainInfo } from 'drand-client'
 
-const CHAIN_HASH = process.env.NEXT_PUBLIC_DRAND_CHAIN_HASH ?? process.env.DRAND_CHAIN_HASH
-const API_URLS = (process.env.NEXT_PUBLIC_DRAND_API_URLS ?? process.env.DRAND_API_URLS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean)
-
-if (!CHAIN_HASH) {
-  throw new Error('Missing DRAND_CHAIN_HASH (or NEXT_PUBLIC_DRAND_CHAIN_HASH)')
-}
-if (API_URLS.length === 0) {
-  throw new Error('Missing DRAND_API_URLS (or NEXT_PUBLIC_DRAND_API_URLS)')
-}
+// Env values are read LAZILY (inside getClient) rather than at module-load.
+// Reading at module-load would crash the compose page on import if the env
+// is misconfigured — even if the user never actually sends a friend letter.
+// Lazy reads mean the page still loads; only the friend-letter seal action
+// throws, which surfaces a useful error at the right moment.
 
 let _info: ChainInfo | null = null
 let _client: HttpChainClient | null = null
 
+function readEnv(): { chainHash: string; apiUrls: string[] } {
+  const chainHash = process.env.NEXT_PUBLIC_DRAND_CHAIN_HASH ?? process.env.DRAND_CHAIN_HASH
+  const apiUrls = (process.env.NEXT_PUBLIC_DRAND_API_URLS ?? process.env.DRAND_API_URLS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!chainHash) {
+    throw new Error(
+      'tlock: missing NEXT_PUBLIC_DRAND_CHAIN_HASH (browser) or DRAND_CHAIN_HASH (server). Add to .env and force-recreate the container.',
+    )
+  }
+  if (apiUrls.length === 0) {
+    throw new Error(
+      'tlock: missing NEXT_PUBLIC_DRAND_API_URLS (browser) or DRAND_API_URLS (server). Add to .env and force-recreate the container.',
+    )
+  }
+  return { chainHash, apiUrls }
+}
+
 async function getClient(): Promise<{ client: HttpChainClient; info: ChainInfo }> {
   if (_client && _info) return { client: _client, info: _info }
+  const { chainHash, apiUrls } = readEnv()
   // Pick the first endpoint; HttpCachingChain handles retries internally.
-  const chain = new HttpCachingChain(`${API_URLS[0]}/${CHAIN_HASH}`)
+  const chain = new HttpCachingChain(`${apiUrls[0]}/${chainHash}`)
   const info = await chain.info()
   _info = info
   _client = new HttpChainClient(chain)
