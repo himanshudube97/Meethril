@@ -460,11 +460,13 @@ export async function sendFriendLetterTransientEmail(args: {
   if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
 
   const url = `${appUrl}/letter/${args.publicToken}#k=${encodeURIComponent(args.tlockedKey)}`
-  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const safeSender = escapeHtml(args.senderName)
+  const safeRecipient = args.recipientName ? escapeHtml(args.recipientName) : null
+  const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hello,'
   const html = `
     <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
       <p>${greeting}</p>
-      <p>${args.senderName} wrote you a letter and asked us to deliver it today.</p>
+      <p>${safeSender} wrote you a letter and asked us to deliver it today.</p>
       <p>
         <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #3d342a; color: #f6efe2; text-decoration: none; border-radius: 999px;">
           Open your letter
@@ -501,7 +503,8 @@ export async function sendSelfLetterReminderEmail(args: {
   const writtenStr = args.writtenOn.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
-  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const safeRecipient = args.recipientName ? escapeHtml(args.recipientName) : null
+  const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hello,'
   const html = `
     <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
       <p>${greeting}</p>
@@ -524,11 +527,13 @@ export async function sendAskForCopyEmail(args: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
   if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
 
-  const greeting = args.recipientName ? `Hi ${args.recipientName},` : 'Hello,'
+  const safeSender = escapeHtml(args.senderName)
+  const safeRecipient = args.recipientName ? escapeHtml(args.recipientName) : null
+  const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hello,'
   const html = `
     <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
       <p>${greeting}</p>
-      <p>${args.senderName} has been thinking about the letter you saved and would love to read it again.</p>
+      <p>${safeSender} has been thinking about the letter you saved and would love to read it again.</p>
       <p>If you'd like to send a copy back to them, open Hearth and find the letter in your kept letters.</p>
       <p><a href="${appUrl}/me" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Hearth</a></p>
     </div>

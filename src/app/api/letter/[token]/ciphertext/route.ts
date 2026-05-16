@@ -46,19 +46,24 @@ export async function GET(
       return NextResponse.json({ reason: 'expired' }, { status: 410 })
     }
   } else {
-    // First read — set firstReadAt and transientExpiresAt, mirror onto Letter
+    // First read — atomically claim it. Two concurrent first reads could
+    // both pass the `if (delivery.firstReadAt)` check above, so use
+    // updateMany with `firstReadAt: null` as the guard: only the request
+    // that finds it still null actually writes. Losers harmlessly skip the
+    // Letter mirror; their effective firstReadAt is "now" anyway (modulo
+    // a few ms), so the 24h window math is unchanged either way.
     const firstReadAt = new Date()
     const transientExpiresAt = new Date(firstReadAt.getTime() + READ_WINDOW_MS)
-    await prisma.$transaction([
-      prisma.letterDelivery.update({
-        where: { id: delivery.id },
-        data: { firstReadAt, transientExpiresAt },
-      }),
-      prisma.letter.update({
+    const claim = await prisma.letterDelivery.updateMany({
+      where: { id: delivery.id, firstReadAt: null },
+      data: { firstReadAt, transientExpiresAt },
+    })
+    if (claim.count > 0) {
+      await prisma.letter.update({
         where: { id: delivery.letter.id },
         data: { firstReadAt },
-      }),
-    ])
+      })
+    }
   }
 
   return NextResponse.json({

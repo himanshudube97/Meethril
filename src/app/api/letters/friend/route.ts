@@ -13,7 +13,9 @@ interface Body {
   tlockedKey: string
   recipientEmail: string
   recipientName: string
-  senderName: string
+  // senderName from client is ignored — server derives it from the
+  // authenticated user's profile.nickname / User.name so a sender can't
+  // spoof their display name in the delivery email.
   scheduledFor: string
   letterLocation?: string | null
   draftEntryId?: string | null
@@ -54,6 +56,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'scheduledFor too late (max 30 days)' }, { status: 400 })
   }
 
+  // Derive senderName server-side. Prefer profile.nickname (the user-set
+  // display name) and fall back to User.name. Never trust a client-supplied
+  // senderName — the email is sent on this user's behalf, so the name in
+  // it has to come from the authenticated identity.
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { name: true, profile: true },
+  })
+  const profile = (dbUser?.profile ?? null) as { nickname?: string } | null
+  const senderName =
+    (profile?.nickname && profile.nickname.trim()) ||
+    (dbUser?.name && dbUser.name.trim()) ||
+    'A friend'
+
   // Create the Letter (receipt, no content) + LetterDelivery in one transaction,
   // then call Resend. If Resend fails, we delete the rows to avoid orphans.
   const publicToken = newPublicToken()
@@ -67,7 +83,7 @@ export async function POST(request: NextRequest) {
         scheduledFor,
         recipientEmail: body.recipientEmail,
         recipientName: body.recipientName,
-        senderName: body.senderName,
+        senderName,
         letterLocation: body.letterLocation ?? null,
         isSealed: true,
       },
@@ -90,7 +106,7 @@ export async function POST(request: NextRequest) {
     const { id } = await sendFriendLetterTransientEmail({
       to: body.recipientEmail,
       recipientName: body.recipientName,
-      senderName: body.senderName,
+      senderName,
       scheduledFor,
       publicToken,
       tlockedKey: body.tlockedKey,
