@@ -37,10 +37,14 @@ export async function POST(request: NextRequest) {
   if (Number.isNaN(scheduledFor.valueOf())) {
     return NextResponse.json({ error: 'bad scheduledFor' }, { status: 400 })
   }
-  // 1-week minimum (mirrors SealModal). No upper bound for self-letters.
-  const minSec = 7 * 24 * 60 * 60
-  if (scheduledFor.getTime() < Date.now() + minSec * 1000 - 60_000) {
-    return NextResponse.json({ error: 'scheduledFor too soon' }, { status: 400 })
+  // PRELAUNCH-TEST-PILLS: minimum lead time is 1 minute so SealModal's 5m
+  // and 1h test pills work for self-letters too. Tighten back to 7 days
+  //   const minSec = 7 * 24 * 60 * 60
+  //   if (scheduledFor.getTime() < Date.now() + minSec * 1000 - 60_000) ...
+  // before public launch. Grep for "PRELAUNCH-TEST-PILLS" to find every spot.
+  // No upper bound for self-letters.
+  if (scheduledFor.getTime() < Date.now() + 60_000 - 5_000) {
+    return NextResponse.json({ error: 'scheduledFor too soon (min ~1 minute)' }, { status: 400 })
   }
 
   const letter = await prisma.letter.create({

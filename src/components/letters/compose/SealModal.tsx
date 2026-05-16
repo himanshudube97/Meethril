@@ -4,16 +4,21 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 
-type SelfPill = '1w' | '1m' | '6m' | '1y' | 'custom'
-// PRELAUNCH-TEST-PILLS: '5m' and '1h' exist so the team can manually
-// smoke-test friend-letter delivery without waiting a week. Remove them
-// (and the matching server floor in /api/letters/friend) before public
-// launch. Grep for "PRELAUNCH-TEST-PILLS" to find every spot.
+// PRELAUNCH-TEST-PILLS: '5m' and '1h' exist on BOTH SelfPill and FriendPill
+// so the team can smoke-test delivery without waiting a week. Remove them
+// (and the matching server lead-time relaxations in /api/letters/self
+// + /api/letters/friend) before public launch. Grep for
+// "PRELAUNCH-TEST-PILLS" to find every spot.
+type SelfPill = '5m' | '1h' | '1w' | '1m' | '6m' | '1y' | 'custom'
 type FriendPill = '5m' | '1h' | '1w' | '2w' | '30d' | 'custom'
 
 function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
   const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  if (p === '5m') return new Date(now + 5 * minute)
+  if (p === '1h') return new Date(now + hour)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '1m') return new Date(now + 30 * day)
   if (p === '6m') return new Date(now + 182 * day)
@@ -35,7 +40,11 @@ function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function labelForSelf(p: SelfPill): string {
-  return p === '1w'
+  return p === '5m'
+    ? '5 min (test)'
+    : p === '1h'
+    ? '1 hr (test)'
+    : p === '1w'
     ? '1 week'
     : p === '1m'
     ? '1 month'
@@ -208,7 +217,8 @@ export function SealModal({
 
               <div className="flex flex-wrap gap-2 mb-3">
                 {recipient === 'self'
-                  ? (['1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
+                  // PRELAUNCH-TEST-PILLS: drop '5m' and '1h' before public launch.
+                  ? (['5m', '1h', '1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"
