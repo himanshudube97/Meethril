@@ -71,7 +71,6 @@ export async function POST(request: NextRequest) {
       data: {
         userId: user.id,
         letterType: 'received-friend',
-        encryptionType: 'e2ee',
         contentCiphertext: body.contentCiphertext,
         contentIVs: body.contentIVs,
         scheduledFor: delivery.letter.scheduledFor,

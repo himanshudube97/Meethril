@@ -101,7 +101,6 @@ export async function POST(request: NextRequest) {
       data: {
         userId: user.id,
         letterType: 'friend',
-        encryptionType: 'e2ee',
         contentCiphertext: null,
         scheduledFor,
         recipientEmail: body.recipientEmail,

@@ -123,10 +123,6 @@ model Letter {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Phase 2 backfill traceability. Set on rows backfilled from JournalEntry;
-  // null on natively-created rows (Phase 3+). Drops in Phase 7.
-  sourceJournalEntryId String? @unique
-
   // Letter classification per target architecture
   letterType String // "self" | "friend" | "received-friend"
 
@@ -135,12 +131,6 @@ model Letter {
   contentIVs        Json?
   title             String?
   titleIV           String?
-
-  // Transitional encryption metadata — preserves legacy server/e2ee dispatch
-  // during the migration window. Drops in Phase 7.
-  encryptionType String  @default("server") // "server" | "e2ee"
-  e2eeIV         String?
-  e2eeIVs        Json?
 
   // Plaintext metadata
   recipientEmail String?
@@ -184,7 +174,6 @@ model Letter {
 
   @@index([userId, letterType, isArchived])
   @@index([scheduledFor, deliveredAt])
-  @@index([sourceJournalEntryId])
   @@map("letters")
 }
 

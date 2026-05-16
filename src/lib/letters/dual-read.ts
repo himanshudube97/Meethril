@@ -78,9 +78,6 @@ const NATIVE_LETTER_SELECT = {
   letterType: true,
   contentCiphertext: true,
   contentIVs: true,
-  encryptionType: true,
-  e2eeIV: true,
-  e2eeIVs: true,
   recipientEmail: true,
   recipientName: true,
   senderName: true,
@@ -118,9 +115,10 @@ type NativeLetterRow = Prisma.LetterGetPayload<{ select: typeof NATIVE_LETTER_SE
 function mapNativeLetter(letter: NativeLetterRow): DualReadLetter {
   const contentIVs = letter.contentIVs as Record<string, string> | null
 
-  // Alias: expose the content IV under 'text' so legacy decryptEntry consumers
-  // that call e2eeIVs.text keep working. Also keep e2eeIVs.content as-is.
-  const e2eeIVsAliased: Record<string, string> | null = contentIVs
+  // Synthesize the legacy e2eeIVs shape from contentIVs.
+  // The content IV is exposed under both 'content' and 'text' so legacy
+  // decrypt consumers that call e2eeIVs.text keep working.
+  const e2eeIVsSynthesized: Record<string, string> | null = contentIVs
     ? { ...contentIVs, text: contentIVs.content }
     : null
 
@@ -133,11 +131,10 @@ function mapNativeLetter(letter: NativeLetterRow): DualReadLetter {
     id: letter.id,
     entryType,
     text: letter.contentCiphertext ?? '',
-    encryptionType: letter.encryptionType,
-    e2eeIV: letter.e2eeIV,
-    // Use letter.e2eeIVs if present, otherwise fall back to the aliased
-    // contentIVs so both paths work.
-    e2eeIVs: (letter.e2eeIVs ?? e2eeIVsAliased) as Prisma.JsonValue | null,
+    // All native letters are E2EE — synthesize constants for legacy consumers.
+    encryptionType: 'e2ee',
+    e2eeIV: null,
+    e2eeIVs: e2eeIVsSynthesized as Prisma.JsonValue | null,
     recipientEmail: letter.recipientEmail,
     recipientName: letter.recipientName,
     senderName: letter.senderName,
