@@ -96,7 +96,6 @@ model JournalEntry {
 
   doodles      Doodle[]
   photos       EntryPhoto[]
-  accessTokens LetterAccessToken[]
 
   // Indexes for scalable queries
   @@index([userId, createdAt(sort: Desc)]) // Timeline queries
@@ -118,21 +117,6 @@ model OrphanedBlob {
   @@map("orphaned_blobs")
 }
 
-model LetterAccessToken {
-  id              String       @id @default(cuid())
-  token           String       @unique
-  letterId        String
-  letter          JournalEntry @relation(fields: [letterId], references: [id], onDelete: Cascade)
-  recipientEmail  String
-  expiresAt       DateTime
-  readsRemaining  Int          @default(3)
-  readCount       Int          @default(0)
-  firstReadAt     DateTime?
-  createdAt       DateTime     @default(now())
-
-  @@index([letterId])
-  @@map("letter_access_tokens")
-}
 
 model Letter {
   id     String @id @default(cuid())
