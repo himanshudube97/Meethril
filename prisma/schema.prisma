@@ -68,10 +68,8 @@ model JournalEntry {
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // E2EE fields
-  encryptionType String  @default("server") // "server" | "e2ee"
-  e2eeIV         String? // IV for E2EE entries (client-side encryption)
-  e2eeIVs        Json?   // per-field IVs map for E2EE entries: { text, textPreview, tags, song, ... }
+  // E2EE fields — all entries are E2EE; per-field IV map stored here
+  e2eeIVs        Json?   // per-field IVs map: { text, textPreview, tags, song, ... }
 
   // Multi-spread page layout fields
   spreads    Int     @default(1) // Number of spreads (1-3)
@@ -274,10 +272,9 @@ model Scrapbook {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title          String?  // encrypted (AES-256-GCM, ciphertext format from src/lib/encryption.ts)
-  items          String   @db.Text // encrypted JSON blob (ScrapbookItem[])
-  encryptionType String   @default("server")
-  e2eeIVs        Json?
+  title          String?  // E2EE ciphertext (client-encrypted under master key)
+  items          String   @db.Text // E2EE ciphertext JSON blob (ScrapbookItem[])
+  e2eeIVs        Json?    // per-field IVs map: { title?, items }
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

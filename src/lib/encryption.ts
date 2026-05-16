@@ -116,33 +116,3 @@ export function decryptJson<T>(encryptedData: string | null | undefined): T | nu
   }
 }
 
-// ============================================
-// Entry-specific helpers
-// ============================================
-
-interface EntryEncryptedFields {
-  text: string
-  textPreview?: string | null
-}
-
-/**
- * Encrypt sensitive fields of a journal entry before saving
- */
-export function encryptEntryFields<T extends EntryEncryptedFields>(entry: T): T {
-  return {
-    ...entry,
-    text: encrypt(entry.text),
-    textPreview: entry.textPreview ? encrypt(entry.textPreview) : null,
-  }
-}
-
-/**
- * Decrypt sensitive fields of a journal entry after reading
- */
-export function decryptEntryFields<T extends EntryEncryptedFields>(entry: T): T {
-  return {
-    ...entry,
-    text: safeDecrypt(entry.text),
-    textPreview: safeDecrypt(entry.textPreview),
-  }
-}

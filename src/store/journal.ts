@@ -17,9 +17,8 @@ export interface JournalEntry {
   // Letter draft marker — JournalEntry is used as a draft while composing;
   // when sealed, the Letter row is created and the JE draft is deleted.
   entryType?: 'normal' | 'letter' | 'unsent_letter' | 'ephemeral'
-  // E2EE fields
-  encryptionType?: 'server' | 'e2ee'
-  e2eeIV?: string | null
+  // E2EE per-field IV map — all entries are E2EE
+  e2eeIVs?: Record<string, string> | null
 }
 
 export interface Doodle {

@@ -2,17 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { encrypt, decryptEntryFields } from '@/lib/encryption'
 import { isEntryLocked, utcInstantForLocalDate, localDatePartsNow } from '@/lib/entry-lock'
 import { parseStyle } from '@/lib/entry-style'
-
-// Helper to strip HTML and create preview
-function createPreview(html: string | null | undefined, maxLength = 150): string {
-  if (!html) return ''
-  const text = html.replace(/<[^>]*>/g, '').trim()
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength).trim() + '...'
-}
 
 // GET - Fetch entries with pagination and filters
 export async function GET(request: NextRequest) {
@@ -108,20 +99,17 @@ export async function GET(request: NextRequest) {
     const returnEntries = hasMore ? entries.slice(0, -1) : entries
     const nextCursor = hasMore ? returnEntries[returnEntries.length - 1]?.id : null
 
-    // Decrypt and transform entries
+    // All entries are E2EE — pass through ciphertext as-is; client decrypts.
     const transformedEntries = returnEntries.map(entry => {
-      const isE2EE = entry.encryptionType === 'e2ee'
-      const decrypted = isE2EE ? entry : decryptEntryFields(entry)
-
       return {
-        ...decrypted,
-        textPreview: isE2EE ? decrypted.textPreview : (decrypted.textPreview || createPreview(decrypted.text)),
+        ...entry,
+        // textPreview is ciphertext for E2EE entries; return as-is
+        textPreview: entry.textPreview,
         doodles: entry.doodles || [],
         photos: entry.photos || [],
         spreads: entry.spreads || 1,
         isArchived: entry.isArchived,
-        encryptionType: entry.encryptionType,
-        e2eeIV: entry.e2eeIV,
+        e2eeIVs: entry.e2eeIVs,
         style: parseStyle(entry.style),
       }
     })
@@ -160,7 +148,7 @@ export async function POST(request: NextRequest) {
 
     const {
       text, song, tags, doodles, entryType,
-      encryptionType, e2eeIV, e2eeIVs,
+      e2eeIVs,
       // New fields
       photos, spreads,
       // New: per-entry style
@@ -196,32 +184,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if this is an E2EE entry
-    const isE2EE = encryptionType === 'e2ee'
-
-    // Create preview
-    const textPreview = isE2EE ? '[Encrypted]' : createPreview(text)
-    console.log('[POST /api/entries] Preview:', textPreview?.slice(0, 50), 'E2EE:', isE2EE)
-
-    // Encrypt sensitive fields
-    console.log('[POST /api/entries] Encrypting text, length:', text?.length || 0)
-    const encryptedText = isE2EE ? text : encrypt(text)
-    const encryptedTextPreview = isE2EE ? textPreview : encrypt(textPreview)
+    // All entries are E2EE: text and textPreview arrive as ciphertext from the client.
+    // Store them as-is; the server never encrypts or decrypts entry content.
+    const textPreview = '[Encrypted]'
+    console.log('[POST /api/entries] Preview: [Encrypted] (E2EE)')
+    console.log('[POST /api/entries] Storing E2EE ciphertext, length:', text?.length || 0)
 
     console.log('[POST /api/entries] Creating entry for user:', user.id, 'photos:', photos?.length || 0, 'doodles:', doodles?.length || 0)
 
     const entry = await prisma.journalEntry.create({
       data: {
-        text: encryptedText,
-        textPreview: encryptedTextPreview,
+        text: text ?? '',
+        textPreview,
         song: song || null,
         tags: tags ?? [],
         style: style !== undefined ? (parseStyle(style) as Prisma.InputJsonValue) : Prisma.JsonNull,
         userId: user.id,
         entryType: entryType || 'normal',
-        // E2EE fields
-        encryptionType: encryptionType || 'server',
-        e2eeIV: e2eeIV || null,
+        // E2EE per-field IV map
         e2eeIVs: e2eeIVs ?? undefined,
         // New multi-spread fields
         spreads: spreads ?? 1,
@@ -238,7 +218,7 @@ export async function POST(request: NextRequest) {
           : undefined,
         // Create photos. Photo bytes themselves are uploaded client-side via
         // /api/photos before this request lands; we only persist the reference
-        // (handle URL for non-E2EE, encryptedRef pair for E2EE).
+        // (encryptedRef pair for E2EE).
         photos: photos && photos.length > 0
           ? {
               create: photos.map((p: {
@@ -267,11 +247,9 @@ export async function POST(request: NextRequest) {
 
     console.log('[POST /api/entries] Created entry:', entry.id)
 
-    const responseEntry = isE2EE ? entry : decryptEntryFields(entry)
     return NextResponse.json({
-      ...responseEntry,
-      encryptionType: entry.encryptionType,
-      e2eeIV: entry.e2eeIV,
+      ...entry,
+      e2eeIVs: entry.e2eeIVs,
       spreads: entry.spreads,
       photos: entry.photos,
       style: parseStyle(entry.style),

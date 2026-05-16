@@ -103,9 +103,8 @@ export default function ComposeView() {
           return
         }
         const raw = (await res.json()) as JournalEntry
-        const decrypted = raw.encryptionType === 'e2ee'
-          ? await decryptEntryFromServer(raw)
-          : raw
+        // All entries are E2EE — always decrypt client-side.
+        const decrypted = await decryptEntryFromServer(raw)
 
         if (decrypted.createdAt) setCreatedAt(new Date(decrypted.createdAt))
 
