@@ -1,6 +1,6 @@
 # Letters in Hearth — Architecture & Current State
 
-> **Snapshot:** 2026-05-16. Reflects the state of branch `feat/e2ee-onboarding` after Phase 4 (friend letters with tlock + self-letter native writes).
+> **Snapshot:** 2026-05-16. Reflects the state of branch `feat/e2ee-onboarding` after Phase 4 (friend letters with tlock), Phase 4.1 (photo + doodle assets), and Phase 5 cleanup (legacy infrastructure removed — `LetterAccessToken`, dual-read JournalEntry fallback, `Letter` transitional columns, and 13 letter-specific columns on `JournalEntry` all dropped).
 > **Read this when:** you're about to touch any code under `src/app/api/letters/*`, `src/app/api/letter/*`, `src/app/letter/*`, `src/lib/letters/*`, or the compose flow under `src/components/letters/compose/*`.
 
 ---
@@ -24,7 +24,7 @@ Three Postgres tables matter:
 
 ### `JournalEntry`
 - Hosts the **draft** of a letter while the user is still composing (autosave goes here). Once sealed, the draft row is deleted.
-- Also hosts **pre-Phase-4 legacy letters** with `entryType in ('letter','unsent_letter')`. These are read via the Phase 2 dual-read helper.
+- ~~Also hosts pre-Phase-4 legacy letters with `entryType in ('letter','unsent_letter')`.~~ Post-Phase-5 cleanup: legacy letter rows on `JournalEntry` are gone, and the 13 letter-specific columns on `JournalEntry` are dropped. `entryType` remains because the draft autosave still uses it to distinguish drafts during compose.
 - Phase 7 (cleanup, future) drops all the letter-specific columns from this model.
 
 ### `Letter` (new in Phase 2, written natively in Phase 4)
@@ -224,11 +224,9 @@ Crypto primitives in code:
 | `/api/letters/[id]/peek`, `/viewed`, `/read` | various | session | Single-letter mutations |
 | `/api/letter/[token]/meta` | GET | public | Drand/scheduledFor/display names — no content |
 | `/api/letter/[token]/ciphertext` | GET | public | Transient blob + IV; 24h gate |
-| `/api/letter/[token]` (legacy) | GET | public | Pre-Phase-4 `LetterAccessToken` route; **untouched, kept for legacy test letters** |
 | `/api/webhooks/resend` | POST | Svix signature | Sets deliveredAt/bouncedAt |
 | `/api/cron/self-letter-reminders` | GET | `CRON_SECRET` | Daily nudge for due self-letters |
 | `/api/cron/letter-cleanup` | GET | `CRON_SECRET` | Daily delete of expired LetterDelivery rows |
-| `/api/cron/deliver-letters` (legacy) | GET | `CRON_SECRET` | **Untouched, runs over empty set post-Phase-4** |
 
 ### Client surfaces
 | Path | Purpose |
@@ -248,9 +246,8 @@ Crypto primitives in code:
 | `src/lib/letters/self-letter-client.ts` | Self-letter payload build/decrypt |
 | `src/lib/letters/friend-letter-client.ts` | Friend-letter payload build |
 | `src/lib/letters/resend-webhook.ts` | Svix signature verification |
-| `src/lib/letters/dual-read.ts` | Phase 2 dual-read helper. Anchors on `JournalEntry` for legacy rows; in Phase 4 also queries native `Letter where sourceJournalEntryId IS NULL AND letterType='self'` and maps them into the same shape (IV aliased as `e2eeIVs.text` AND `e2eeIVs.content` so legacy and native decrypt consumers both work). |
-| `src/lib/letter-tokens.ts` (legacy) | Pre-Phase-4 `LetterAccessToken` — still used by the legacy route |
-| `src/lib/email.ts` | All Resend wrappers. Phase 4 helpers: `sendFriendLetterTransientEmail`, `sendSelfLetterReminderEmail`, `sendAskForCopyEmail`. Pre-Phase-4: `sendFriendLetterMagicLink` (now dead code), `sendSelfLetterEmail`, `sendSelfLetterNotification` |
+| `src/lib/letters/dual-read.ts` | Post-Phase-5: queries native `Letter` only (the JournalEntry fallback was dropped). `listLettersForRead` / `findLetterForRead` translate caller-supplied JournalEntry-shaped `where` clauses into native Letter terms. The mapper synthesizes `encryptionType: 'e2ee'` and the `e2eeIVs.text` / `e2eeIVs.content` IV alias so existing consumers keep working without changes. |
+| `src/lib/email.ts` | All Resend wrappers. Phase 4 helpers: `sendFriendLetterTransientEmail`, `sendSelfLetterReminderEmail`, `sendAskForCopyEmail`. Surviving pre-Phase-4: `sendSelfLetterEmail`, `sendSelfLetterNotification` (used by the in-app reveal flow). All `from:` addresses env-driven via `RESEND_FROM_LETTERS`. |
 | `src/lib/billing/is-paid-user.ts` | Lemon Squeezy status gate for ask-for-copy |
 
 ---
@@ -294,8 +291,8 @@ NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (cur
 ### 🟡 Lower priority
 8. **No Svix timestamp freshness check.** Replay window is unbounded. Reject `svix-timestamp` older than ~5 min.
 9. **Email subject uses unescaped `senderName`.** Not HTML-injection, but a nickname with a newline could inject SMTP headers in legacy MTAs. Strip control chars.
-10. **`sendFriendLetterMagicLink` is dead.** Phase 3 legacy helper. Phase 5 cleanup.
-11. ~~**CRON_SECRET only enforced when set.**~~ **FIXED in `db236db`** for the Phase 4 crons (`self-letter-reminders`, `letter-cleanup`). Both routes now return 500 in production when `CRON_SECRET` is unset. Dev keeps fail-open so local testing works. **Note:** the same pattern exists in 5 non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`, `deliver-letters`) — out of Phase 4 scope; consider applying the same pattern across the board.
+10. ~~**`sendFriendLetterMagicLink` is dead.**~~ **FIXED in `54360ba`** (Phase 5 Task 2). Helper deleted alongside the legacy `/api/cron/deliver-letters` cron and the `/api/letter/[token]` route.
+11. ~~**CRON_SECRET only enforced when set.**~~ **FIXED in `db236db`** for the Phase 4 crons (`self-letter-reminders`, `letter-cleanup`). Both routes now return 500 in production when `CRON_SECRET` is unset. Dev keeps fail-open so local testing works. **Note:** the same pattern exists in 3 non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`) — out of letter-cleanup scope; consider applying the same pattern across the board.
 
 ---
 
@@ -308,8 +305,8 @@ Things you must verify or undo before going public:
 - [x] ~~Fix Critical #2 (XSS).~~ Done in `6066142`.
 - [x] ~~Important #3 minimum: localStorage → sessionStorage.~~ Done in `972e617`. (WebCrypto `wrapKey` upgrade is still a future improvement, not blocking.)
 - [x] ~~Important #6 (E2EE photos silently dropped).~~ Done across Phase 4.1 (commits `265b9a2` → `42a1ee8`).
-- [ ] Remove dead `sendFriendLetterMagicLink` and the legacy `/api/letter/[token]` + `/api/cron/deliver-letters` routes — Phase 5-cleanup work.
-- [ ] Apply the fail-closed CRON_SECRET pattern (#11) to the 5 non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`, `deliver-letters`).
+- [x] ~~Remove dead `sendFriendLetterMagicLink` and the legacy `/api/letter/[token]` + `/api/cron/deliver-letters` routes.~~ Done in Phase 5 cleanup (`e4a08f8`, `54360ba`).
+- [ ] Apply the fail-closed CRON_SECRET pattern (#11) to the 3 remaining non-Phase-4 crons (`sweep-orphaned-blobs`, `expire-stranger-notes`, `send-reminders`).
 - [ ] Add Svix timestamp freshness check to the Resend webhook (Lower #8) — reject `svix-timestamp` older than ~5 min.
 - [ ] Strip control chars from `senderName` in the email subject line (Lower #9).
 - [ ] Confirm `RESEND_WEBHOOK_SECRET` is set in production and the Resend dashboard webhook points at `${NEXT_PUBLIC_APP_URL}/api/webhooks/resend`.

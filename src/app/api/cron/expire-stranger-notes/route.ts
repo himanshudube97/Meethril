@@ -4,7 +4,7 @@ import { tryDeliverQueued } from '@/lib/stranger-matcher'
 import { NOTE_LIFETIME_MS, REPLY_LIFETIME_MS } from '@/lib/stranger-notes'
 
 export async function GET(request: NextRequest) {
-  // Cron auth — same pattern as /api/cron/deliver-letters
+  // Cron auth — same Bearer-CRON_SECRET pattern as the other cron routes.
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
