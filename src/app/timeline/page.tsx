@@ -353,16 +353,13 @@ export default function TimelinePage() {
                 className="space-y-3 ml-4 border-l-2 pl-6"
                 style={{ borderColor: theme.glass.border }}
               >
-                {group.entries.map((entry) => {
-                  const isLetter = entry.entryType === 'letter' && entry.isSealed
-                  return (
-                    <EntryCard
-                      key={entry.id}
-                      entry={entry}
-                      onClick={isLetter ? undefined : () => setSelectedEntryId(entry.id)}
-                    />
-                  )
-                })}
+                {group.entries.map((entry) => (
+                  <EntryCard
+                    key={entry.id}
+                    entry={entry}
+                    onClick={() => setSelectedEntryId(entry.id)}
+                  />
+                ))}
               </div>
             </motion.div>
           ))}

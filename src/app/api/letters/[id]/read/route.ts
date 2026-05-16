@@ -15,7 +15,8 @@ export async function POST(
   const letter = await findLetterForRead({ id, userId: user.id })
   if (!letter) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-  const result = await prisma.journalEntry.updateMany({
+  // Mark isViewed on the Letter table. Letters no longer live on JournalEntry.
+  const result = await prisma.letter.updateMany({
     where: { id, userId: user.id, isViewed: false },
     data: { isViewed: true },
   })

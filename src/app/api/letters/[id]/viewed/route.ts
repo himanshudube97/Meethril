@@ -17,18 +17,13 @@ export async function POST(
     const { id } = await params
 
     const letter = await findLetterForRead({ id, userId: user.id })
+    // Only self-letters (no recipientEmail) can be marked as viewed by the sender/recipient.
     if (!letter || letter.recipientEmail !== null) {
       return NextResponse.json({ error: 'Letter not found' }, { status: 404 })
     }
-    // The dual-read helper doesn't carry entryType; preserve the original 'letter' filter with a narrow check.
-    const isLetter = await prisma.journalEntry.findFirst({
-      where: { id, userId: user.id, entryType: 'letter' },
-      select: { id: true },
-    })
-    if (!isLetter) return NextResponse.json({ error: 'Letter not found' }, { status: 404 })
 
-    // Mark as viewed
-    await prisma.journalEntry.update({
+    // Mark as viewed on the Letter table (letters no longer live on JournalEntry).
+    await prisma.letter.update({
       where: { id },
       data: { isViewed: true },
     })

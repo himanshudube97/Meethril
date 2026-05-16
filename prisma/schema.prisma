@@ -60,8 +60,6 @@ model JournalEntry {
   updatedAt   DateTime  @updatedAt
   song        String?
   entryType   String    @default("normal") // normal, letter, unsent_letter, ephemeral
-  unlockDate  DateTime?
-  isSealed    Boolean   @default(false)
   expiresAt   DateTime?
   tags        String[]  @default([])
   // Per-entry display style (font / ink color / effect). Plain JSON, non-sensitive.
@@ -69,21 +67,6 @@ model JournalEntry {
   style       Json?
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Letter-specific fields (for letters to friends)
-  recipientEmail String? // Friend's email address
-  recipientName  String? // Friend's name for personalization
-  senderName     String? // How sender wants to be identified
-  letterLocation String? // Where the letter was written from (e.g., "Himachal Pradesh")
-  isDelivered    Boolean   @default(false) // Has the letter been sent/delivered
-  deliveredAt    DateTime? // When the letter was delivered
-  isViewed       Boolean   @default(false) // Has the user viewed this letter after it arrived
-  letterPeekedAt DateTime? // Set when user breaks seal early via the 'peek' affordance from /sent
-
-  // Received letter tracking
-  isReceivedLetter  Boolean   @default(false)
-  originalSenderId  String?
-  originalEntryId   String?
 
   // E2EE fields
   encryptionType String  @default("server") // "server" | "e2ee"
@@ -99,7 +82,6 @@ model JournalEntry {
 
   // Indexes for scalable queries
   @@index([userId, createdAt(sort: Desc)]) // Timeline queries
-  @@index([unlockDate, isDelivered]) // For cron job to find due letters
   @@index([userId, isArchived]) // For archive queries
   @@map("journal_entries")
 }

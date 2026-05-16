@@ -172,10 +172,10 @@ function mapNativeLetter(letter: NativeLetterRow): DualReadLetter {
  *     isReceivedLetter, recipientEmail, …) map 1:1.
  */
 function translateWhereForNative(
-  where: Prisma.JournalEntryWhereInput,
+  where: Record<string, unknown>,
   userId: string,
 ): Prisma.LetterWhereInput {
-  const w = where as Record<string, unknown>
+  const w = where
   const out: Prisma.LetterWhereInput = { userId }
 
   for (const [key, val] of Object.entries(w)) {
@@ -193,7 +193,7 @@ function translateWhereForNative(
     } else if (key === 'OR') {
       // Recursively translate OR branches
       const branches = val as Record<string, unknown>[]
-      out.OR = branches.map((branch) => translateWhereForNative(branch, userId))
+      out.OR = branches.map((branch) => translateWhereForNative(branch as Record<string, unknown>, userId))
       // Remove the userId from sub-clauses (already set at root)
       out.OR = out.OR.map(({ userId: _uid, ...rest }) => rest)
     } else {
@@ -228,12 +228,12 @@ function entryTypeToLetterTypes(entryType: string): string[] {
  * Mapping: unlockDate → scheduledFor; all other fields map 1:1.
  */
 function translateOrderByForNative(
-  orderBy: Prisma.JournalEntryOrderByWithRelationInput | undefined,
+  orderBy: Record<string, unknown> | undefined,
 ): Prisma.LetterOrderByWithRelationInput | undefined {
   if (!orderBy || typeof orderBy !== 'object' || Array.isArray(orderBy)) {
     return { createdAt: 'desc' }
   }
-  const ob = orderBy as Record<string, unknown>
+  const ob = orderBy
   const result: Record<string, unknown> = {}
   for (const [key, val] of Object.entries(ob)) {
     if (key === 'unlockDate') {
@@ -275,14 +275,19 @@ export async function findLetterForRead(args: {
 }
 
 /**
- * List letters for an owner. The `where` and `orderBy` arguments use
- * JournalEntry-shaped types for caller compatibility; they are translated to
- * Letter terms internally before querying.
+ * List letters for an owner. The `where` and `orderBy` arguments use a
+ * JournalEntry-shaped vocabulary (entryType, isSealed, unlockDate, …) for
+ * caller compatibility. They are translated to Letter column names by
+ * `translateWhereForNative` / `translateOrderByForNative` before querying —
+ * callers never touch the Letter table directly. The types are intentionally
+ * loose (`Record<string, unknown>`) so callers can pass legacy JournalEntry
+ * field names that no longer exist on the Prisma-generated type after the
+ * column drop (isSealed, unlockDate, isReceivedLetter, …).
  */
 export async function listLettersForRead(args: {
   userId: string
-  where: Prisma.JournalEntryWhereInput
-  orderBy?: Prisma.JournalEntryOrderByWithRelationInput
+  where: Record<string, unknown>
+  orderBy?: Record<string, unknown>
 }): Promise<DualReadLetter[]> {
   const letters = await prisma.letter.findMany({
     where: translateWhereForNative(args.where, args.userId),
