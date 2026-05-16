@@ -204,10 +204,21 @@ export default function BookSpread() {
           // autosave overwrites the (still-encrypted) row with that
           // placeholder text — corruption in slow motion. Skip hydration
           // and let the effect re-run when isE2EEReady flips true.
-          const isE2EEPlaceholder =
-            active.encryptionType === 'e2ee' &&
-            (active.text?.includes('[Encrypted') ||
-              active.text?.includes('[Decryption failed]'))
+          //
+          // Phase 5b removed `encryptionType` from JournalEntry, so the
+          // detect is now purely based on the placeholder text strings the
+          // decrypt hook injects. All entries are E2EE, so doodle/photo
+          // shape mismatches manifest as `strokes` being the encrypted
+          // `{encryptedStrokes, e2eeIV}` object rather than a stroke array —
+          // detect that explicitly too so we never feed it into the canvas.
+          const placeholderText =
+            active.text?.includes('[Encrypted') ||
+            active.text?.includes('[Decryption failed]')
+          const firstDoodleStrokes = active.doodles?.[0]?.strokes
+          const doodleStillEncrypted =
+            firstDoodleStrokes !== undefined &&
+            !Array.isArray(firstDoodleStrokes)
+          const isE2EEPlaceholder = placeholderText || doodleStillEncrypted
           if (isE2EEPlaceholder) {
             // Bind autosave to this id so any future edits target the right
             // row, but don't touch the draft / song / doodle / photo state.

@@ -74,7 +74,13 @@ export const useJournalStore = create<JournalStore>((set) => ({
   addDoodleStroke: (stroke) => set((state) => ({
     currentDoodleStrokes: [...state.currentDoodleStrokes, stroke]
   })),
-  setDoodleStrokes: (strokes) => set({ currentDoodleStrokes: strokes }),
+  setDoodleStrokes: (strokes) =>
+    // Defense in depth: refuse non-array input. Callers occasionally pass
+    // the raw `Doodle.strokes` JSON from the server — for an E2EE entry
+    // before decryption that's `{encryptedStrokes, e2eeIV}`, NOT an array.
+    // Feeding it into state crashes the canvas at render with
+    // `strokes.map is not a function`. Coerce to empty array instead.
+    set({ currentDoodleStrokes: Array.isArray(strokes) ? strokes : [] }),
   clearDoodleStrokes: () => set({ currentDoodleStrokes: [] }),
   resetCurrentEntry: () => set({
     currentText: '',
