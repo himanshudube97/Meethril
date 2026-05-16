@@ -10,9 +10,6 @@ interface BackfillEntry {
   textPreview?: string
   tags?: string[]
   song?: string | null
-  senderName?: string | null
-  recipientName?: string | null
-  letterLocation?: string | null
   doodles?: { id: string; strokes: unknown }[]
   photos?: { id: string; url?: string }[]
 }
@@ -67,9 +64,6 @@ export function useBackfill() {
             textPreview: entry.textPreview ?? null,
             tags: entry.tags ?? null,
             song: entry.song ?? null,
-            senderName: entry.senderName ?? null,
-            recipientName: entry.recipientName ?? null,
-            letterLocation: entry.letterLocation ?? null,
             doodles: entry.doodles ?? [],
           }
           const encryptedFields = await encryptDraft(draft, masterKey)

@@ -159,8 +159,7 @@ export async function POST(request: NextRequest) {
     console.log('[POST /api/entries] Body:', JSON.stringify(body).slice(0, 200))
 
     const {
-      text, song, tags, doodles, entryType, unlockDate, isSealed,
-      recipientEmail, recipientName, senderName, letterLocation,
+      text, song, tags, doodles, entryType,
       encryptionType, e2eeIV, e2eeIVs,
       // New fields
       photos, spreads,
@@ -208,9 +207,6 @@ export async function POST(request: NextRequest) {
     console.log('[POST /api/entries] Encrypting text, length:', text?.length || 0)
     const encryptedText = isE2EE ? text : encrypt(text)
     const encryptedTextPreview = isE2EE ? textPreview : encrypt(textPreview)
-    const encryptedSenderName = senderName ? (isE2EE ? senderName : encrypt(senderName)) : null
-    const encryptedRecipientName = recipientName ? (isE2EE ? recipientName : encrypt(recipientName)) : null
-    const encryptedLetterLocation = letterLocation ? (isE2EE ? letterLocation : encrypt(letterLocation)) : null
 
     console.log('[POST /api/entries] Creating entry for user:', user.id, 'photos:', photos?.length || 0, 'doodles:', doodles?.length || 0)
 
@@ -223,13 +219,6 @@ export async function POST(request: NextRequest) {
         style: style !== undefined ? (parseStyle(style) as Prisma.InputJsonValue) : Prisma.JsonNull,
         userId: user.id,
         entryType: entryType || 'normal',
-        unlockDate: unlockDate ? new Date(unlockDate) : null,
-        isSealed: isSealed ?? false,
-        // Letter-specific fields
-        recipientEmail: recipientEmail || null,
-        recipientName: encryptedRecipientName,
-        senderName: encryptedSenderName,
-        letterLocation: encryptedLetterLocation,
         // E2EE fields
         encryptionType: encryptionType || 'server',
         e2eeIV: e2eeIV || null,

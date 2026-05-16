@@ -14,17 +14,17 @@ interface EntryCardProps {
 export default function EntryCard({ entry, onClick }: EntryCardProps) {
   const { theme } = useThemeStore()
 
-  // Check if this is a sealed letter
-  const isLetter = entry.entryType === 'letter' && entry.isSealed
-  const isLetterToFriend = isLetter && !!entry.recipientEmail
+  // Letter drafts in JournalEntry are always unsealed (letters move to the
+  // Letter table when sealed, and the JE draft is deleted). Sealed letters
+  // no longer appear as JournalEntry rows, so this branch is now unreachable
+  // in practice. Keeping the entryType check in case of old rows.
+  const isLetterDraft = entry.entryType === 'letter' || entry.entryType === 'unsent_letter'
 
   // Strip HTML tags for preview
   const textPreview = entry.text.replace(/<[^>]*>/g, '').slice(0, 100)
 
-  // Render letter card (sealed, compact)
-  if (isLetter) {
-    const isUnlocked = entry.unlockDate && new Date(entry.unlockDate) <= new Date()
-
+  // Render letter draft card
+  if (isLetterDraft) {
     return (
       <motion.div
         className="rounded-xl px-4 py-3 flex items-center gap-3"
@@ -35,23 +35,16 @@ export default function EntryCard({ entry, onClick }: EntryCardProps) {
         }}
         layout
         transition={{ layout: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] } }}
+        onClick={onClick}
       >
         <span className="text-lg">✉️</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm" style={{ color: theme.text.primary }}>
-            {isLetterToFriend ? 'Letter to friend' : 'Letter to self'}
+            Letter draft
           </p>
-          {entry.unlockDate && (
-            <p className="text-xs" style={{ color: theme.text.muted }}>
-              {isUnlocked
-                ? isLetterToFriend ? 'Delivered' : 'Ready to open'
-                : `${isLetterToFriend ? 'Delivers' : 'Opens'} ${format(new Date(entry.unlockDate), 'MMM d, yyyy')}`
-              }
-            </p>
-          )}
         </div>
         <span className="text-sm" style={{ color: theme.text.muted }}>
-          {isUnlocked ? '✨' : '🔒'}
+          📝
         </span>
       </motion.div>
     )

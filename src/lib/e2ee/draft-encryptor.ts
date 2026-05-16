@@ -18,9 +18,6 @@ export interface EncryptableDraft {
   textPreview?: string | null
   tags?: string[] | null
   song?: string | null
-  senderName?: string | null
-  recipientName?: string | null
-  letterLocation?: string | null
   doodles?: Array<{ strokes: unknown; spread?: number; positionInEntry?: number }>
   // photos and scrapbook items handled via separate flows (see PhotoSlot, scrapbook hooks)
 }
@@ -31,9 +28,6 @@ export interface EncryptedDraft {
   textPreview?: string
   tags?: string
   song?: string
-  senderName?: string
-  recipientName?: string
-  letterLocation?: string
   doodles?: Array<{
     // Stored under `strokes` so the server's `Doodle.strokes Json` column
     // accepts the payload as-is. The decryptor reads back from this nested
@@ -49,9 +43,6 @@ const STRING_FIELDS = [
   'text',
   'textPreview',
   'song',
-  'senderName',
-  'recipientName',
-  'letterLocation',
 ] as const
 
 const JSON_FIELDS = ['tags'] as const

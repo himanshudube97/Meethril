@@ -80,9 +80,10 @@ export async function PUT(
 
     const { id } = await params
 
-    // Load enough state up-front to run the lock check below. For letters we
-    // also need entryType + isSealed because their lock semantics differ
-    // (sealed = locked, draft = fully editable across days).
+    // Load enough state up-front to run the lock check below. For letter drafts
+    // the lock is calendar-day-based (like normal entries — letter drafts are
+    // always unsealed until the Letter row is created; then the JE draft is
+    // deleted, so a sealed JE never reaches this path).
     const existing = await prisma.journalEntry.findUnique({
       where: { id },
       select: {
@@ -94,7 +95,6 @@ export async function PUT(
         text: true,
         song: true,
         entryType: true,
-        isSealed: true,
         style: true,
         photos: { select: { spread: true, position: true } },
         doodles: { select: { spread: true } },
@@ -122,9 +122,11 @@ export async function PUT(
       // explicitly want that semantic.
       doodles,
       photos,
-      // Letter-only fields. Drafts can be edited freely; sealed letters reject
-      // all writes via the lock check below.
-      entryType, recipientEmail, recipientName, senderName, letterLocation, unlockDate,
+      // entryType is kept so letter drafts (letter/unsent_letter) can set their
+      // type during autosave. The letter-specific detail fields (recipientEmail,
+      // recipientName, senderName, letterLocation, unlockDate) are no longer
+      // stored on JournalEntry — they live on the Letter row created at seal time.
+      entryType,
     } = body
 
     const bodyIsE2EE = encryptionType === 'e2ee'
@@ -145,9 +147,6 @@ export async function PUT(
       text !== undefined ||
       appendText !== undefined ||
       song !== undefined ||
-      recipientName !== undefined ||
-      senderName !== undefined ||
-      letterLocation !== undefined ||
       doodles !== undefined ||
       newDoodles !== undefined ||
       photos !== undefined ||
@@ -162,17 +161,23 @@ export async function PUT(
     const isE2EE = bodyIsE2EE
     const isLetter = existing.entryType !== 'normal'
 
-    // Lock check. Letters: sealed = full reject. Journal entries: calendar-day
+    // Lock check. Letter drafts in JournalEntry are always unsealed (the JE
+    // draft is deleted when the Letter is created at seal time, so a sealed
+    // letter never reaches this PUT path). For normal entries: calendar-day
     // → append-only diff allowed.
     const userTz = request.headers.get('x-user-tz') ?? 'UTC'
     const locked = isEntryLocked(existing.createdAt, userTz, {
       entryType: existing.entryType,
-      isSealed: existing.isSealed,
+      // isSealed was removed from JournalEntry; letter drafts are always
+      // editable until the Letter row is created (then the JE is deleted).
+      isSealed: false,
     })
     if (locked) {
       if (isLetter) {
+        // This branch is only reachable for old-calendar-locked letter drafts;
+        // in practice the draft is deleted at seal time before any calendar lock.
         return NextResponse.json(
-          { error: 'This letter is sealed and cannot be modified' },
+          { error: 'This letter draft is too old to edit' },
           { status: 403 },
         )
       }
@@ -237,27 +242,12 @@ export async function PUT(
     }
     if (e2eeIVs !== undefined) updateData.e2eeIVs = e2eeIVs
 
-    // Letter fields. recipientEmail is plaintext (cron job needs it to look up
-    // user / send the email). recipientName / senderName / letterLocation get
-    // the same server-side encryption as text. unlockDate is a plain date.
+    // Letter-draft field. entryType marks the JE as a letter draft ('letter'
+    // or 'unsent_letter') so the draft list and compose resume can identify it.
+    // The detail fields (recipientEmail, recipientName, senderName,
+    // letterLocation, unlockDate) are no longer stored on JournalEntry — they
+    // are passed directly at seal time and persisted on the Letter row.
     if (entryType !== undefined) updateData.entryType = entryType
-    if (recipientEmail !== undefined) updateData.recipientEmail = recipientEmail || null
-    if (recipientName !== undefined) {
-      updateData.recipientName = recipientName
-        ? (isE2EE ? recipientName : encrypt(recipientName))
-        : null
-    }
-    if (senderName !== undefined) {
-      updateData.senderName = senderName
-        ? (isE2EE ? senderName : encrypt(senderName))
-        : null
-    }
-    if (letterLocation !== undefined) {
-      updateData.letterLocation = letterLocation
-        ? (isE2EE ? letterLocation : encrypt(letterLocation))
-        : null
-    }
-    if (unlockDate !== undefined) updateData.unlockDate = unlockDate ? new Date(unlockDate) : null
 
     // Update the entry
     await prisma.journalEntry.update({

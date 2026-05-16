@@ -123,9 +123,6 @@ export function decryptJson<T>(encryptedData: string | null | undefined): T | nu
 interface EntryEncryptedFields {
   text: string
   textPreview?: string | null
-  senderName?: string | null
-  recipientName?: string | null
-  letterLocation?: string | null
 }
 
 /**
@@ -136,9 +133,6 @@ export function encryptEntryFields<T extends EntryEncryptedFields>(entry: T): T 
     ...entry,
     text: encrypt(entry.text),
     textPreview: entry.textPreview ? encrypt(entry.textPreview) : null,
-    senderName: entry.senderName ? encrypt(entry.senderName) : null,
-    recipientName: entry.recipientName ? encrypt(entry.recipientName) : null,
-    letterLocation: entry.letterLocation ? encrypt(entry.letterLocation) : null,
   }
 }
 
@@ -150,8 +144,5 @@ export function decryptEntryFields<T extends EntryEncryptedFields>(entry: T): T 
     ...entry,
     text: safeDecrypt(entry.text),
     textPreview: safeDecrypt(entry.textPreview),
-    senderName: safeDecrypt(entry.senderName),
-    recipientName: safeDecrypt(entry.recipientName),
-    letterLocation: safeDecrypt(entry.letterLocation),
   }
 }

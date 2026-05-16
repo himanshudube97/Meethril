@@ -14,14 +14,9 @@ export interface JournalEntry {
   spreads?: number
   isArchived?: boolean
   style?: EntryStyle | null
-  // Letter-specific fields
+  // Letter draft marker — JournalEntry is used as a draft while composing;
+  // when sealed, the Letter row is created and the JE draft is deleted.
   entryType?: 'normal' | 'letter' | 'unsent_letter' | 'ephemeral'
-  isSealed?: boolean
-  unlockDate?: string
-  recipientEmail?: string | null
-  recipientName?: string | null
-  senderName?: string | null
-  letterLocation?: string | null
   // E2EE fields
   encryptionType?: 'server' | 'e2ee'
   e2eeIV?: string | null

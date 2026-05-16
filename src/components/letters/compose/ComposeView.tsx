@@ -112,9 +112,11 @@ export default function ComposeView() {
         if (decrypted.entryType === 'letter') {
           setRecipient({ recipient: 'self' })
         } else if (decrypted.entryType === 'unsent_letter') {
+          // recipientName is no longer stored on JournalEntry; the user will
+          // need to re-enter the friend's name if they resume a draft.
           setRecipient({
             recipient: 'friend',
-            name: decrypted.recipientName ?? '',
+            name: '',
           })
         } else {
           // Not a letter at all — bounce back rather than corrupt it via autosave.
@@ -213,8 +215,6 @@ export default function ComposeView() {
         ? [{ strokes: doodleStrokes, spread: 1 }]
         : [],
       entryType: isSelf ? 'letter' : 'unsent_letter',
-      recipientEmail: null,
-      recipientName: isSelf ? 'future me' : recipient.name,
     })
   }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
 
