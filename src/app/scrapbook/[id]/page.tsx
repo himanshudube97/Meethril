@@ -11,7 +11,6 @@ interface BoardData {
   id: string
   title: string | null
   items: ScrapbookItem[]
-  encryptionType?: string
   e2eeIVs?: { title?: string; items: string } | null
 }
 
@@ -19,7 +18,7 @@ async function decryptScrapbookIfNeeded(
   data: BoardData,
   masterKey: CryptoKey | null
 ): Promise<BoardData> {
-  if (data.encryptionType !== 'e2ee') return data
+  // All scrapbooks are E2EE — always attempt decryption.
   if (!masterKey) throw new Error('Unlock E2EE to view this scrapbook.')
 
   const ivs = data.e2eeIVs as { title?: string; items: string } | null
