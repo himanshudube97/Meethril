@@ -5,12 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 
 type SelfPill = '1w' | '1m' | '6m' | '1y' | 'custom'
-// '5m' and '1h' are TEST-ONLY pills, gated to dev mode below. Remove both
-// the pill values AND the `isDevAuth` rendering branch when test scaffolding
-// is no longer needed.
+// PRELAUNCH-TEST-PILLS: '5m' and '1h' exist so the team can manually
+// smoke-test friend-letter delivery without waiting a week. Remove them
+// (and the matching server floor in /api/letters/friend) before public
+// launch. Grep for "PRELAUNCH-TEST-PILLS" to find every spot.
 type FriendPill = '5m' | '1h' | '1w' | '2w' | '30d' | 'custom'
-
-const isDevAuth = process.env.NEXT_PUBLIC_USE_DEV_AUTH === 'true'
 
 function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
   const now = Date.now()
@@ -228,13 +227,8 @@ export function SealModal({
                         {labelForSelf(p)}
                       </button>
                     ))
-                  : ([
-                      ...(isDevAuth ? (['5m', '1h'] as FriendPill[]) : []),
-                      '1w',
-                      '2w',
-                      '30d',
-                      'custom',
-                    ] as FriendPill[]).map((p) => (
+                  // PRELAUNCH-TEST-PILLS: drop '5m' and '1h' before public launch.
+                  : (['5m', '1h', '1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"
