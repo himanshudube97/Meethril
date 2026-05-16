@@ -19,6 +19,15 @@ interface Body {
   scheduledFor: string
   letterLocation?: string | null
   draftEntryId?: string | null
+  photoAssets?: Array<{
+    ciphertext: string
+    iv: string
+    type: 'photo' | 'doodle'
+    position: number
+    spread: number
+    rotation: number
+    ordinal: number
+  }>
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -58,6 +67,16 @@ export async function POST(request: NextRequest) {
   }
   if (scheduledFor.getTime() > Date.now() + thirtyDaysMs + 60_000) {
     return NextResponse.json({ error: 'scheduledFor too late (max 30 days)' }, { status: 400 })
+  }
+
+  const photoAssets = body.photoAssets ?? []
+  if (photoAssets.length > 20) {
+    return NextResponse.json({ error: 'too many assets (max 20)' }, { status: 400 })
+  }
+  for (const a of photoAssets) {
+    if (!a.ciphertext || !a.iv || a.type !== 'photo') {
+      return NextResponse.json({ error: 'invalid asset shape' }, { status: 400 })
+    }
   }
 
   // Derive senderName server-side. Prefer profile.nickname (the user-set
@@ -103,6 +122,20 @@ export async function POST(request: NextRequest) {
       },
       select: { id: true, publicToken: true },
     })
+    if (photoAssets.length > 0) {
+      await tx.letterDeliveryAsset.createMany({
+        data: photoAssets.map((a) => ({
+          deliveryId: delivery.id,
+          ciphertext: a.ciphertext,
+          iv: a.iv,
+          type: a.type,
+          position: a.position,
+          spread: a.spread,
+          rotation: a.rotation,
+          ordinal: a.ordinal,
+        })),
+      })
+    }
     return { letterId: letter.id, delivery }
   })
 
