@@ -10,6 +10,9 @@ import { SealModal } from './SealModal'
 import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
 import { useE2EE } from '@/hooks/useE2EE'
 import { useProfileStore } from '@/store/profile'
+import { useE2EEStore } from '@/store/e2ee'
+import { buildSelfLetterPayload } from '@/lib/letters/self-letter-client'
+import { buildFriendLetterPayload } from '@/lib/letters/friend-letter-client'
 import type { Photo } from '@/components/desk/PhotoBlock'
 import type { RecipientChoice } from '../letterTypes'
 import type { JournalEntry, StrokeData } from '@/store/journal'
@@ -53,9 +56,11 @@ export default function ComposeView() {
   const params = useSearchParams()
   const draftId = params.get('id')
 
-  const { fetchProfile } = useProfileStore()
+  const { profile, fetchProfile } = useProfileStore()
   const { decryptEntryFromServer, isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
   const autosave = useAutosaveEntry(draftId ?? null)
+  const masterKey = useE2EEStore((s) => s.masterKey)
+  const userName = profile?.nickname ?? 'A friend'
 
   const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
   const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
@@ -263,22 +268,72 @@ export default function ComposeView() {
     // first POST completes — if the user types and immediately taps seal,
     // the debounce hasn't fired yet.
     await autosave.flush()
-    const id = autosave.entryId
-    if (!id) {
+    const draftEntryId = autosave.entryId
+    if (!draftEntryId) {
       throw new Error('Draft has not been saved yet — please add some text.')
     }
-    const res = await fetch(`/api/entries/${id}/seal`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        unlockDate: unlockDate.toISOString(),
-        recipientEmail,
-      }),
-    })
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}))
-      throw new Error(json.error ?? 'Could not seal.')
+    if (!masterKey) {
+      throw new Error('Unlock Hearth first — your master key is required to seal letters.')
     }
+    // recipient is always non-null here (handleSeal is only reachable after the
+    // picker phase, where recipient is guaranteed to be set), but we narrow
+    // explicitly for TypeScript.
+    if (!recipient) throw new Error('No recipient selected.')
+
+    const combinedText = [bodyFront, bodyBack].filter(Boolean).join('\n\n')
+
+    if (recipient.recipient === 'self') {
+      const payload = await buildSelfLetterPayload({
+        draft: {
+          text: combinedText,
+          song,
+          photos: [],
+          doodles: [],
+          letterLocation: null,
+        },
+        unlockDate,
+        masterKey,
+      })
+      const res = await fetch('/api/letters/self', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload, draftEntryId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Could not save self letter.')
+      }
+      return
+    }
+
+    if (recipient.recipient === 'friend') {
+      if (!recipientEmail) throw new Error('Recipient email missing.')
+      const payload = await buildFriendLetterPayload({
+        draft: {
+          text: combinedText,
+          song,
+          photos: [],
+          doodles: [],
+        },
+        unlockDate,
+        recipientEmail,
+        recipientName: recipient.name,
+        senderName: userName,
+        letterLocation: null,
+      })
+      const res = await fetch('/api/letters/friend', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload, draftEntryId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Could not send friend letter.')
+      }
+      return
+    }
+
+    throw new Error(`Unknown recipient type: ${(recipient as RecipientChoice).recipient}`)
   }
 
   // Card flip control: front→back = 180 degrees (preserves the prior 3D flip).
