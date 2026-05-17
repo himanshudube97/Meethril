@@ -18,6 +18,7 @@ const themeIcons: Record<ThemeName, string> = {
   postal: '✉️',
   linen: '🕊️',
   sunset: '🌅',
+  rain: '🌧️',
 }
 
 export default function DeskSettingsPanel() {

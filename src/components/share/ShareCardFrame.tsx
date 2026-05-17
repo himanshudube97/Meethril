@@ -14,6 +14,7 @@ const themeStamps: Record<ThemeName, { icon: string; color: string }> = {
   postal: { icon: '✉️', color: '#1F2750' },
   linen: { icon: '🕊️', color: '#A85530' },
   sunset: { icon: '🌅', color: '#C8472D' },
+  rain: { icon: '🌧️', color: '#7A98B8' },
 }
 
 export const SHARE_CARD_W = 1080

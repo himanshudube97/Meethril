@@ -9,6 +9,7 @@ export type ThemeName =
   | 'postal'
   | 'linen'
   | 'sunset'
+  | 'rain'
 
 export interface Theme {
   name: string
@@ -44,12 +45,20 @@ export interface Theme {
   }
   moodEmojis: string[]
   moodLabels: string[]
-  particles: 'fireflies' | 'embers' | 'goldFlecks' | 'leaves' | 'sakura' | 'sunbeam' | 'foam' | 'mist' | 'dust'
-  ambience: 'forest' | 'firelight' | 'rose' | 'sage' | 'ocean' | 'postal' | 'linen' | 'sunset'
+  particles: 'fireflies' | 'embers' | 'goldFlecks' | 'leaves' | 'sakura' | 'sunbeam' | 'foam' | 'mist' | 'dust' | 'rain'
+  ambience: 'forest' | 'firelight' | 'rose' | 'sage' | 'ocean' | 'postal' | 'linen' | 'sunset' | 'rainy'
   /** Optional per-theme override for the hardcover frame around the
    *  spread. When unset, the cover falls back to a darkened version
    *  of `accent.primary`. */
   cover?: string
+  /** Optional override for the diary's writing surface. Lets a "dark scene
+   *  with light paper" theme decouple the page color/text from the outer
+   *  chrome (which still uses `glass.bg` + `text.primary`). When unset,
+   *  the page inherits glass.bg / text.primary as before. */
+  paper?: {
+    bg: string
+    text: string
+  }
 }
 
 // Rivendell Sunset - Forest greens with fireflies
@@ -369,6 +378,52 @@ export const sunsetTheme: Theme = {
   cover: '#A04030',
 }
 
+// Rain — quiet evening rainfall on slate-blue dusk
+export const rainTheme: Theme = {
+  name: 'Rain',
+  description: 'A quiet evening of gentle rainfall',
+  mode: 'dark',
+  bg: {
+    primary: '#1E2733',
+    secondary: '#262F3D',
+    gradient: 'linear-gradient(180deg, #2A3340 0%, #1E2733 55%, #161D28 100%)',
+  },
+  text: {
+    primary: '#DCE3EC',
+    secondary: '#9CA7B6',
+    muted: '#6A7385',
+  },
+  accent: {
+    primary: '#7A98B8',
+    secondary: '#5E7891',
+    warm: '#D4A878',
+    highlight: '#A8C2DC',
+  },
+  glass: {
+    bg: 'rgba(38, 47, 61, 0.55)',
+    border: 'rgba(122, 152, 184, 0.18)',
+    blur: '28px',
+  },
+  moods: {
+    0: '#566578',
+    1: '#6F8095',
+    2: '#7A98B8',
+    3: '#A8C2DC',
+    4: '#D4A878',
+  },
+  moodEmojis: ['🌧️', '☔', '🌫️', '🌦️', '✨'],
+  moodLabels: ['Heavy', 'Steady', 'Misty', 'Easing', 'Radiant'],
+  particles: 'rain',
+  ambience: 'rainy',
+  cover: '#2C3848',
+  // Dark rainy-dusk scene, but the diary itself is a pale paper-grey —
+  // gives the feeling of writing on light paper under a covered porch.
+  paper: {
+    bg: 'rgba(178, 186, 198, 0.9)',
+    text: '#222933',
+  },
+}
+
 export const themes: Record<ThemeName, Theme> = {
   rose: roseTheme,
   sage: sageTheme,
@@ -378,6 +433,7 @@ export const themes: Record<ThemeName, Theme> = {
   hearth: hearthTheme,
   linen: linenTheme,
   sunset: sunsetTheme,
+  rain: rainTheme,
 }
 
 // Time-based greetings

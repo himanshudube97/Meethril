@@ -67,16 +67,21 @@ const darken = (hex: string, factor: number): string => {
 }
 
 export function getGlassDiaryColors(theme: Theme): GlassDiaryColors {
+  // The diary's writing surface can be decoupled from the outer chrome via
+  // `theme.paper` — used by themes that want a dark scene with light paper
+  // (Rain) without darkening every other text surface in the app.
+  const paperBg = theme.paper?.bg ?? theme.glass.bg
+  const paperText = theme.paper?.text ?? theme.text.primary
   return {
-    pageBg: theme.glass.bg,
-    pageBgSolid: stripAlpha(theme.glass.bg),
+    pageBg: paperBg,
+    pageBgSolid: stripAlpha(paperBg),
     pageBlur: theme.glass.blur,
     pageBorder: warm(theme, 0.18),
     ruledLine: warm(theme, 0.28),
-    sectionLabel: withAlpha(theme.text.primary, 0.95),
-    prompt: withAlpha(theme.text.primary, 0.7),
+    sectionLabel: withAlpha(paperText, 0.95),
+    prompt: withAlpha(paperText, 0.7),
     date: warm(theme, 0.85),
-    bodyText: theme.text.primary,
+    bodyText: paperText,
     photoBorder: warm(theme, 0.3),
     doodleBorder: warm(theme, 0.2),
     doodleBg: 'rgba(255, 255, 255, 0.03)',
