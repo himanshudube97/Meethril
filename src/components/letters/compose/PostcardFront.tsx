@@ -8,6 +8,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
+import { findLargestFittingPrefix } from '@/lib/text-fit'
 
 // ~12 lines × ~36 chars per line. Sized to match the visible writing area on
 // the 660-px-tall postcard so the line cap and the lines you can SEE are the
@@ -65,17 +66,22 @@ export function PostcardFront({
   const diaryColors = getGlassDiaryColors(theme)
 
   const [atVisualCap, setAtVisualCap] = useState(false)
+  const trimmingRef = useRef(false)
 
-  // Hard line cap. We measure the editor's own contentEditable offsetHeight
-  // (NOT the lined-area wrapper's scrollHeight, which is floored at
-  // clientHeight). Strategy:
-  //   • Allow typing on the last visible line — the user must be able to
-  //     fill it. We only intervene when the change actually overflows.
-  //   • Pre-block Enter once the editor is already at the cap, because
-  //     adding another paragraph CAN'T fit — saves a flicker for the most
-  //     common overflow attempt.
-  //   • For everything else (chars, paste), let it land, measure, and undo
-  //     if it overflowed.
+  // INVARIANTS for the postcard-front writing area:
+  //   1. The contentEditable surface is `FRONT_LINES * 36px` tall, clipped
+  //      by `overflow: hidden`. No internal scroll, ever.
+  //   2. Enter at the cap is pre-blocked (handleKeyDown below) so the user
+  //      doesn't see a "type, then undo" flicker on the most common
+  //      overflow attempt.
+  //   3. On any other visual overflow (typing on the last line that wraps,
+  //      paste of more than fits) we binary-search the longest text prefix
+  //      that still fits and snap the editor to that. Paste keeps what it
+  //      can; the rest is silently dropped (NOT undone wholesale).
+  //   4. The "turn over" pulse fires once the surface is within 2px of the
+  //      cap — see `setAtVisualCap` below. Don't gate that on chars.
+  // The trim algorithm is covered by src/__tests__/text-fit.test.ts. CSS
+  // regressions in (1) need a manual smoke test (Vitest+jsdom has no layout).
   const MAX_EDITOR_HEIGHT = FRONT_LINES * 36
 
   const editor = useEditor({
@@ -87,18 +93,30 @@ export function PostcardFront({
     ],
     content: body,
     onUpdate({ editor }) {
-      const editorDom = editor.view.dom as HTMLElement
-      const editorHeight = editorDom.offsetHeight
+      if (trimmingRef.current) return
 
-      if (editorHeight > MAX_EDITOR_HEIGHT + 2) {
-        setAtVisualCap(true)
-        editor.commands.undo()
-        return
+      const editorDom = editor.view.dom as HTMLElement
+
+      if (editorDom.offsetHeight > MAX_EDITOR_HEIGHT + 2) {
+        trimmingRef.current = true
+        try {
+          const fullText = editor.getText()
+          const fits = (prefix: string): boolean => {
+            editor.commands.setContent(prefix, { emitUpdate: false })
+            return editorDom.offsetHeight <= MAX_EDITOR_HEIGHT + 2
+          }
+          const fittingLen = findLargestFittingPrefix(fullText, fits)
+          editor.commands.setContent(fullText.slice(0, fittingLen), { emitUpdate: false })
+          editor.commands.focus('end')
+        } finally {
+          trimmingRef.current = false
+        }
       }
-      // Show the "turn over" prompt + button pulse once the writing area is
-      // fully consumed (within 2px). Does NOT block further typing on the
-      // last line — typing more chars on the same line doesn't add height.
-      const isFull = editorHeight >= MAX_EDITOR_HEIGHT - 2
+
+      // Pulse the "turn over" prompt + button once the surface is fully
+      // consumed (within 2px). Does NOT block further typing on the last
+      // line — typing more chars on the same line doesn't add height.
+      const isFull = editorDom.offsetHeight >= MAX_EDITOR_HEIGHT - 2
       setAtVisualCap(isFull)
       onBodyChange?.(editor.getText())
     },

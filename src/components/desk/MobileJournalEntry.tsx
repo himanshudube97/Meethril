@@ -341,9 +341,6 @@ export default function MobileJournalEntry({ onClose }: MobileJournalEntryProps)
     return () => clearTimeout(id)
   }, [activePage])
 
-  // Char count = sum of all page texts
-  const charCount = pages.reduce((sum, p) => sum + p.length, 0)
-
   const handleSongChange = useCallback((value: string) => {
     setSongInput(value)
     setCurrentSong(value)
@@ -517,7 +514,6 @@ export default function MobileJournalEntry({ onClose }: MobileJournalEntryProps)
                 onPageTextChange={(value, cursorAtEnd) => handlePageTextChange(activePage, value, cursorAtEnd)}
                 linesPerPage={linesPerPage}
                 prompt={prompt}
-                charCount={charCount}
                 songInput={songInput}
                 onSongChange={handleSongChange}
                 onSongClear={() => handleSongChange('')}
@@ -585,7 +581,7 @@ function AutosaveIndicator({ status, color }: { status: AutosaveStatus; color: s
 
 function WritingPage({
   colors, isFirstPage, pageText, onPageTextChange, linesPerPage,
-  prompt, charCount, songInput, onSongChange, onSongClear, textareaRef,
+  prompt, songInput, onSongChange, onSongClear, textareaRef,
 }: {
   colors: ReturnType<typeof getGlassDiaryColors>
   isFirstPage: boolean
@@ -593,7 +589,6 @@ function WritingPage({
   onPageTextChange: (value: string, cursorAtEnd: boolean) => void
   linesPerPage: number
   prompt: string
-  charCount: number
   songInput: string
   onSongChange: (value: string) => void
   onSongClear: () => void
@@ -661,7 +656,6 @@ function WritingPage({
         }}
         placeholder={isFirstPage ? "What's on your mind today..." : ''}
         rows={linesPerPage}
-        maxLength={JOURNAL.MAX_CHARS}
         className="w-full resize-none outline-none rounded-lg p-3"
         style={{
           // Fixed height = exactly linesPerPage tall, no internal scroll.
@@ -682,10 +676,6 @@ function WritingPage({
         }}
       />
 
-      <div className="text-right text-[10px] mt-2"
-        style={{ color: charCount > JOURNAL.MAX_CHARS * 0.9 ? colors.saveButton : colors.prompt }}>
-        {charCount} / {JOURNAL.MAX_CHARS}
-      </div>
     </div>
   )
 }

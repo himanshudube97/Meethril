@@ -8,8 +8,8 @@ import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { useJournalStore, StrokeData } from '@/store/journal'
 import { useDeskStore } from '@/store/desk'
 import { getRandomPrompt } from '@/lib/themes'
-import { JOURNAL } from '@/lib/journal-constants'
 import { htmlToSplitPlainText } from '@/lib/text-utils'
+import { findLargestFittingPrefix } from '@/lib/text-fit'
 import {
   isCaretOnFirstVisualRow,
   getCaretLeftOffset,
@@ -249,27 +249,64 @@ const RightPage = memo(forwardRef<RightPageHandle, RightPageProps>(function Righ
     setPrompt(getRandomPrompt())
   }, [setPrompt])
 
+  // INVARIANTS for the right page writing surface:
+  //   1. The textarea NEVER scrolls. Its CSS uses `overflow: hidden` and a
+  //      fixed height (driven by `flex-1 min-h-0` inside the spread). Don't
+  //      add `overflow: auto/scroll` or remove the fixed-height constraint
+  //      without thinking about what the user can write into invisible space.
+  //   2. Typing past the visible bottom is silently rejected (no keystroke,
+  //      no cursor move).
+  //   3. Pasting more than fits truncates to what fits — existing content
+  //      before the paste is preserved (the `floor` argument enforces this).
+  //   4. There is no "page 3" — this is the last writing surface in the
+  //      spread; overflow has nowhere to go.
+  // Behavioral regressions in (2) and (3) trip the unit tests in
+  // src/__tests__/text-fit.test.ts. CSS regressions in (1) need a manual
+  // smoke test (Vitest+jsdom can't compute layout).
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value
+    const newCursorPos = e.target.selectionStart
 
-    // Enforce character limit (combined with left page)
-    const totalChars = (leftPageText?.length || 0) + newText.length
-    if (totalChars > JOURNAL.MAX_CHARS && newText.length > text.length) {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      setText(newText)
       return
     }
 
-    // Use DOM measurement to check right page capacity
-    const textarea = textareaRef.current
-    if (textarea && newText.length > text.length) {
-      const prevValue = textarea.value
-      textarea.value = newText
-      const overflows = textarea.scrollHeight > textarea.clientHeight + 1
-      textarea.value = prevValue
-      if (overflows) return // right page is full — no third page
+    // Shrinking or unchanged length — always accept (delete/replace).
+    if (newText.length <= text.length) {
+      setText(newText)
+      return
     }
 
-    setText(newText)
-  }, [text, leftPageText, setText])
+    // Use textarea height as the monotonic fit predicate. Set value via the
+    // raw DOM during measurement, then restore before letting React render.
+    const prevValue = textarea.value
+    const fits = (prefix: string): boolean => {
+      textarea.value = prefix
+      return textarea.scrollHeight <= textarea.clientHeight + 1
+    }
+
+    const fittingLen = findLargestFittingPrefix(newText, fits, text.length)
+    textarea.value = prevValue
+
+    if (fittingLen === newText.length) {
+      setText(newText)
+      return
+    }
+
+    const fitsText = newText.slice(0, fittingLen)
+    setText(fitsText)
+
+    // Restore caret to the user's intended position, clamped to the kept text.
+    requestAnimationFrame(() => {
+      const t = textareaRef.current
+      if (!t) return
+      t.focus()
+      const pos = Math.min(newCursorPos, fitsText.length)
+      t.setSelectionRange(pos, pos)
+    })
+  }, [text, setText])
 
   if (isNewEntry) {
     const captionDate = entry?.createdAt ? new Date(entry.createdAt) : new Date()

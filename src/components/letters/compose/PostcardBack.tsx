@@ -11,6 +11,7 @@ import SongEmbed from '@/components/SongEmbed'
 import PhotoBlock, { type Photo } from '@/components/desk/PhotoBlock'
 import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import type { StrokeData } from '@/store/journal'
+import { findLargestFittingPrefix } from '@/lib/text-fit'
 
 // Back side. The writing area sits below the music slot in the left column,
 // so it gets fewer lines than the front. ~11 lines × ~36 chars per line.
@@ -80,10 +81,19 @@ export function PostcardBack({
   }
 
   const [atVisualCap, setAtVisualCap] = useState(false)
+  const trimmingRef = useRef(false)
 
-  // Hard line cap — mirrors PostcardFront. Allow typing on the last visible
-  // line; only undo on actual overflow; pre-block Enter at the cap to spare
-  // the user a flicker on the most common overflow attempt.
+  // INVARIANTS for the postcard-back writing area:
+  //   1. The contentEditable surface is `BACK_LINES * 36px` tall, clipped by
+  //      `overflow: hidden`. No internal scroll, ever.
+  //   2. Enter at the cap is pre-blocked (handleKeyDown below) to spare a
+  //      flicker on the most common overflow attempt.
+  //   3. On any other visual overflow (typing on the last line that wraps,
+  //      paste of more than fits) we binary-search the longest text prefix
+  //      that still fits and snap the editor to that. Paste keeps what it
+  //      can; the rest is silently dropped (NOT undone wholesale).
+  // The trim algorithm is covered by src/__tests__/text-fit.test.ts. CSS
+  // regressions in (1) need a manual smoke test (Vitest+jsdom has no layout).
   const MAX_EDITOR_HEIGHT = BACK_LINES * 36
 
   const editor = useEditor({
@@ -95,15 +105,27 @@ export function PostcardBack({
     ],
     content: body,
     onUpdate({ editor }) {
-      const editorDom = editor.view.dom as HTMLElement
-      const editorHeight = editorDom.offsetHeight
+      if (trimmingRef.current) return
 
-      if (editorHeight > MAX_EDITOR_HEIGHT + 2) {
-        setAtVisualCap(true)
-        editor.commands.undo()
-        return
+      const editorDom = editor.view.dom as HTMLElement
+
+      if (editorDom.offsetHeight > MAX_EDITOR_HEIGHT + 2) {
+        trimmingRef.current = true
+        try {
+          const fullText = editor.getText()
+          const fits = (prefix: string): boolean => {
+            editor.commands.setContent(prefix, { emitUpdate: false })
+            return editorDom.offsetHeight <= MAX_EDITOR_HEIGHT + 2
+          }
+          const fittingLen = findLargestFittingPrefix(fullText, fits)
+          editor.commands.setContent(fullText.slice(0, fittingLen), { emitUpdate: false })
+          editor.commands.focus('end')
+        } finally {
+          trimmingRef.current = false
+        }
       }
-      const isFull = editorHeight >= MAX_EDITOR_HEIGHT - 2
+
+      const isFull = editorDom.offsetHeight >= MAX_EDITOR_HEIGHT - 2
       setAtVisualCap(isFull)
       onBodyChange?.(editor.getText())
     },
