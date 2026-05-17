@@ -11,6 +11,7 @@ import TopHint from './TopHint'
 import NewLetterTag from './NewLetterTag'
 import LetterFanout from './LetterFanout'
 import RevealModal from './RevealModal'
+import DraftResumePrompt, { type DraftPromptInfo } from './DraftResumePrompt'
 import { MONTHS, MONTH_NAMES, groupInboxByMonth, countUnread } from '../lettersData'
 import type { InboxLetter } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
@@ -27,7 +28,41 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   const [monthIdx, setMonthIdx] = useState(today.getMonth())
   const [fanTriggerKey, setFanTriggerKey] = useState(0)
   const [revealLetter, setRevealLetter] = useState<InboxLetter | null>(null)
+  const [draftPrompt, setDraftPrompt] = useState<DraftPromptInfo[] | null>(null)
   const { isE2EEReady } = useE2EE()
+
+  async function handleBegin() {
+    try {
+      const res = await fetch('/api/letters/drafts')
+      if (!res.ok) {
+        router.push('/letters/write')
+        return
+      }
+      const data = (await res.json()) as {
+        drafts?: Array<{
+          id: string
+          entryType: 'letter' | 'unsent_letter'
+          recipientName: string | null
+          updatedAt: string
+        }>
+      }
+      const drafts = data.drafts ?? []
+      if (drafts.length === 0) {
+        router.push('/letters/write')
+        return
+      }
+      setDraftPrompt(
+        drafts.map((d) => ({
+          id: d.id,
+          recipientName: d.recipientName,
+          isSelf: d.entryType === 'letter',
+          updatedAt: d.updatedAt,
+        })),
+      )
+    } catch {
+      router.push('/letters/write')
+    }
+  }
 
   // List view only renders unencrypted metadata (recipient name, dates,
   // isViewed). Don't decrypt here — RevealModal does the single decrypt
@@ -98,7 +133,7 @@ export default function InboxView({ onUnreadCountChange }: Props) {
 
       <div className="absolute inset-0 z-[5] flex items-end justify-center w-full pb-[160px]">
         <div className="flex items-end gap-[60px] w-full px-[80px] justify-center">
-          <WriteCard onBegin={() => router.push('/letters/write')} />
+          <WriteCard onBegin={handleBegin} />
 
           <div className="flex items-end gap-[80px]">
             <Lamp />
@@ -143,6 +178,19 @@ export default function InboxView({ onUnreadCountChange }: Props) {
           fetch(`/api/letters/${id}/read`, { method: 'POST' }).catch(() => {})
           setLetters(ls => ls.map(l => l.id === id ? { ...l, isViewed: true } : l))
         }}
+      />
+
+      <DraftResumePrompt
+        drafts={draftPrompt}
+        onResume={(id) => {
+          setDraftPrompt(null)
+          router.push(`/letters/write?id=${id}`)
+        }}
+        onStartNew={() => {
+          setDraftPrompt(null)
+          router.push('/letters/write')
+        }}
+        onClose={() => setDraftPrompt(null)}
       />
     </section>
   )
