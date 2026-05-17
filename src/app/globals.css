@@ -78,6 +78,17 @@ textarea,
   transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
+/* Letter compose editors — each line in the lined writing area must be
+   exactly 36px tall (matches the line-height + the printed paper lines).
+   Browser default <p> margins (~16px top + bottom) would make each
+   paragraph 68px and break the visible-line-count = typeable-line-count
+   contract that the visual-cap guard depends on. */
+.letter-front-editor p,
+.letter-back-editor p {
+  margin: 0;
+  line-height: 36px;
+}
+
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;

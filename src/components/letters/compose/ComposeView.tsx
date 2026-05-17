@@ -7,15 +7,18 @@ import { RecipientPicker } from './RecipientPicker'
 import { PostcardFront, FRONT_CHAR_LIMIT } from './PostcardFront'
 import { PostcardBack, BACK_CHAR_LIMIT } from './PostcardBack'
 import { SealModal } from './SealModal'
-import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
+import { useAutosaveLetterDraft } from '@/hooks/useAutosaveLetterDraft'
 import { useE2EE } from '@/hooks/useE2EE'
 import { useProfileStore } from '@/store/profile'
 import { useE2EEStore } from '@/store/e2ee'
+import { useThemeStore } from '@/store/theme'
+import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { buildSelfLetterPayload } from '@/lib/letters/self-letter-client'
 import { buildFriendLetterPayload } from '@/lib/letters/friend-letter-client'
+import { decryptLetterDraft, type LetterDraftWire } from '@/lib/letters/draft-decrypt'
 import type { Photo } from '@/components/desk/PhotoBlock'
 import type { RecipientChoice } from '../letterTypes'
-import type { JournalEntry, StrokeData } from '@/store/journal'
+import type { StrokeData } from '@/store/journal'
 
 type Phase = 'picker' | 'front' | 'back'
 
@@ -57,9 +60,10 @@ export default function ComposeView() {
   const draftId = params.get('id')
 
   const { profile, fetchProfile } = useProfileStore()
-  const { decryptEntryFromServer, isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
-  const autosave = useAutosaveEntry(draftId ?? null)
+  const { isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
+  const autosave = useAutosaveLetterDraft(draftId ?? null)
   const masterKey = useE2EEStore((s) => s.masterKey)
+  const theme = useThemeStore((s) => s.theme)
   const userName = profile?.nickname ?? 'A friend'
 
   const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
@@ -82,81 +86,85 @@ export default function ComposeView() {
     fetchProfile()
   }, [fetchProfile])
 
-  // Hydrate a resumed draft. The body / recipientName may be E2EE-encrypted
-  // on the wire — push them through decryptEntryFromServer (no-op for
-  // server-side rows) before splitting into front/back.
+  // Lock both <html> and <body> scroll while the compose view is mounted.
+  // globals.css forces `html { overflow-y: scroll }` to avoid scrollbar
+  // layout shift across the rest of the app — locking body alone is not
+  // enough; the html-level scrollbar is what actually appears.
+  useEffect(() => {
+    const html = document.documentElement
+    const originalHtmlOverflow = html.style.overflowY
+    const originalBodyOverflow = document.body.style.overflow
+    html.style.overflowY = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflowY = originalHtmlOverflow
+      document.body.style.overflow = originalBodyOverflow
+    }
+  }, [])
+
+  // Hydrate a resumed draft from the letters table. We have to wait for the
+  // master key to be available — drafts are E2EE under it, and decrypting
+  // before unlock would just seed the editors with placeholder text.
   useEffect(() => {
     if (!draftId || hydratedRef.current) return
-    // For E2EE rows we have to wait until either the key is loaded or we know
-    // for sure the user has E2EE disabled. Otherwise decryptEntryFromServer
-    // hands back the "[Encrypted — unlock to view]" placeholder and we'd seed
-    // the editors with that.
     if (!isE2EEInitialized) return
     if (isE2EEEnabled && !isE2EEReady) return
+    if (!masterKey) return
 
     hydratedRef.current = true
     void (async () => {
       try {
-        const res = await fetch(`/api/entries/${draftId}`)
+        const res = await fetch(`/api/letters/drafts/${draftId}`)
         if (!res.ok) {
           router.replace('/letters')
           return
         }
-        const raw = (await res.json()) as JournalEntry
-        // All entries are E2EE — always decrypt client-side.
-        const decrypted = await decryptEntryFromServer(raw)
+        const wire = (await res.json()) as LetterDraftWire
+        const decrypted = await decryptLetterDraft(wire, masterKey)
 
-        if (decrypted.createdAt) setCreatedAt(new Date(decrypted.createdAt))
+        setCreatedAt(new Date(wire.createdAt))
 
-        if (decrypted.entryType === 'letter') {
+        if (decrypted.letterType === 'self') {
           setRecipient({ recipient: 'self' })
-        } else if (decrypted.entryType === 'unsent_letter') {
-          // recipientName is no longer stored on JournalEntry; the user will
-          // need to re-enter the friend's name if they resume a draft.
+        } else {
+          // Friend drafts keep the recipient name on the row itself now —
+          // hydrate it back into the picker state.
           setRecipient({
             recipient: 'friend',
-            name: '',
+            name: decrypted.recipientName ?? '',
           })
-        } else {
-          // Not a letter at all — bounce back rather than corrupt it via autosave.
-          router.replace('/letters')
-          return
         }
 
-        const { front, back } = splitBody(decrypted.text ?? '')
+        const { front, back } = splitBody(decrypted.text)
         setBodyFront(front)
         setBodyBack(back)
 
-        // Hydrate photo refs from the persisted entry. The server-side shape
-        // uses `position: number` and includes `spread`; PhotoBlock's Photo
-        // type uses `position: 1 | 2` and omits spread. Normalise here so the
-        // round-trip through autosave (which re-adds spread:1) is stable.
-        const hydratedPhotos: Photo[] = (decrypted.photos ?? [])
+        const hydratedPhotos: Photo[] = decrypted.photos
           .filter((p) => p.position === 1 || p.position === 2)
           .map((p) => ({
-            id: p.id,
-            url: p.url,
-            encryptedRef: p.encryptedRef,
-            encryptedRefIV: p.encryptedRefIV,
+            url: p.url ?? undefined,
+            encryptedRef: p.encryptedRef ?? undefined,
+            encryptedRefIV: p.encryptedRefIV ?? undefined,
             rotation: p.rotation,
             position: p.position as 1 | 2,
           }))
         setPhotos(hydratedPhotos)
 
-        // Hydrate doodle strokes from the persisted entry (spread 1 only).
-        const hydratedDoodle = decrypted.doodles?.[0]?.strokes ?? []
-        setDoodleStrokes(hydratedDoodle)
+        const firstDoodle = decrypted.doodles[0]
+        if (firstDoodle && Array.isArray(firstDoodle.strokes)) {
+          setDoodleStrokes(firstDoodle.strokes as StrokeData[])
+        } else {
+          setDoodleStrokes([])
+        }
 
-        // Hydrate song URL from the persisted entry.
-        setSong(decrypted.song ?? null)
-
+        setSong(decrypted.song)
         setLoading(false)
       } catch (err) {
         console.error('Failed to resume letter draft:', err)
         router.replace('/letters')
       }
     })()
-  }, [draftId, router, decryptEntryFromServer, isE2EEEnabled, isE2EEInitialized, isE2EEReady])
+  }, [draftId, router, isE2EEEnabled, isE2EEInitialized, isE2EEReady, masterKey])
 
   // ── Photo + doodle handlers — bubble up to autosave via state setters.
   const handlePhotoAdd = useCallback(
@@ -180,10 +188,11 @@ export default function ComposeView() {
     setPhotos((prev) => prev.filter((p) => p.position !== position))
   }, [])
 
-  // Autosave wiring. The hook is imperative (`trigger(draft)` + debounce),
+  // Autosave wiring. The hook is imperative (`trigger(payload)` + debounce),
   // so we re-trigger whenever the two body slices, recipient mapping,
-  // photos, or doodle strokes change. The hook handles the POST→PUT
-  // lifecycle and E2EE encryption.
+  // photos, song, or doodle strokes change. The hook handles the
+  // POST→PUT lifecycle against /api/letters/drafts and the E2EE
+  // encryption.
   useEffect(() => {
     if (!recipient) return
     if (phase === 'picker') return
@@ -195,25 +204,21 @@ export default function ComposeView() {
     const isSelf = recipient.recipient === 'self'
 
     autosave.trigger({
+      letterType: isSelf ? 'self' : 'friend',
       text: joined,
       song,
-      // Photos + doodles are now owned by ComposeView (lifted out of
-      // PostcardBack) so they survive autosave + draft resume. The server's
-      // destructive replace block only runs when these keys are present,
-      // which is exactly what we want now that ComposeView is the source
-      // of truth.
       photos: photos.map((p) => ({
-        url: p.url,
-        encryptedRef: p.encryptedRef,
-        encryptedRefIV: p.encryptedRefIV,
+        url: p.url ?? null,
+        encryptedRef: p.encryptedRef ?? null,
+        encryptedRefIV: p.encryptedRefIV ?? null,
         position: p.position,
         rotation: p.rotation,
         spread: 1,
       })),
-      doodles: doodleStrokes.length > 0
-        ? [{ strokes: doodleStrokes, spread: 1 }]
-        : [],
-      entryType: isSelf ? 'letter' : 'unsent_letter',
+      doodleStrokes,
+      recipientName: isSelf ? null : recipient.name ?? null,
+      recipientEmail: null,
+      letterLocation: null,
     })
   }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
 
@@ -263,20 +268,17 @@ export default function ComposeView() {
     recipientEmail?: string
   }) {
     // Flush the pending autosave so the seal request sees the final body /
-    // recipient state. autosave.entryId becomes available only after the
+    // recipient state. autosave.draftId becomes available only after the
     // first POST completes — if the user types and immediately taps seal,
     // the debounce hasn't fired yet.
     await autosave.flush()
-    const draftEntryId = autosave.entryId
-    if (!draftEntryId) {
+    const draftLetterId = autosave.draftId
+    if (!draftLetterId) {
       throw new Error('Draft has not been saved yet — please add some text.')
     }
     if (!masterKey) {
       throw new Error('Unlock Hearth first — your master key is required to seal letters.')
     }
-    // recipient is always non-null here (handleSeal is only reachable after the
-    // picker phase, where recipient is guaranteed to be set), but we narrow
-    // explicitly for TypeScript.
     if (!recipient) throw new Error('No recipient selected.')
 
     const combinedText = [bodyFront, bodyBack].filter(Boolean).join('\n\n')
@@ -296,7 +298,7 @@ export default function ComposeView() {
       const res = await fetch('/api/letters/self', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...payload, draftEntryId }),
+        body: JSON.stringify({ ...payload, draftLetterId }),
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -308,38 +310,34 @@ export default function ComposeView() {
     if (recipient.recipient === 'friend') {
       if (!recipientEmail) throw new Error('Recipient email missing.')
 
-      // Fetch the draft's photos and doodles so we can bundle them into
-      // the letter payload. The autosave route persisted them under the
-      // draftEntryId; the bundler will decrypt with the master key and
-      // re-encrypt under K.
-      const draftRes = await fetch(`/api/entries/${draftEntryId}`)
+      // Re-fetch the draft so we get the encrypted doodle strokes in the
+      // shape the asset bundler expects. Photos are read from React state
+      // (ComposeView owns those refs); doodles come from the draft because
+      // local state holds plaintext strokes.
+      const draftRes = await fetch(`/api/letters/drafts/${draftLetterId}`)
       if (!draftRes.ok) throw new Error('Could not load draft for sealing.')
-      const draft = (await draftRes.json()) as {
-        photos?: Array<{
-          encryptedRef: string | null
-          encryptedRefIV: string | null
-          url: string | null
-          position: number
-          spread: number
-          rotation: number
-        }>
-        doodles?: Array<{
-          strokes: unknown
-          spread: number
-          positionInEntry: number
+      const draftWire = (await draftRes.json()) as {
+        draftDoodles?: Array<{
+          strokes: { encryptedStrokes: string; e2eeIV: string } | unknown
+          spread?: number
+          positionInEntry?: number
         }>
       }
 
-      const draftPhotos = (draft.photos ?? []).map((p, i) => ({
-        encryptedRef: p.encryptedRef,
-        encryptedRefIV: p.encryptedRefIV,
-        url: p.url,
+      const draftPhotos = photos.map((p, i) => ({
+        encryptedRef: p.encryptedRef ?? null,
+        encryptedRefIV: p.encryptedRefIV ?? null,
+        url: p.url ?? null,
         position: p.position,
-        spread: p.spread,
+        spread: 1,
         rotation: p.rotation,
         ordinal: i,
       }))
-      const draftDoodles = draft.doodles ?? []
+      const draftDoodles = (draftWire.draftDoodles ?? []).map((d) => ({
+        strokes: d.strokes,
+        spread: d.spread ?? 1,
+        positionInEntry: d.positionInEntry ?? 0,
+      }))
 
       const payload = await buildFriendLetterPayload({
         draft: {
@@ -358,7 +356,7 @@ export default function ComposeView() {
       const res = await fetch('/api/letters/friend', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...payload, draftEntryId }),
+        body: JSON.stringify({ ...payload, draftLetterId }),
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -373,28 +371,74 @@ export default function ComposeView() {
   // Card flip control: front→back = 180 degrees (preserves the prior 3D flip).
   const cardRotateY = phase === 'back' ? 180 : 0
 
+  // Pull the same cover tokens the journal uses for its leather binding.
+  // The blotter behind the postcard reads as the same physical material.
+  const diaryColors = getGlassDiaryColors(theme)
+
   return (
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 200,
+        zIndex: 30, // below Navigation (z-40/50) so the navbar stays visible
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(180deg, var(--bg-1), var(--bg-2))',
         perspective: 1600,
+        // background intentionally left transparent so the theme Background
+        // (snow, fireflies, sakura, etc.) animates behind the postcard the
+        // same way it does behind a journal spread.
       }}
     >
+      {/* Leather desk blotter — hugs the postcard with a small even margin.
+          The inkwell + quill sit OUTSIDE the blotter, on the bare desk, so
+          the blotter reads as a leather mat just for the letter. Same
+          theme cover token + crosshatch grain as before. */}
+      <div
+        style={{
+          position: 'relative',
+          padding: '20px 26px',
+          borderRadius: 14,
+          backgroundColor: diaryColors.cover,
+          backgroundImage: `repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 6px)`,
+          border: `1px solid ${diaryColors.coverBorder}`,
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25), 0 35px 70px rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.28)',
+        }}
+      >
       {/* The postcard itself — landscape */}
       <motion.div
         style={{
-          width: 'min(1100px, calc(100vw - 80px))',
-          height: 'min(640px, calc(100vh - 180px))',
+          width: 'min(1140px, calc(100vw - 80px))',
+          height: 'min(660px, calc(100vh - 140px))',
           position: 'relative',
           transformStyle: 'preserve-3d',
         }}
       >
+        {/* Quill — illustration asset standing beside the postcard. */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.35, ease: [0.2, 0.7, 0.2, 1] }}
+          style={{
+            position: 'absolute',
+            right: -300,
+            bottom: 0,
+            width: 280,
+            height: 280,
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 14px 22px rgba(0,0,0,0.32))',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/quill.png"
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </motion.div>
+
+
         {/* 3D flip wrapper */}
         <motion.div
           animate={{ rotateY: cardRotateY }}
@@ -406,8 +450,12 @@ export default function ComposeView() {
             transformStyle: 'preserve-3d',
           }}
         >
-          {/* FRONT face — its own backfaceVisibility is set inside the component */}
+          {/* FRONT face. `active` toggles pointer-events on its root because
+              backface-visibility:hidden doesn't reliably block clicks on the
+              rotated-away face across browsers — without this guard, clicks
+              on the back leak through to the (invisible) front. */}
           <PostcardFront
+            active={phase === 'front'}
             salutationName={salutationName}
             body={bodyFront}
             onBodyChange={setBodyFront}
@@ -416,9 +464,9 @@ export default function ComposeView() {
             createdAt={createdAt}
           />
 
-          {/* BACK face — already applies its own rotateY(180deg) + backfaceVisibility */}
+          {/* BACK face — same active guard. */}
           <PostcardBack
-            entryId={autosave.entryId}
+            active={phase === 'back'}
             body={bodyBack}
             onBodyChange={setBodyBack}
             photos={photos}
@@ -434,6 +482,7 @@ export default function ComposeView() {
           />
         </motion.div>
       </motion.div>
+      </div>
 
       {showSeal && (
         <SealModal

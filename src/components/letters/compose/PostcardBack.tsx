@@ -6,23 +6,20 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import { useThemeStore } from '@/store/theme'
+import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
 import PhotoBlock, { type Photo } from '@/components/desk/PhotoBlock'
 import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import type { StrokeData } from '@/store/journal'
 
-// ~9 lines × ~36 chars per line (matches PostcardFront)
-export const BACK_CHAR_LIMIT = 324
-const BACK_LINES = 9
+// Back side. The writing area sits below the music slot in the left column,
+// so it gets fewer lines than the front. ~11 lines × ~36 chars per line.
+export const BACK_CHAR_LIMIT = 396
+const BACK_LINES = 11
 
-// Intrinsic postcard paper colours — constant by design (not theme-driven)
-const PAPER_BG = `
-  repeating-linear-gradient(
-    transparent, transparent 36px,
-    rgba(120, 90, 50, 0.09) 36px, rgba(120, 90, 50, 0.09) 37px
-  ),
-  linear-gradient(160deg, #fff6f2 0%, #fbe6dd 100%)
-`
+// Postcard paper picks up its colour from getGlassDiaryColors() (see
+// PostcardFront for the matching pattern). Lines belong ONLY in the writing
+// area, not the whole paper.
 const PAPER_INK = '#3d342a'
 const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
 
@@ -33,7 +30,6 @@ const DOODLE_BORDER = 'rgba(120, 90, 50, 0.22)'
 const DOODLE_COLORS = ['#3d342a', '#b34a3a', '#5a7a5a', '#7a5a3a']
 
 export function PostcardBack({
-  entryId = null,
   body = '',
   onBodyChange,
   photos = [],
@@ -46,8 +42,8 @@ export function PostcardBack({
   onTurnBack,
   onSeal,
   canSeal,
+  active = true,
 }: {
-  entryId?: string | null
   body?: string
   onBodyChange?: (next: string) => void
   photos?: Photo[]
@@ -60,14 +56,36 @@ export function PostcardBack({
   onTurnBack?: () => void
   onSeal?: () => void
   canSeal?: boolean
+  // When false, the face is rotated away — turn off pointer-events so clicks
+  // don't leak through to the invisible face.
+  active?: boolean
 }) {
   const theme = useThemeStore((s) => s.theme)
+  // Same journal page tokens — solid theme bg + tinted overlay. Matches
+  // .diary-page exactly.
+  const diaryColors = getGlassDiaryColors(theme)
 
-  // ── Local input buffer for the song URL form (not persisted — only
-  // songConfirmed / the `song` prop is the source of truth).
-  const [songInput, setSongInput] = useState('')
+  // Music input — same pattern as the journal's LeftPage: a single text input
+  // that auto-collapses into <SongEmbed> the moment a valid URL is detected.
+  // No "add" button — paste a URL and it just becomes a player.
+  const [songInput, setSongInput] = useState(song ?? '')
+  const [isEditingSong, setIsEditingSong] = useState(!song)
 
-  // ── TipTap editor ─────────────────────────────────────────────────────────
+  const handleSongChange = (value: string) => {
+    setSongInput(value)
+    onSongChange?.(value || null)
+    if (value && /https?:\/\//.test(value)) {
+      setIsEditingSong(false)
+    }
+  }
+
+  const [atVisualCap, setAtVisualCap] = useState(false)
+
+  // Hard line cap — mirrors PostcardFront. Allow typing on the last visible
+  // line; only undo on actual overflow; pre-block Enter at the cap to spare
+  // the user a flicker on the most common overflow attempt.
+  const MAX_EDITOR_HEIGHT = BACK_LINES * 36
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -77,6 +95,16 @@ export function PostcardBack({
     ],
     content: body,
     onUpdate({ editor }) {
+      const editorDom = editor.view.dom as HTMLElement
+      const editorHeight = editorDom.offsetHeight
+
+      if (editorHeight > MAX_EDITOR_HEIGHT + 2) {
+        setAtVisualCap(true)
+        editor.commands.undo()
+        return
+      }
+      const isFull = editorHeight >= MAX_EDITOR_HEIGHT - 2
+      setAtVisualCap(isFull)
       onBodyChange?.(editor.getText())
     },
     editorProps: {
@@ -87,9 +115,16 @@ export function PostcardBack({
           'font-size: 19px',
           'line-height: 36px',
           'color: #3d342a',
-          'overflow: hidden',
-          'height: 100%',
         ].join(';'),
+      },
+      handleKeyDown: (view, event) => {
+        if (event.key !== 'Enter' || event.shiftKey) return false
+        const dom = view.dom as HTMLElement
+        if (dom.offsetHeight >= MAX_EDITOR_HEIGHT - 2) {
+          event.preventDefault()
+          return true
+        }
+        return false
       },
     },
   })
@@ -105,22 +140,9 @@ export function PostcardBack({
     lastSeededRef.current = body
   }, [body, editor])
 
-  const atCap = (editor?.storage.characterCount.characters() ?? 0) >= BACK_CHAR_LIMIT
-
-  // ── Song handlers ─────────────────────────────────────────────────────────
-  const handleSongSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const trimmed = songInput.trim()
-    if (trimmed) {
-      onSongChange?.(trimmed)
-      setSongInput('')
-    }
-  }
-
-  const handleSongClear = () => {
-    setSongInput('')
-    onSongChange?.(null)
-  }
+  const atCap =
+    (editor?.storage.characterCount.characters() ?? 0) >= BACK_CHAR_LIMIT ||
+    atVisualCap
 
   const handleTurnBack = onTurnBack
   const sealEnabled = canSeal ?? true
@@ -138,36 +160,104 @@ export function PostcardBack({
           position: 'absolute',
           inset: 0,
           transform: 'rotateY(180deg)',
-          background: PAPER_BG,
+          backgroundColor: diaryColors.pageBgSolid,
+          backgroundImage: `linear-gradient(${diaryColors.pageBg}, ${diaryColors.pageBg})`,
           borderRadius: 8,
           border: '1px solid rgba(80, 55, 40, 0.16)',
           boxShadow:
             '0 20px 56px rgba(0,0,0,0.40), 0 4px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.55)',
           overflow: 'hidden',
           color: PAPER_INK,
+          pointerEvents: active ? 'auto' : 'none',
         }}
       >
-        {/* ── Two-column content area ─────────────────────────────────────── */}
+        {/* ── Two-column content area — 50/50 split ─────────────────────── */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '60% 40%',
+            gridTemplateColumns: '50% 50%',
             flex: 1,
             minHeight: 0,
             overflow: 'hidden',
           }}
         >
-          {/* LEFT 60% — writing continuation */}
+          {/* LEFT 50% — music top, writing area below */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              padding: '22px 20px 0 28px',
+              padding: '22px 24px 0 28px',
               overflow: 'hidden',
               borderRight: `1px solid ${LINE_COLOR}`,
+              gap: 14,
             }}
           >
-            {/* Lined writing area */}
+            {/* MUSIC slot — journal-style: single input that auto-collapses
+                into <SongEmbed> the moment a valid URL is detected. No "add"
+                button; pasting a link is the commit action. */}
+            <div style={{ flexShrink: 0, minHeight: 76 }}>
+              {isEditingSong || !songInput ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: 'Cormorant Garamond, Georgia, serif',
+                      fontStyle: 'italic',
+                      fontSize: 11,
+                      letterSpacing: 2,
+                      color: 'rgba(120, 90, 50, 0.55)',
+                      textTransform: 'lowercase',
+                      marginBottom: 6,
+                    }}
+                  >
+                    add a song
+                  </div>
+                  <input
+                    type="text"
+                    value={songInput}
+                    onChange={(e) => handleSongChange(e.target.value)}
+                    placeholder="Paste Spotify, YouTube, or SoundCloud link..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${DOODLE_BORDER}`,
+                      background: DOODLE_BG,
+                      color: PAPER_INK,
+                      fontFamily: 'Cormorant Garamond, Georgia, serif',
+                      fontSize: 13,
+                      outline: 'none',
+                    }}
+                  />
+                </>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <SongEmbed url={songInput} compact audioOnly />
+                  <button
+                    onClick={() => setIsEditingSong(true)}
+                    title="Change song"
+                    style={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: 'rgba(120, 90, 50, 0.15)',
+                      color: 'rgba(120, 90, 50, 0.7)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      opacity: 0.6,
+                    }}
+                  >
+                    ✎
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Lined writing area — fixed height = BACK_LINES × 36 so the
+                line cap and the visible lines are the same number. */}
             <div
               onClick={() => editor?.commands.focus()}
               style={{
@@ -179,21 +269,18 @@ export function PostcardBack({
                 position: 'relative',
               }}
             >
-              <EditorContent
-                editor={editor}
-                style={{ height: '100%', overflow: 'hidden' }}
-              />
+              <EditorContent editor={editor} />
             </div>
 
-            {/* "your letter is full." whisper */}
             {atCap && (
               <p
                 style={{
-                  marginTop: 8,
+                  marginTop: 4,
                   fontFamily: 'Cormorant Garamond, Georgia, serif',
                   fontStyle: 'italic',
                   fontSize: 12,
                   color: 'rgba(120, 90, 50, 0.5)',
+                  flexShrink: 0,
                 }}
               >
                 your letter is full.
@@ -201,147 +288,73 @@ export function PostcardBack({
             )}
           </div>
 
-          {/* RIGHT 40% — media stack: song top, 2 photos middle, doodle bottom */}
+          {/* RIGHT 50% — photos top, doodle below */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
-              padding: '16px 16px 8px 14px',
+              gap: 14,
+              padding: '22px 28px 0 24px',
               overflow: 'hidden',
             }}
           >
-            {/* ── Song slot (top) ───────────────────────────────────────── */}
+            {/* PHOTOS — slightly larger than before (scale 1.15) */}
             <div style={{ flexShrink: 0 }}>
               <div
                 style={{
                   fontFamily: 'Cormorant Garamond, Georgia, serif',
                   fontStyle: 'italic',
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: 2,
-                  color: 'rgba(120, 90, 50, 0.5)',
-                  textTransform: 'lowercase',
-                  marginBottom: 6,
-                }}
-              >
-                music
-              </div>
-              {song ? (
-                <div>
-                  {/* SongEmbed — reused verbatim, wrapped to cap height */}
-                  <div style={{ height: 64, overflow: 'hidden', borderRadius: 8 }}>
-                    <SongEmbed url={song} compact />
-                  </div>
-                  <button
-                    onClick={handleSongClear}
-                    style={{
-                      marginTop: 4,
-                      background: 'none',
-                      border: 'none',
-                      fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontStyle: 'italic',
-                      fontSize: 11,
-                      color: 'rgba(120, 90, 50, 0.5)',
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
-                  >
-                    remove
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSongSubmit} style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    type="url"
-                    placeholder="paste a song URL…"
-                    value={songInput}
-                    onChange={(e) => setSongInput(e.target.value)}
-                    style={{
-                      flex: 1,
-                      background: 'rgba(120, 90, 50, 0.06)',
-                      border: '1px solid rgba(120, 90, 50, 0.22)',
-                      borderRadius: 6,
-                      padding: '5px 8px',
-                      fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 11,
-                      color: PAPER_INK,
-                      outline: 'none',
-                      minWidth: 0,
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      border: `1px solid ${theme.accent.primary}`,
-                      background: 'transparent',
-                      color: theme.accent.primary,
-                      fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                  >
-                    add
-                  </button>
-                </form>
-              )}
-            </div>
-
-            {/* ── 2 photo slots (middle) ────────────────────────────────── */}
-            <div style={{ flexShrink: 0 }}>
-              <div
-                style={{
-                  fontFamily: 'Cormorant Garamond, Georgia, serif',
-                  fontStyle: 'italic',
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  color: 'rgba(120, 90, 50, 0.5)',
+                  color: 'rgba(120, 90, 50, 0.55)',
                   textTransform: 'lowercase',
                   marginBottom: 6,
                 }}
               >
                 photos
               </div>
-              {/*
-               * PhotoBlock is the journal's polaroid orchestrator. It owns the
-               * full upload pipeline (compress → encrypt-if-E2EE → POST
-               * /api/photos → emit {url | encryptedRef + encryptedRefIV}).
-               * State lives in ComposeView so refs survive autosave + draft
-               * resume — see CLAUDE.md's "Photo / Image Storage Flow".
-               */}
-              <PhotoBlock
-                photos={photos}
-                onPhotoAdd={onPhotoAdd}
-                onPhotoRemove={onPhotoRemove}
-              />
+              <div
+                style={{
+                  transform: 'scale(1.3)',
+                  transformOrigin: 'top center',
+                  marginTop: 16,
+                  marginBottom: 50, // accommodate scale overflow below
+                }}
+              >
+                <PhotoBlock
+                  photos={photos}
+                  onPhotoAdd={onPhotoAdd}
+                  onPhotoRemove={onPhotoRemove}
+                />
+              </div>
             </div>
 
-            {/* ── Doodle (bottom) ───────────────────────────────────────── */}
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {/* Separator between photos and doodle — visual divide so the
+                doodle reads as its own block, not stacked tight under photos. */}
+            <div
+              style={{
+                borderTop: `1px solid ${LINE_COLOR}`,
+                marginTop: 4,
+                flexShrink: 0,
+              }}
+            />
+
+            {/* DOODLE — slim band, pushed down by the separator margin. */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
               <div
                 style={{
                   fontFamily: 'Cormorant Garamond, Georgia, serif',
                   fontStyle: 'italic',
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: 2,
-                  color: 'rgba(120, 90, 50, 0.5)',
+                  color: 'rgba(120, 90, 50, 0.55)',
                   textTransform: 'lowercase',
                   marginBottom: 6,
-                  flexShrink: 0,
                 }}
               >
                 doodle
               </div>
-              {/*
-               * CompactDoodleCanvas mirrors the journal new-entry doodle:
-               * fires onStrokesChange on every stroke (no manual "save"),
-               * which is what we want for autosave. The previous DoodleCanvas
-               * inline mode only persisted on explicit save click — silently
-               * dropping strokes on navigation.
-               */}
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div style={{ height: 160 }}>
                 <CompactDoodleCanvas
                   strokes={doodleStrokes}
                   onStrokesChange={(s) => onDoodleStrokesChange?.(s)}
@@ -353,18 +366,70 @@ export function PostcardBack({
                 />
               </div>
             </div>
+
+            {/* SIGN-OFF — fills the leftover space below the doodle so the
+                right column doesn't read as empty. Decorative, part of the
+                letter's vibe but not user-editable. */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                color: theme.accent.primary,
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Cormorant Garamond, Georgia, serif',
+                  fontSize: 11,
+                  letterSpacing: 6,
+                  textTransform: 'uppercase',
+                  opacity: 0.55,
+                }}
+              >
+                ❦ ✦ ❦
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-caveat), Caveat, cursive',
+                  fontStyle: 'italic',
+                  fontSize: 22,
+                  opacity: 0.85,
+                  lineHeight: 1,
+                }}
+              >
+                with love &amp; ink
+              </div>
+              <div
+                style={{
+                  fontFamily: 'Cormorant Garamond, Georgia, serif',
+                  fontStyle: 'italic',
+                  fontSize: 10,
+                  letterSpacing: 3,
+                  textTransform: 'uppercase',
+                  opacity: 0.5,
+                }}
+              >
+                — sealed by hearth —
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ── FOOTER BAND ─────────────────────────────────────────────────── */}
+        {/* ── FOOTER BAND — matches PostcardFront's 84px height */}
         <div
           style={{
             flexShrink: 0,
-            height: 56,
+            height: 84,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: '0 32px 18px',
             borderTop: `1px solid ${LINE_COLOR}`,
           }}
         >
@@ -412,19 +477,14 @@ export function PostcardBack({
       </div>
 
       <style jsx global>{`
-        .letter-back-editor .ProseMirror {
+        .letter-back-editor.ProseMirror {
           outline: none;
-          height: 100%;
-          overflow: hidden;
           font-family: Caveat, cursive;
           font-size: 19px;
           line-height: 36px;
           color: #3d342a;
         }
-        .letter-back-editor .ProseMirror p {
-          margin: 0;
-        }
-        .letter-back-editor .ProseMirror p.is-editor-empty:first-child::before {
+        .letter-back-editor.ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           color: rgba(120, 90, 50, 0.38);
           pointer-events: none;
