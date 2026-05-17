@@ -27,6 +27,7 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   const [year, setYear] = useState(today.getFullYear())
   const [monthIdx, setMonthIdx] = useState(today.getMonth())
   const [fanTriggerKey, setFanTriggerKey] = useState(0)
+  const [lettersShown, setLettersShown] = useState(false)
   const [revealLetter, setRevealLetter] = useState<InboxLetter | null>(null)
   const [draftPrompt, setDraftPrompt] = useState<DraftPromptInfo[] | null>(null)
   const { isE2EEReady } = useE2EE()
@@ -123,6 +124,10 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   // re-fan when month/year/letters count changes
   useEffect(() => { setFanTriggerKey(k => k + 1) }, [year, monthIdx, letters.length])
 
+  // Tuck letters back into the postbox whenever the user navigates to a
+  // different month — they have to click the postbox again to peek inside.
+  useEffect(() => { setLettersShown(false) }, [year, monthIdx])
+
   return (
     <section
       className="relative h-screen overflow-hidden"
@@ -137,18 +142,31 @@ export default function InboxView({ onUnreadCountChange }: Props) {
 
           <div className="flex items-end gap-[80px]">
             <Lamp />
-            <Postbox onClick={() => setFanTriggerKey(k => k + 1)}>
-              <PostboxControls
-                year={year}
-                monthIdx={monthIdx}
-                yearMin={yearMin}
-                yearMax={yearMax}
-                monthMaxForCurrentYear={monthMaxForCurrentYear}
-                onYearChange={setYear}
-                onMonthChange={setMonthIdx}
+            <div style={{ position: 'relative' }}>
+              <LetterFanout
+                letters={currentLetters}
+                triggerKey={fanTriggerKey}
+                onLetterClick={setRevealLetter}
+                shown={lettersShown}
               />
-              <NewLetterTag count={newCountTotal} />
-            </Postbox>
+              <Postbox
+                onClick={() => {
+                  setLettersShown((s) => !s)
+                  setFanTriggerKey((k) => k + 1)
+                }}
+              >
+                <PostboxControls
+                  year={year}
+                  monthIdx={monthIdx}
+                  yearMin={yearMin}
+                  yearMax={yearMax}
+                  monthMaxForCurrentYear={monthMaxForCurrentYear}
+                  onYearChange={setYear}
+                  onMonthChange={setMonthIdx}
+                />
+                <NewLetterTag count={newCountTotal} />
+              </Postbox>
+            </div>
           </div>
         </div>
       </div>
@@ -164,12 +182,6 @@ export default function InboxView({ onUnreadCountChange }: Props) {
       >
         — {MONTH_NAMES[monthIdx]} · {year} · {captionFor(currentLetters)} —
       </div>
-
-      <LetterFanout
-        letters={currentLetters}
-        triggerKey={fanTriggerKey}
-        onLetterClick={setRevealLetter}
-      />
 
       <RevealModal
         letter={revealLetter}
