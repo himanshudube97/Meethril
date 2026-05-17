@@ -75,9 +75,10 @@ export async function GET(request: NextRequest) {
       where.text = { contains: search, mode: 'insensitive' }
     }
 
-    if (entryType) {
-      where.entryType = entryType
-    }
+    // journal_entries is now journal-only; letters live in the `letters` table.
+    // Legacy letter/unsent_letter rows are filtered out so they can't leak into
+    // the shelf, memory, desk and archive views during cleanup.
+    where.entryType = entryType || 'normal'
 
     // Build query
     const entries = await prisma.journalEntry.findMany({
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
     console.log('[POST /api/entries] Body:', JSON.stringify(body).slice(0, 200))
 
     const {
-      text, song, tags, doodles, entryType,
+      text, song, tags, doodles,
       e2eeIVs,
       // New fields
       photos, spreads,
@@ -155,33 +156,28 @@ export async function POST(request: NextRequest) {
       style,
     } = body
 
-    // Enforce one-normal-entry-per-day. Letters and other special types
-    // are not subject to this rule. We look at the user's recent normal
-    // entries and use isEntryLocked() to determine "created today in the
-    // user's timezone" (false = today). A 2-day window is more than enough
-    // to cover any TZ.
-    const effectiveType = entryType || 'normal'
-    if (effectiveType === 'normal') {
-      const userTz = request.headers.get('x-user-tz') ?? 'UTC'
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-      const recentNormal = await prisma.journalEntry.findMany({
-        where: {
-          userId: user.id,
-          entryType: 'normal',
-          isArchived: false,
-          createdAt: { gte: twoDaysAgo },
-        },
-        select: { id: true, createdAt: true },
-      })
-      const todayExists = recentNormal.some(
-        (e) => !isEntryLocked(e.createdAt, userTz, { entryType: 'normal' })
+    // /api/entries only handles journal entries now — letters live in the
+    // `letters` table and go through /api/letters/*. Enforce
+    // one-entry-per-day for journals here.
+    const userTz = request.headers.get('x-user-tz') ?? 'UTC'
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+    const recentNormal = await prisma.journalEntry.findMany({
+      where: {
+        userId: user.id,
+        entryType: 'normal',
+        isArchived: false,
+        createdAt: { gte: twoDaysAgo },
+      },
+      select: { id: true, createdAt: true },
+    })
+    const todayExists = recentNormal.some(
+      (e) => !isEntryLocked(e.createdAt, userTz, { entryType: 'normal' })
+    )
+    if (todayExists) {
+      return NextResponse.json(
+        { error: 'An entry already exists for today. Edit that one instead.' },
+        { status: 409 }
       )
-      if (todayExists) {
-        return NextResponse.json(
-          { error: 'An entry already exists for today. Edit that one instead.' },
-          { status: 409 }
-        )
-      }
     }
 
     // All entries are E2EE: text and textPreview arrive as ciphertext from the client.
@@ -200,7 +196,7 @@ export async function POST(request: NextRequest) {
         tags: tags ?? [],
         style: style !== undefined ? (parseStyle(style) as Prisma.InputJsonValue) : Prisma.JsonNull,
         userId: user.id,
-        entryType: entryType || 'normal',
+        entryType: 'normal',
         // E2EE per-field IV map
         e2eeIVs: e2eeIVs ?? undefined,
         // New multi-spread fields

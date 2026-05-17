@@ -1,6 +1,7 @@
 // src/app/api/letters/friend/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { sendFriendLetterTransientEmail } from '@/lib/email'
@@ -18,7 +19,12 @@ interface Body {
   // spoof their display name in the delivery email.
   scheduledFor: string
   letterLocation?: string | null
-  draftEntryId?: string | null
+  // If the compose flow had a draft Letter row, pass its id so we promote
+  // that row in-place instead of creating a new Letter. The draft scratch
+  // fields are nulled — friend letters keep `contentCiphertext = null`
+  // because the owner has no readable copy after seal (the recipient gets
+  // it via tlock + LetterDelivery.transientCiphertext).
+  draftLetterId?: string | null
   photoAssets?: Array<{
     ciphertext: string
     iv: string
@@ -93,27 +99,60 @@ export async function POST(request: NextRequest) {
     (dbUser?.name && dbUser.name.trim()) ||
     'A friend'
 
-  // Create the Letter (receipt, no content) + LetterDelivery in one transaction,
-  // then call Resend. If Resend fails, we delete the rows to avoid orphans.
+  // Create / promote the Letter (receipt, no content) + LetterDelivery in
+  // one transaction, then call Resend. If Resend fails, we delete the rows
+  // to avoid orphans.
   const publicToken = newPublicToken()
   const created = await prisma.$transaction(async (tx) => {
-    const letter = await tx.letter.create({
-      data: {
-        userId: user.id,
-        letterType: 'friend',
-        contentCiphertext: null,
-        scheduledFor,
-        recipientEmail: body.recipientEmail,
-        recipientName: body.recipientName,
-        senderName,
-        letterLocation: body.letterLocation ?? null,
-        isSealed: true,
-      },
-      select: { id: true },
-    })
+    let letterId: string
+    if (body.draftLetterId) {
+      const existing = await tx.letter.findFirst({
+        where: { id: body.draftLetterId, userId: user.id, isSealed: false, isArchived: false },
+        select: { id: true },
+      })
+      if (!existing) throw new Error('draft_not_found')
+      const updated = await tx.letter.update({
+        where: { id: body.draftLetterId },
+        data: {
+          letterType: 'friend',
+          contentCiphertext: null,
+          contentIVs: Prisma.DbNull,
+          scheduledFor,
+          recipientEmail: body.recipientEmail,
+          recipientName: body.recipientName,
+          senderName,
+          letterLocation: body.letterLocation ?? null,
+          isSealed: true,
+          draftSong: null,
+          draftSongIV: null,
+          draftPhotos: Prisma.DbNull,
+          draftDoodles: Prisma.DbNull,
+          draftStyle: Prisma.DbNull,
+        },
+        select: { id: true },
+      })
+      letterId = updated.id
+    } else {
+      const letter = await tx.letter.create({
+        data: {
+          userId: user.id,
+          letterType: 'friend',
+          contentCiphertext: null,
+          scheduledFor,
+          recipientEmail: body.recipientEmail,
+          recipientName: body.recipientName,
+          senderName,
+          letterLocation: body.letterLocation ?? null,
+          isSealed: true,
+        },
+        select: { id: true },
+      })
+      letterId = letter.id
+    }
+
     const delivery = await tx.letterDelivery.create({
       data: {
-        letterId: letter.id,
+        letterId,
         transientCiphertext: body.transientCiphertext,
         transientIV: body.transientIV,
         tlockedKey: body.tlockedKey,
@@ -135,8 +174,17 @@ export async function POST(request: NextRequest) {
         })),
       })
     }
-    return { letterId: letter.id, delivery }
+    return { letterId, delivery }
+  }).catch((e) => {
+    if (e instanceof Error && e.message === 'draft_not_found') {
+      return null
+    }
+    throw e
   })
+
+  if (created === null) {
+    return NextResponse.json({ error: 'draft not found' }, { status: 404 })
+  }
 
   try {
     const { id } = await sendFriendLetterTransientEmail({
@@ -165,12 +213,6 @@ export async function POST(request: NextRequest) {
       { error: e instanceof Error ? e.message : 'resend failed' },
       { status: 502 }
     )
-  }
-
-  if (body.draftEntryId) {
-    await prisma.journalEntry
-      .deleteMany({ where: { id: body.draftEntryId, userId: user.id } })
-      .catch(() => {})
   }
 
   return NextResponse.json({ letterId: created.letterId, publicToken })

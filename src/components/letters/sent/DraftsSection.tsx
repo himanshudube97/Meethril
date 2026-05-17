@@ -75,7 +75,7 @@ export default function DraftsSection() {
     const ok = window.confirm('Discard this draft? This cannot be undone.')
     if (!ok) return
     try {
-      await fetch(`/api/entries/${id}`, { method: 'DELETE' })
+      await fetch(`/api/letters/drafts/${id}`, { method: 'DELETE' })
       // Re-fetch from server instead of optimistic filter to avoid race with
       // any in-flight load() call overwriting state with stale data.
       setRefreshTick((t) => t + 1)

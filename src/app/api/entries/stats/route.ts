@@ -48,8 +48,11 @@ export async function GET(request: NextRequest) {
     // the right month/day on the shelf and in streak math, not the server's.
     const userTz = request.headers.get('x-user-tz') ?? 'UTC'
 
+    // Only journal entries. Letters live in the `letters` table; legacy
+    // letter/unsent_letter rows in this table shouldn't inflate shelf month
+    // counts or streaks.
     const entries = await prisma.journalEntry.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, entryType: 'normal' },
       select: {
         createdAt: true,
       },

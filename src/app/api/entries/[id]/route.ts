@@ -110,35 +110,26 @@ export async function PUT(
       // explicitly want that semantic.
       doodles,
       photos,
-      // entryType is kept so letter drafts (letter/unsent_letter) can set their
-      // type during autosave. The letter-specific detail fields (recipientEmail,
-      // recipientName, senderName, letterLocation, unlockDate) are no longer
-      // stored on JournalEntry — they live on the Letter row created at seal time.
-      entryType,
     } = body
 
-    const isLetter = existing.entryType !== 'normal'
+    // /api/entries only handles journal entries now — letters live in the
+    // `letters` table. Refuse to touch any row that's somehow not a journal
+    // entry (legacy letter/unsent_letter rows should be migrated/deleted out
+    // of journal_entries; this guard catches any that linger).
+    if (existing.entryType !== 'normal') {
+      return NextResponse.json(
+        { error: 'This row is not a journal entry — use /api/letters/drafts.' },
+        { status: 400 },
+      )
+    }
 
-    // Lock check. Letter drafts in JournalEntry are always unsealed (the JE
-    // draft is deleted when the Letter is created at seal time, so a sealed
-    // letter never reaches this PUT path). For normal entries: calendar-day
-    // → append-only diff allowed.
+    // Lock check. For normal entries: calendar-day → append-only diff allowed.
     const userTz = request.headers.get('x-user-tz') ?? 'UTC'
     const locked = isEntryLocked(existing.createdAt, userTz, {
       entryType: existing.entryType,
-      // isSealed was removed from JournalEntry; letter drafts are always
-      // editable until the Letter row is created (then the JE is deleted).
       isSealed: false,
     })
     if (locked) {
-      if (isLetter) {
-        // This branch is only reachable for old-calendar-locked letter drafts;
-        // in practice the draft is deleted at seal time before any calendar lock.
-        return NextResponse.json(
-          { error: 'This letter draft is too old to edit' },
-          { status: 403 },
-        )
-      }
       // All entries are E2EE: text on the row is ciphertext. For the
       // append-only diff check we pass the ciphertext as the "old text" — the
       // diff validator compares structures, not plaintexts, so this is safe.
@@ -196,13 +187,6 @@ export async function PUT(
     if (tags !== undefined) updateData.tags = tags
     if (spreads !== undefined) updateData.spreads = spreads
     if (e2eeIVs !== undefined) updateData.e2eeIVs = e2eeIVs
-
-    // Letter-draft field. entryType marks the JE as a letter draft ('letter'
-    // or 'unsent_letter') so the draft list and compose resume can identify it.
-    // The detail fields (recipientEmail, recipientName, senderName,
-    // letterLocation, unlockDate) are no longer stored on JournalEntry — they
-    // are passed directly at seal time and persisted on the Letter row.
-    if (entryType !== undefined) updateData.entryType = entryType
 
     // Update the entry
     await prisma.journalEntry.update({

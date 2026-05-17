@@ -147,6 +147,22 @@ model Letter {
   // normalize this.
   keptPhotoRefs Json?
 
+  // Draft autosave fields. Populated while isSealed=false (compose in
+  // progress). Encrypted under the owner's master key so they can resume on
+  // any device. On seal, the client re-encrypts the body into the final
+  // payload (contentCiphertext for self-letters, LetterDelivery
+  // transientCiphertext for friend letters) and the seal endpoint nulls
+  // these draft fields. Letters live ONLY in this table now; journal_entries
+  // is journal-only.
+  draftText        String? @db.Text
+  draftTextIV      String?
+  draftTextPreview String? @db.Text
+  draftSong        String?
+  draftSongIV      String?
+  draftPhotos      Json?
+  draftDoodles     Json?
+  draftStyle       Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

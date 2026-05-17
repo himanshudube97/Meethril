@@ -30,11 +30,6 @@ export interface AutosaveDraft {
   // sent to the server only when non-empty so existing letter saves don't
   // pick up an empty `style: {}` over the wire.
   style?: EntryStyle
-  // Letter-only field. Absent for normal journal entries; present for letter
-  // drafts so the server marks the JE as a letter draft. Detail fields
-  // (recipientEmail, recipientName, senderName, letterLocation, unlockDate)
-  // are passed directly at seal time — they no longer live on JournalEntry.
-  entryType?: string
 }
 
 // Re-exported so existing callers that imported `AutosaveStatus` from this
@@ -131,7 +126,6 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       photos: draft.photos,
       doodles: draft.doodles,
       style: draft.style,
-      entryType: draft.entryType,
     })
     if (draftSig === lastSavedSigRef.current) {
       setStatus('saved')
@@ -177,7 +171,6 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
         })),
       } : {}),
       ...(draft.style && Object.keys(draft.style).length > 0 ? { style: draft.style } : {}),
-      ...(draft.entryType !== undefined ? { entryType: draft.entryType } : {}),
     })
 
     try {
@@ -216,7 +209,6 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
           photos: draft.photos,
           doodles: draft.doodles,
           style: draft.style,
-          entryType: draft.entryType,
         })
         inFlightRef.current = false
         if (dirtyRef.current) {
