@@ -14,7 +14,6 @@ import RevealModal from './RevealModal'
 import { MONTHS, MONTH_NAMES, groupInboxByMonth, countUnread } from '../lettersData'
 import type { InboxLetter } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
-import type { JournalEntry } from '@/store/journal'
 
 interface Props {
   onUnreadCountChange: (n: number) => void
@@ -28,23 +27,26 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   const [monthIdx, setMonthIdx] = useState(today.getMonth())
   const [fanTriggerKey, setFanTriggerKey] = useState(0)
   const [revealLetter, setRevealLetter] = useState<InboxLetter | null>(null)
-  const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
+  const { isE2EEReady } = useE2EE()
 
+  // List view only renders unencrypted metadata (recipient name, dates,
+  // isViewed). Don't decrypt here — RevealModal does the single decrypt
+  // when the user actually opens a letter. Decrypting in InboxView caused
+  // double-decryption: text was decrypted once here, stored as plaintext
+  // JSON in state, then RevealModal tried to decrypt the already-decrypted
+  // string and atob exploded on `{`.
   useEffect(() => {
     let cancelled = false
     fetch('/api/letters/inbox')
       .then(r => r.json())
-      .then(async d => {
+      .then(d => {
         if (cancelled) return
         const raw = (d.letters || []) as InboxLetter[]
-        const decrypted = (await decryptEntriesFromServer(
-          raw as unknown as JournalEntry[]
-        )) as unknown as InboxLetter[]
-        setLetters(decrypted)
+        setLetters(raw)
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [decryptEntriesFromServer, isE2EEReady])
+  }, [isE2EEReady])
 
   const grouped = useMemo(() => groupInboxByMonth(letters), [letters])
 

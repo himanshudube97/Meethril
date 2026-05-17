@@ -58,7 +58,11 @@ export default function LetterFanout({ letters, onLetterClick, triggerKey }: Pro
 
   return (
     <div ref={fanRef} className="fanout" aria-hidden={letters.length === 0}>
-      <style jsx>{`
+      {/* styled-jsx must be `global` here because the .fan-letter elements
+          are created imperatively via document.createElement above — they
+          never pass through React, so the per-component scope class is
+          never applied to them, and a non-global rule won't match. */}
+      <style jsx global>{`
         .fanout {
           position: absolute; left: 50%; bottom: 28%;
           transform: translateX(-50%);

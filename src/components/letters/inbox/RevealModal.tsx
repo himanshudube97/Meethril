@@ -35,7 +35,23 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
         e2eeIVs: letter.e2eeIVs,
       } as unknown as JournalEntry
       decryptEntryFromServer(inlineEntry)
-        .then(decrypted => setBody((decrypted?.text || '').toString()))
+        .then(decrypted => {
+          // Self-letters (new flow) encrypt a JSON blob `{text, song,
+          // photos, doodles}` as one string. After decrypt, the result IS
+          // that JSON. Parse it and surface the inner text. Legacy / friend
+          // letters whose body is plain text decrypt to a non-JSON string
+          // and skip the parse.
+          let body = (decrypted?.text || '').toString()
+          if (body.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(body) as { text?: unknown }
+              if (typeof parsed.text === 'string') body = parsed.text
+            } catch {
+              // not JSON — fall through and show the raw decrypted string
+            }
+          }
+          setBody(body)
+        })
         .catch(() => setBody(''))
       return
     }

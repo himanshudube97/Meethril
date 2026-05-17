@@ -32,7 +32,7 @@ export function useE2EE() {
       if (!isE2EEReady || !masterKey) {
         return {
           ...entry,
-          text: '<p><em>[Encrypted — unlock to view]</em></p>',
+          text: '[Encrypted — unlock to view]',
           textPreview: '[Encrypted]',
         }
       }
@@ -43,7 +43,7 @@ export function useE2EE() {
         console.error('E2EE decryption failed for entry:', entry.id, error)
         return {
           ...entry,
-          text: '<p><em>[Decryption failed]</em></p>',
+          text: '[Decryption failed]',
           textPreview: '[Decryption failed]',
         }
       }
