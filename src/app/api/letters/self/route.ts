@@ -39,14 +39,10 @@ export async function POST(request: NextRequest) {
   if (Number.isNaN(scheduledFor.valueOf())) {
     return NextResponse.json({ error: 'bad scheduledFor' }, { status: 400 })
   }
-  // PRELAUNCH-TEST-PILLS: minimum lead time is 1 minute so SealModal's 5m
-  // and 1h test pills work for self-letters too. Tighten back to 7 days
-  //   const minSec = 7 * 24 * 60 * 60
-  //   if (scheduledFor.getTime() < Date.now() + minSec * 1000 - 60_000) ...
-  // before public launch. Grep for "PRELAUNCH-TEST-PILLS" to find every spot.
-  // No upper bound for self-letters.
-  if (scheduledFor.getTime() < Date.now() + 60_000 - 5_000) {
-    return NextResponse.json({ error: 'scheduledFor too soon (min ~1 minute)' }, { status: 400 })
+  // Minimum 7-day lead time for self-letters. No upper bound.
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  if (scheduledFor.getTime() < Date.now() + sevenDaysMs - 60_000) {
+    return NextResponse.json({ error: 'scheduledFor too soon (min 7 days)' }, { status: 400 })
   }
 
   let letter: { id: string; scheduledFor: Date | null; createdAt: Date }
