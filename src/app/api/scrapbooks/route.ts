@@ -1,9 +1,8 @@
 // src/app/api/scrapbooks/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import type { ScrapbookItem } from '@/lib/scrapbook'
-import { makeDateItem } from '@/lib/scrapbook'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -34,29 +33,35 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = req.headers.get('content-length') === '0' || req.headers.get('content-type') === null
-    ? {}
-    : await req.json().catch(() => ({}))
+  const body =
+    req.headers.get('content-length') === '0' || req.headers.get('content-type') === null
+      ? {}
+      : await req.json().catch(() => ({}))
 
-  const { e2eeIVs } = body as { e2eeIVs?: unknown }
+  const { items, e2eeIVs } = body as { items?: unknown; e2eeIVs?: unknown }
 
-  const initialItems: ScrapbookItem[] = [makeDateItem(new Date(), [])]
+  // All scrapbooks are E2EE. The client must encrypt the initial items with
+  // the master key and send ciphertext + IVs, so the row lands on disk in a
+  // decryptable state. Creating a row without IVs leaves it permanently
+  // unopenable on the board page.
+  if (typeof items !== 'string' || !e2eeIVs || typeof e2eeIVs !== 'object') {
+    return NextResponse.json(
+      { error: 'Scrapbook creation requires encrypted items and e2eeIVs.' },
+      { status: 400 },
+    )
+  }
 
   const created = await prisma.scrapbook.create({
     data: {
       userId: user.id,
       title: null,
-      // Store initial items as plain JSON for now; the client will immediately
-      // PUT with encrypted items once it has the master key.
-      items: JSON.stringify(initialItems),
-      e2eeIVs: e2eeIVs ?? undefined,
+      items,
+      e2eeIVs: e2eeIVs as Prisma.InputJsonValue,
     },
   })
 
   return NextResponse.json({
     id: created.id,
-    title: null,
-    items: initialItems,
     createdAt: created.createdAt,
     updatedAt: created.updatedAt,
   })
