@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { encrypt, decryptEntryFields } from '@/lib/encryption'
 import { isEntryLocked, validateAppendOnlyDiff } from '@/lib/entry-lock'
 import { parseStyle } from '@/lib/entry-style'
-
-// Helper to strip HTML and create preview
-function createPreview(html: string, maxLength = 150): string {
-  const text = html.replace(/<[^>]*>/g, '').trim()
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength).trim() + '...'
-}
 
 // GET - Fetch single entry (only if owned by user)
 export async function GET(
@@ -46,12 +38,10 @@ export async function GET(
       )
     }
 
-    const isE2EE = entry.encryptionType === 'e2ee'
-    const decryptedEntry = isE2EE ? entry : decryptEntryFields(entry)
+    // All entries are E2EE — return ciphertext as-is; client decrypts.
     return NextResponse.json({
-      ...decryptedEntry,
-      encryptionType: entry.encryptionType,
-      e2eeIV: entry.e2eeIV,
+      ...entry,
+      e2eeIVs: entry.e2eeIVs,
       spreads: entry.spreads,
       isArchived: entry.isArchived,
       photos: entry.photos,
@@ -80,21 +70,19 @@ export async function PUT(
 
     const { id } = await params
 
-    // Load enough state up-front to run the lock check below. For letters we
-    // also need entryType + isSealed because their lock semantics differ
-    // (sealed = locked, draft = fully editable across days).
+    // Load enough state up-front to run the lock check below. For letter drafts
+    // the lock is calendar-day-based (like normal entries — letter drafts are
+    // always unsealed until the Letter row is created; then the JE draft is
+    // deleted, so a sealed JE never reaches this path).
     const existing = await prisma.journalEntry.findUnique({
       where: { id },
       select: {
         userId: true,
-        encryptionType: true,
-        e2eeIV: true,
         e2eeIVs: true,
         createdAt: true,
         text: true,
         song: true,
         entryType: true,
-        isSealed: true,
         style: true,
         photos: { select: { spread: true, position: true } },
         doodles: { select: { spread: true } },
@@ -111,7 +99,7 @@ export async function PUT(
 
     const body = await request.json()
     const {
-      text, song, tags, encryptionType, e2eeIV, e2eeIVs,
+      text, song, tags, e2eeIVs,
       spreads, appendText, newPhotos, newDoodles,
       style,
       // Full-replacement doodle/photo lists (autosave wire format). When the
@@ -122,63 +110,31 @@ export async function PUT(
       // explicitly want that semantic.
       doodles,
       photos,
-      // Letter-only fields. Drafts can be edited freely; sealed letters reject
-      // all writes via the lock check below.
-      entryType, recipientEmail, recipientName, senderName, letterLocation, unlockDate,
     } = body
 
-    const bodyIsE2EE = encryptionType === 'e2ee'
-    const existingIsE2EE = existing.encryptionType === 'e2ee'
-
-    // Defense against a race we hit in production: client autosave fires
-    // before the E2EE store has initialized, body omits `encryptionType`, and
-    // we used to fall back to `existing.encryptionType === 'e2ee'`. That path
-    // stored plaintext text into a row flagged as e2ee — atob() would then
-    // crash on read. Reject loudly instead so the client retries once unlocked.
-    //
-    // The list covers every field whose stored shape differs by encryption
-    // mode: text/preview/letter-fields (string ciphertext vs server-hex),
-    // doodle strokes (`{encryptedStrokes,e2eeIV}` vs raw stroke array), and
-    // photos (`encryptedRef` vs `url`). Anything else (style, spreads,
-    // archive flags, scheduling) has the same shape either way and is safe.
-    const writesEncryptedField =
-      text !== undefined ||
-      appendText !== undefined ||
-      song !== undefined ||
-      recipientName !== undefined ||
-      senderName !== undefined ||
-      letterLocation !== undefined ||
-      doodles !== undefined ||
-      newDoodles !== undefined ||
-      photos !== undefined ||
-      newPhotos !== undefined
-    if (writesEncryptedField && existingIsE2EE && !bodyIsE2EE) {
+    // /api/entries only handles journal entries now — letters live in the
+    // `letters` table. Refuse to touch any row that's somehow not a journal
+    // entry (legacy letter/unsent_letter rows should be migrated/deleted out
+    // of journal_entries; this guard catches any that linger).
+    if (existing.entryType !== 'normal') {
       return NextResponse.json(
-        { error: 'E2EE entry — unlock and resend with encryptionType: "e2ee".' },
-        { status: 409 },
+        { error: 'This row is not a journal entry — use /api/letters/drafts.' },
+        { status: 400 },
       )
     }
 
-    const isE2EE = bodyIsE2EE
-    const isLetter = existing.entryType !== 'normal'
-
-    // Lock check. Letters: sealed = full reject. Journal entries: calendar-day
-    // → append-only diff allowed.
+    // Lock check. For normal entries: calendar-day → append-only diff allowed.
     const userTz = request.headers.get('x-user-tz') ?? 'UTC'
     const locked = isEntryLocked(existing.createdAt, userTz, {
       entryType: existing.entryType,
-      isSealed: existing.isSealed,
+      isSealed: false,
     })
     if (locked) {
-      if (isLetter) {
-        return NextResponse.json(
-          { error: 'This letter is sealed and cannot be modified' },
-          { status: 403 },
-        )
-      }
-      const decryptedExisting = isE2EE ? { text: existing.text } : decryptEntryFields({ text: existing.text })
+      // All entries are E2EE: text on the row is ciphertext. For the
+      // append-only diff check we pass the ciphertext as the "old text" — the
+      // diff validator compares structures, not plaintexts, so this is safe.
       const diff = validateAppendOnlyDiff({
-        oldText: decryptedExisting.text,
+        oldText: existing.text,
         newText: text,
         appendText,
         oldSong: existing.song,
@@ -201,11 +157,11 @@ export async function PUT(
     // Build update data
     const updateData: Record<string, unknown> = {}
 
-    // Handle text update (for append-only, we'd append to existing)
+    // All entries are E2EE: text arrives as ciphertext from the client.
+    // Store as-is; server never encrypts or decrypts entry content.
     if (text !== undefined) {
-      const textPreview = !isE2EE ? createPreview(text) : '[Encrypted]'
-      updateData.text = isE2EE ? text : encrypt(text)
-      updateData.textPreview = isE2EE ? textPreview : encrypt(textPreview)
+      updateData.text = text
+      updateData.textPreview = '[Encrypted]'
     }
 
     // Handle append text (for append-only editing)
@@ -215,11 +171,12 @@ export async function PUT(
         select: { text: true },
       })
       if (currentEntry) {
-        const decryptedCurrent = isE2EE ? currentEntry.text : decryptEntryFields({ text: currentEntry.text }).text
-        const newText = `${decryptedCurrent}<p>${appendText}</p>`
-        const textPreview = !isE2EE ? createPreview(newText) : '[Encrypted]'
-        updateData.text = isE2EE ? newText : encrypt(newText)
-        updateData.textPreview = isE2EE ? textPreview : encrypt(textPreview)
+        // Append is only valid for unlocked entries in practice; for E2EE
+        // the client is responsible for re-encrypting the combined text and
+        // sending it as `text`. This path is kept for compatibility.
+        const newText = `${currentEntry.text}<p>${appendText}</p>`
+        updateData.text = newText
+        updateData.textPreview = '[Encrypted]'
       }
     }
 
@@ -229,35 +186,7 @@ export async function PUT(
     if (song !== undefined) updateData.song = song
     if (tags !== undefined) updateData.tags = tags
     if (spreads !== undefined) updateData.spreads = spreads
-    if (encryptionType !== undefined) updateData.encryptionType = encryptionType
-    if (e2eeIV !== undefined) updateData.e2eeIV = e2eeIV
-    // Clear legacy e2eeIV when transitioning from server to e2ee encryption
-    if (encryptionType === 'e2ee' && existing.encryptionType === 'server') {
-      updateData.e2eeIV = null
-    }
     if (e2eeIVs !== undefined) updateData.e2eeIVs = e2eeIVs
-
-    // Letter fields. recipientEmail is plaintext (cron job needs it to look up
-    // user / send the email). recipientName / senderName / letterLocation get
-    // the same server-side encryption as text. unlockDate is a plain date.
-    if (entryType !== undefined) updateData.entryType = entryType
-    if (recipientEmail !== undefined) updateData.recipientEmail = recipientEmail || null
-    if (recipientName !== undefined) {
-      updateData.recipientName = recipientName
-        ? (isE2EE ? recipientName : encrypt(recipientName))
-        : null
-    }
-    if (senderName !== undefined) {
-      updateData.senderName = senderName
-        ? (isE2EE ? senderName : encrypt(senderName))
-        : null
-    }
-    if (letterLocation !== undefined) {
-      updateData.letterLocation = letterLocation
-        ? (isE2EE ? letterLocation : encrypt(letterLocation))
-        : null
-    }
-    if (unlockDate !== undefined) updateData.unlockDate = unlockDate ? new Date(unlockDate) : null
 
     // Update the entry
     await prisma.journalEntry.update({
@@ -369,12 +298,10 @@ export async function PUT(
       },
     })
 
-    const responseIsE2EE = updatedEntry?.encryptionType === 'e2ee'
-    const decryptedEntry = responseIsE2EE ? updatedEntry : decryptEntryFields(updatedEntry!)
+    // All entries are E2EE — return ciphertext as-is; client decrypts.
     return NextResponse.json({
-      ...decryptedEntry,
-      encryptionType: updatedEntry?.encryptionType,
-      e2eeIV: updatedEntry?.e2eeIV,
+      ...updatedEntry,
+      e2eeIVs: updatedEntry?.e2eeIVs,
       spreads: updatedEntry?.spreads,
       isArchived: updatedEntry?.isArchived,
       photos: updatedEntry?.photos,

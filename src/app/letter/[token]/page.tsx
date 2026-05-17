@@ -1,145 +1,325 @@
+// src/app/letter/[token]/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { tlockDecryptKey } from '@/lib/letters/tlock'
+import { decryptTransient } from '@/lib/letters/transient-crypto'
+import DOMPurify from 'dompurify'
+import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
+import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
 
-type Photo = { url: string; position: number; spread: number; rotation: number }
+// TipTap output uses these — keep the allow-list tight so injected
+// tags/attrs/handlers can't execute. NO 'script', NO 'iframe', NO 'on*'.
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):)/i,
+}
 
-type LetterData = {
+function sanitizeLetter(html: string): string {
+  if (typeof window === 'undefined') return ''
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG) as unknown as string
+}
+
+type LetterContent = {
   text: string
-  senderName: string
-  recipientName: string
-  letterLocation: string | null
-  writtenAt: string
   song: string | null
-  photos: Photo[]
-  readsRemaining: number
-  expiresAt: string
+  doodles: Array<{ strokes: unknown; spread: number; positionInEntry: number }>
+}
+
+type AssetMeta = {
+  id: string
+  type: string
+  position: number
+  spread: number
+  rotation: number
+  ordinal: number
 }
 
 type State =
-  | { kind: 'loading' }
-  | { kind: 'error'; reason: 'not_found' | 'expired' | 'exhausted' }
-  | { kind: 'ok'; data: LetterData }
+  | { kind: 'loading'; stage: string }
+  | { kind: 'not_yet'; scheduledFor: string }
+  | { kind: 'expired' }
+  | { kind: 'not_found' }
+  | { kind: 'error'; message: string }
+  | {
+      kind: 'ok'
+      data: LetterContent
+      senderName: string
+      recipientName: string
+      expiresAt: Date
+      K: Uint8Array
+      assets: AssetMeta[]
+    }
+
+const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 
 export default function LetterPage() {
   const params = useParams<{ token: string }>()
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const router = useRouter()
+  const [state, setState] = useState<State>({ kind: 'loading', stage: 'reading link' })
+  const ranRef = useRef(false)
 
   useEffect(() => {
-    let cancelled = false
+    if (ranRef.current) return
+    ranRef.current = true
+
     async function run() {
-      const res = await fetch(`/api/letter/${params.token}`)
-      if (cancelled) return
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        const reason: 'not_found' | 'expired' | 'exhausted' =
-          data.reason === 'expired' || data.reason === 'exhausted' ? data.reason : 'not_found'
-        setState({ kind: 'error', reason })
-        return
+      try {
+        // 1) URL fragment carries the tlocked key
+        const hash = typeof window !== 'undefined' ? window.location.hash : ''
+        const m = hash.match(/(?:^#|&)k=([^&]+)/)
+        if (!m) {
+          setState({ kind: 'error', message: 'Missing key in URL. The letter link is incomplete.' })
+          return
+        }
+        const tlockedKey = decodeURIComponent(m[1])
+
+        // 2) Meta
+        setState({ kind: 'loading', stage: 'fetching letter info' })
+        const metaRes = await fetch(`/api/letter/${params.token}/meta`)
+        if (metaRes.status === 404) return setState({ kind: 'not_found' })
+        if (!metaRes.ok) throw new Error(`meta ${metaRes.status}`)
+        const meta = (await metaRes.json()) as {
+          scheduledFor: string | null
+          senderName: string | null
+          recipientName: string | null
+          alreadyExpired: boolean
+          firstReadAt: string | null
+          assets: AssetMeta[]
+        }
+        if (meta.alreadyExpired) return setState({ kind: 'expired' })
+        if (!meta.scheduledFor) throw new Error('letter has no scheduledFor')
+        const scheduledFor = new Date(meta.scheduledFor)
+        if (scheduledFor.getTime() > Date.now()) {
+          return setState({ kind: 'not_yet', scheduledFor: meta.scheduledFor })
+        }
+
+        // 3) Tlock-decrypt K (drand round must be available)
+        setState({ kind: 'loading', stage: 'fetching time-lock beacon' })
+        const K = await tlockDecryptKey(tlockedKey, scheduledFor)
+
+        // 4) Fetch ciphertext (sets firstReadAt server-side)
+        setState({ kind: 'loading', stage: 'fetching ciphertext' })
+        const ctRes = await fetch(`/api/letter/${params.token}/ciphertext`)
+        if (ctRes.status === 410) return setState({ kind: 'expired' })
+        if (ctRes.status === 425) return setState({ kind: 'not_yet', scheduledFor: meta.scheduledFor })
+        if (ctRes.status === 404) return setState({ kind: 'not_found' })
+        if (!ctRes.ok) throw new Error(`ciphertext ${ctRes.status}`)
+        const { transientCiphertext, transientIV } = await ctRes.json()
+
+        // 5) AES-decrypt with K
+        setState({ kind: 'loading', stage: 'decrypting' })
+        const plaintextBytes = await decryptTransient(transientCiphertext, transientIV, K)
+        const json = new TextDecoder().decode(plaintextBytes)
+        const data: LetterContent = JSON.parse(json)
+
+        // Cache decrypted content + K + asset blobs for the Keep-forever
+        // flow (sessionStorage, tab-scoped). Cleared after save.
+        // K is base64-encoded; asset ciphertexts are already base64 strings.
+        try {
+          const Kbase64 = btoa(String.fromCharCode(...K))
+
+          // Pre-fetch each asset blob so the Save page can re-encrypt them
+          // without needing the URL fragment (which won't survive navigation).
+          const cachedAssets: Array<{
+            id: string
+            type: string
+            position: number
+            spread: number
+            rotation: number
+            ordinal: number
+            ciphertext: string
+            iv: string
+          }> = []
+          for (const a of meta.assets ?? []) {
+            try {
+              const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
+              if (!r.ok) continue
+              const j = (await r.json()) as { ciphertext: string; iv: string }
+              cachedAssets.push({
+                id: a.id,
+                type: a.type,
+                position: a.position,
+                spread: a.spread,
+                rotation: a.rotation,
+                ordinal: a.ordinal,
+                ciphertext: j.ciphertext,
+                iv: j.iv,
+              })
+            } catch {
+              /* skip — Save flow can still proceed without this asset */
+            }
+          }
+
+          sessionStorage.setItem(
+            `${SESSION_KEY_PREFIX}${params.token}`,
+            JSON.stringify({
+              content: data,
+              senderName: meta.senderName ?? 'Someone special',
+              recipientName: meta.recipientName ?? 'Friend',
+              scheduledFor: meta.scheduledFor,
+              K: Kbase64,
+              assets: cachedAssets,
+            })
+          )
+        } catch {
+          /* sessionStorage might be disabled; not fatal */
+        }
+
+        const expiresAt = meta.firstReadAt
+          ? new Date(new Date(meta.firstReadAt).getTime() + 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + 24 * 60 * 60 * 1000)
+        setState({
+          kind: 'ok',
+          data,
+          senderName: meta.senderName ?? 'Someone special',
+          recipientName: meta.recipientName ?? 'Friend',
+          expiresAt,
+          K,
+          assets: meta.assets ?? [],
+        })
+      } catch (e) {
+        setState({ kind: 'error', message: e instanceof Error ? e.message : 'Unknown error' })
       }
-      const data: LetterData = await res.json()
-      setState({ kind: 'ok', data })
     }
     run()
-    return () => { cancelled = true }
   }, [params.token])
 
   if (state.kind === 'loading') {
+    return <CenteredMessage title="Reading your letter" sub={state.stage} />
+  }
+  if (state.kind === 'not_yet') {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-stone-50 text-stone-500">
-        Opening your letter…
-      </main>
+      <CenteredMessage
+        title="This letter isn't ready yet."
+        sub={`It will unlock on ${new Date(state.scheduledFor).toLocaleString()}.`}
+      />
     )
   }
-
+  if (state.kind === 'expired') {
+    return <CenteredMessage title="This letter has faded." sub="It was yours for 24 hours after you opened it. We don't keep copies." />
+  }
+  if (state.kind === 'not_found') {
+    return <CenteredMessage title="We couldn't find this letter." sub="The link may be incorrect, or the letter was deleted." />
+  }
   if (state.kind === 'error') {
-    const title =
-      state.reason === 'expired' ? 'This letter has expired' :
-      state.reason === 'exhausted' ? 'This letter has been viewed' :
-      'Letter not found'
-    const body =
-      state.reason === 'exhausted'
-        ? 'You’ve opened this letter the maximum number of times. Sign up for Hearth to keep your letters safe forever.'
-        : state.reason === 'expired'
-          ? 'This link has expired. Sign up for Hearth to keep your letters before they go.'
-          : 'The link may be incorrect or this letter never existed.'
-
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-stone-50 px-6">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
-          <h1 className="text-2xl font-serif text-stone-800 mb-3">{title}</h1>
-          <p className="text-stone-600 text-sm mb-6">{body}</p>
-          <Link
-            href="/login"
-            className="inline-block bg-stone-800 text-white rounded-full px-6 py-2 text-sm"
-          >
-            Sign up for Hearth
-          </Link>
-        </div>
-      </main>
-    )
+    return <CenteredMessage title="Something went wrong." sub={state.message} />
   }
 
-  const { data } = state
-  const writtenDate = new Date(data.writtenAt).toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  })
-
+  // OK — render the letter
   return (
-    <main className="min-h-screen bg-stone-50 px-6 py-16">
-      <article className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-10 font-serif">
-        <header className="mb-8">
-          <p className="text-sm text-stone-400">
-            Written {data.letterLocation ? `from ${data.letterLocation}, ` : ''}{writtenDate}
-          </p>
-          <p className="text-stone-700 italic mt-2">Dear {data.recipientName},</p>
-        </header>
-
-        <div
-          className="text-stone-800 leading-relaxed prose prose-stone max-w-none"
-          dangerouslySetInnerHTML={{ __html: data.text }}
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#f6efe2',
+        color: '#3d342a',
+        padding: '40px 24px',
+        fontFamily: 'Georgia, serif',
+      }}
+    >
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ opacity: 0.6, fontSize: 14, marginBottom: 24 }}>
+          From <strong>{state.senderName}</strong> · For <strong>{state.recipientName}</strong>
+        </div>
+        <Countdown expiresAt={state.expiresAt} />
+        <article
+          style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 18 }}
+          dangerouslySetInnerHTML={{ __html: sanitizeLetter(state.data.text) }}
         />
-
-        {data.photos.length > 0 && (
-          <div className="flex flex-wrap gap-4 justify-center mt-10">
-            {data.photos.map((p, i) => (
-              <div
-                key={i}
-                className="bg-white p-2 pb-6 shadow-md"
-                style={{ transform: `rotate(${p.rotation || (p.position === 1 ? 5 : -5)}deg)` }}
-              >
-                <img src={p.url} alt="" className="w-32 h-40 object-cover" />
-              </div>
-            ))}
-          </div>
+        {state.data.song && (
+          <p style={{ marginTop: 32, fontSize: 14, opacity: 0.7 }}>
+            Song they sent: <a href={state.data.song}>{state.data.song}</a>
+          </p>
         )}
+        <LetterPhotos token={params.token} assets={state.assets} K={state.K} />
+        <LetterDoodles doodles={state.data.doodles as never} />
+        <KeepForeverCTA token={params.token} router={router} />
+      </div>
+    </div>
+  )
+}
 
-        {data.song && (
-          <div className="mt-8 p-3 border border-stone-200 rounded-lg bg-stone-50">
-            <p className="text-xs text-stone-500 mb-1">A song was shared with this letter</p>
-            <a
-              href={data.song}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-stone-700 underline break-all"
-            >
-              {data.song}
-            </a>
-          </div>
-        )}
+function CenteredMessage({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f6efe2',
+        color: '#3d342a',
+        padding: 24,
+        fontFamily: 'Georgia, serif',
+        textAlign: 'center',
+      }}
+    >
+      <div>
+        <h1 style={{ fontSize: 28, marginBottom: 12 }}>{title}</h1>
+        {sub && <p style={{ opacity: 0.7 }}>{sub}</p>}
+      </div>
+    </div>
+  )
+}
 
-        <footer className="mt-10 pt-6 border-t border-stone-200">
-          <p className="text-stone-700 italic text-right">— {data.senderName}</p>
-        </footer>
+function Countdown({ expiresAt }: { expiresAt: Date }) {
+  const [remaining, setRemaining] = useState(expiresAt.getTime() - Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setRemaining(expiresAt.getTime() - Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [expiresAt])
+  if (remaining <= 0) return null
+  const h = Math.floor(remaining / 3_600_000)
+  const m = Math.floor((remaining % 3_600_000) / 60_000)
+  return (
+    <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 24 }}>
+      This letter fades in {h}h {m}m.
+    </p>
+  )
+}
 
-        <p className="text-xs text-stone-400 mt-10 text-center">
-          {data.readsRemaining > 0
-            ? `You can open this letter ${data.readsRemaining} more time${data.readsRemaining === 1 ? '' : 's'}.`
-            : 'This was your last view of this letter.'}
-        </p>
-      </article>
-    </main>
+function KeepForeverCTA({ token, router }: { token: string; router: ReturnType<typeof useRouter> }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  async function onSave() {
+    setBusy(true); setErr(null)
+    try {
+      // Check whether the recipient is logged in. /api/auth/me returns 401 if not.
+      const meRes = await fetch('/api/auth/me')
+      if (meRes.ok) {
+        // Logged in — drive the save inline (Task 13).
+        router.push(`/letter/${token}/save?logged_in=1`)
+      } else {
+        // Not logged in — magic-link signup flow (Task 14).
+        router.push(`/letter/${token}/save`)
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'unknown error')
+      setBusy(false)
+    }
+  }
+  return (
+    <div style={{ marginTop: 48 }}>
+      <button
+        disabled={busy}
+        onClick={onSave}
+        style={{
+          padding: '12px 24px',
+          background: '#3d342a',
+          color: '#f6efe2',
+          border: 'none',
+          borderRadius: 999,
+          fontFamily: 'inherit',
+          fontSize: 15,
+          cursor: 'pointer',
+          opacity: busy ? 0.5 : 1,
+        }}
+      >
+        {busy ? 'Just a moment...' : 'Keep this letter forever'}
+      </button>
+      {err && <p style={{ color: '#a00', marginTop: 12 }}>{err}</p>}
+    </div>
   )
 }

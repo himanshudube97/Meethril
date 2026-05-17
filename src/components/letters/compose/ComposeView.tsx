@@ -1,174 +1,444 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
-import PostcardFront from './PostcardFront'
-import PostcardBack from './PostcardBack'
-import PostcardFolded from './PostcardFolded'
-import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { RecipientPicker } from './RecipientPicker'
+import { PostcardFront, FRONT_CHAR_LIMIT } from './PostcardFront'
+import { PostcardBack, BACK_CHAR_LIMIT } from './PostcardBack'
+import { SealModal } from './SealModal'
+import { useAutosaveLetterDraft } from '@/hooks/useAutosaveLetterDraft'
+import { useE2EE } from '@/hooks/useE2EE'
 import { useProfileStore } from '@/store/profile'
+import { useE2EEStore } from '@/store/e2ee'
+import { useThemeStore } from '@/store/theme'
+import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
+import { buildSelfLetterPayload } from '@/lib/letters/self-letter-client'
+import { buildFriendLetterPayload } from '@/lib/letters/friend-letter-client'
+import { decryptLetterDraft, type LetterDraftWire } from '@/lib/letters/draft-decrypt'
+import type { Photo } from '@/components/desk/PhotoBlock'
+import type { RecipientChoice } from '../letterTypes'
 import type { StrokeData } from '@/store/journal'
-import {
-  type LetterRecipient,
-  type UnlockChoice,
-  DEFAULT_UNLOCK,
-  resolveUnlockDate,
-  mapRecipientToSchema,
-} from '../letterTypes'
 
-type Phase = 'front' | 'back' | 'folded' | 'sending'
+type Phase = 'picker' | 'front' | 'back'
+
+const BODY_SEPARATOR = '\n\n'
+
+/**
+ * Split a stored body into front/back slices.
+ *
+ * The compose UI keeps two strings so each editor can own its own slice.
+ * Autosave joins them with `\n\n` before writing to `JournalEntry.text` —
+ * splitBody is the inverse for draft resume.
+ *
+ * Legacy fallback (rows saved before this redesign): no separator present,
+ * everything pre-cap goes to front; the overflow tail goes to back.
+ */
+function splitBody(text: string): { front: string; back: string } {
+  if (!text) return { front: '', back: '' }
+  const sepIdx = text.indexOf(BODY_SEPARATOR)
+  if (sepIdx >= 0 && sepIdx <= FRONT_CHAR_LIMIT) {
+    return {
+      front: text.slice(0, sepIdx),
+      back: text.slice(sepIdx + BODY_SEPARATOR.length),
+    }
+  }
+  return {
+    front: text.slice(0, FRONT_CHAR_LIMIT),
+    back: text.slice(FRONT_CHAR_LIMIT, FRONT_CHAR_LIMIT + BACK_CHAR_LIMIT),
+  }
+}
+
+function joinBody(front: string, back: string): string {
+  if (!back) return front
+  return `${front}${BODY_SEPARATOR}${back}`
+}
 
 export default function ComposeView() {
   const router = useRouter()
-  const { fetchProfile } = useProfileStore()
-  const autosave = useAutosaveEntry()
+  const params = useSearchParams()
+  const draftId = params.get('id')
 
-  const [phase, setPhase] = useState<Phase>('front')
-  const [recipient, setRecipient] = useState<LetterRecipient>('future_me')
-  const [closeName, setCloseName] = useState('')
-  const [unlock, setUnlock] = useState<UnlockChoice>(DEFAULT_UNLOCK)
-  const [body, setBody] = useState('')
-  const [photos, setPhotos] = useState<[string | null, string | null]>([null, null])
-  const [song, setSong] = useState<string | null>(null)
+  const { profile, fetchProfile } = useProfileStore()
+  const { isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
+  const autosave = useAutosaveLetterDraft(draftId ?? null)
+  const masterKey = useE2EEStore((s) => s.masterKey)
+  const theme = useThemeStore((s) => s.theme)
+  const userName = profile?.nickname ?? 'A friend'
+
+  const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
+  const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
+  const [bodyFront, setBodyFront] = useState('')
+  const [bodyBack, setBodyBack] = useState('')
+  // Photo refs + doodle strokes are owned here so PhotoBlock's encrypted
+  // {url | encryptedRef + encryptedRefIV} survive autosave and draft resume.
+  // Previously these lived inside PostcardBack as local data: URLs and
+  // were silently lost on refresh.
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [doodleStrokes, setDoodleStrokes] = useState<StrokeData[]>([])
-  const [createdAt] = useState<Date>(() => new Date())
-  const [sealing, setSealing] = useState(false)
+  const [song, setSong] = useState<string | null>(null)
+  const [createdAt, setCreatedAt] = useState<Date>(() => new Date())
+  const [showSeal, setShowSeal] = useState(false)
+  const [loading, setLoading] = useState(Boolean(draftId))
+  const hydratedRef = useRef(false)
 
-  // For the send slide-out animation
-  const sendAnimDoneRef = useRef(false)
-
-  useEffect(() => { fetchProfile() }, [fetchProfile])
-
-  const mapping = mapRecipientToSchema(recipient, closeName, null)
-  // resolveUnlockDate returns a fresh Date instance each call, so calling it
-  // inline would make `unlockDate` a different reference every render and
-  // re-fire the autosave effect (whose deps include unlockDate) on every
-  // render — debounce timer reset, autosave thrashing.
-  const unlockDate = useMemo(() => resolveUnlockDate(unlock, createdAt), [unlock, createdAt])
-
-  // Autosave whenever fields change
   useEffect(() => {
-    autosave.trigger({
-      text: body,
-      song: song,
-      photos: photos
-        .map((url, idx) => url ? { url, position: idx, rotation: 0, spread: 1 } : null)
-        .filter(Boolean) as { url: string; position: number; rotation: number; spread: number }[],
-      doodles: doodleStrokes.length > 0 ? [{ strokes: doodleStrokes, spread: 1 }] : [],
-      entryType: mapping.entryType,
-      recipientEmail: mapping.recipientEmail,
-      recipientName: mapping.recipientName,
-      unlockDate: unlockDate ? unlockDate.toISOString() : null,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, song, photos, doodleStrokes, mapping.entryType, mapping.recipientName, mapping.recipientEmail, unlockDate])
+    fetchProfile()
+  }, [fetchProfile])
 
-  const plainText = body.replace(/<[^>]*>/g, '').trim()
-  const canSeal =
-    plainText.length > 0 &&
-    unlockDate !== null &&
-    (recipient === 'future_me' || closeName.trim().length > 0)
-
-  async function handleFoldAndSeal() {
-    if (!canSeal || sealing) return
-    setSealing(true)
-    setPhase('folded')
-    setSealing(false)
-  }
-
-  async function handleSend() {
-    setSealing(true)
-    try {
-      await autosave.flush()
-      const id = autosave.entryId
-      if (!id) return
-      const res = await fetch(`/api/entries/${id}/seal`, { method: 'POST' })
-      if (res.ok) {
-        setPhase('sending')
-        sendAnimDoneRef.current = true
-        // Wait for send animation (postcard slides up), then navigate back
-        setTimeout(() => {
-          router.push('/letters')
-        }, 900)
-      }
-    } finally {
-      setSealing(false)
+  // Lock both <html> and <body> scroll while the compose view is mounted.
+  // globals.css forces `html { overflow-y: scroll }` to avoid scrollbar
+  // layout shift across the rest of the app — locking body alone is not
+  // enough; the html-level scrollbar is what actually appears.
+  useEffect(() => {
+    const html = document.documentElement
+    const originalHtmlOverflow = html.style.overflowY
+    const originalBodyOverflow = document.body.style.overflow
+    html.style.overflowY = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflowY = originalHtmlOverflow
+      document.body.style.overflow = originalBodyOverflow
     }
+  }, [])
+
+  // Hydrate a resumed draft from the letters table. We have to wait for the
+  // master key to be available — drafts are E2EE under it, and decrypting
+  // before unlock would just seed the editors with placeholder text.
+  useEffect(() => {
+    if (!draftId || hydratedRef.current) return
+    if (!isE2EEInitialized) return
+    if (isE2EEEnabled && !isE2EEReady) return
+    if (!masterKey) return
+
+    hydratedRef.current = true
+    void (async () => {
+      try {
+        const res = await fetch(`/api/letters/drafts/${draftId}`)
+        if (!res.ok) {
+          router.replace('/letters')
+          return
+        }
+        const wire = (await res.json()) as LetterDraftWire
+        const decrypted = await decryptLetterDraft(wire, masterKey)
+
+        setCreatedAt(new Date(wire.createdAt))
+
+        if (decrypted.letterType === 'self') {
+          setRecipient({ recipient: 'self' })
+        } else {
+          // Friend drafts keep the recipient name on the row itself now —
+          // hydrate it back into the picker state.
+          setRecipient({
+            recipient: 'friend',
+            name: decrypted.recipientName ?? '',
+          })
+        }
+
+        const { front, back } = splitBody(decrypted.text)
+        setBodyFront(front)
+        setBodyBack(back)
+
+        const hydratedPhotos: Photo[] = decrypted.photos
+          .filter((p) => p.position === 1 || p.position === 2)
+          .map((p) => ({
+            url: p.url ?? undefined,
+            encryptedRef: p.encryptedRef ?? undefined,
+            encryptedRefIV: p.encryptedRefIV ?? undefined,
+            rotation: p.rotation,
+            position: p.position as 1 | 2,
+          }))
+        setPhotos(hydratedPhotos)
+
+        const firstDoodle = decrypted.doodles[0]
+        if (firstDoodle && Array.isArray(firstDoodle.strokes)) {
+          setDoodleStrokes(firstDoodle.strokes as StrokeData[])
+        } else {
+          setDoodleStrokes([])
+        }
+
+        setSong(decrypted.song)
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to resume letter draft:', err)
+        router.replace('/letters')
+      }
+    })()
+  }, [draftId, router, isE2EEEnabled, isE2EEInitialized, isE2EEReady, masterKey])
+
+  // ── Photo + doodle handlers — bubble up to autosave via state setters.
+  const handlePhotoAdd = useCallback(
+    (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => {
+      setPhotos((prev) => {
+        const filtered = prev.filter((p) => p.position !== position)
+        const next: Photo = {
+          url: photo.url,
+          encryptedRef: photo.encryptedRef,
+          encryptedRefIV: photo.encryptedRefIV,
+          rotation: position === 1 ? -7 : 7,
+          position,
+        }
+        return [...filtered, next]
+      })
+    },
+    [],
+  )
+
+  const handlePhotoRemove = useCallback((position: 1 | 2) => {
+    setPhotos((prev) => prev.filter((p) => p.position !== position))
+  }, [])
+
+  // Autosave wiring. The hook is imperative (`trigger(payload)` + debounce),
+  // so we re-trigger whenever the two body slices, recipient mapping,
+  // photos, song, or doodle strokes change. The hook handles the
+  // POST→PUT lifecycle against /api/letters/drafts and the E2EE
+  // encryption.
+  useEffect(() => {
+    if (!recipient) return
+    if (phase === 'picker') return
+    // Don't write back the empty state while a draft is still hydrating —
+    // that would race with the GET and wipe the row.
+    if (loading) return
+
+    const joined = joinBody(bodyFront, bodyBack)
+    const isSelf = recipient.recipient === 'self'
+
+    autosave.trigger({
+      letterType: isSelf ? 'self' : 'friend',
+      text: joined,
+      song,
+      photos: photos.map((p) => ({
+        url: p.url ?? null,
+        encryptedRef: p.encryptedRef ?? null,
+        encryptedRefIV: p.encryptedRefIV ?? null,
+        position: p.position,
+        rotation: p.rotation,
+        spread: 1,
+      })),
+      doodleStrokes,
+      recipientName: isSelf ? null : recipient.name ?? null,
+      recipientEmail: null,
+      letterLocation: null,
+    })
+  }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'Cormorant Garamond, Georgia, serif',
+          fontStyle: 'italic',
+          opacity: 0.6,
+        }}
+      >
+        opening...
+      </div>
+    )
   }
 
-  // Card flip control: front→back = 180 degrees
-  const cardRotateY = phase === 'front' ? 0 : 180
+  if (phase === 'picker' || !recipient) {
+    return (
+      <RecipientPicker
+        onSubmit={(choice) => {
+          setRecipient(choice)
+          setCreatedAt(new Date())
+          setPhase('front')
+        }}
+        onCancel={() => router.push('/letters')}
+      />
+    )
+  }
+
+  const salutationName =
+    recipient.recipient === 'self' ? 'future me' : recipient.name
+
+  const canSeal =
+    bodyFront.trim().length > 0 || bodyBack.trim().length > 0
+
+  async function handleSeal({
+    unlockDate,
+    recipientEmail,
+  }: {
+    unlockDate: Date
+    recipientEmail?: string
+  }) {
+    // Flush the pending autosave so the seal request sees the final body /
+    // recipient state. autosave.draftId becomes available only after the
+    // first POST completes — if the user types and immediately taps seal,
+    // the debounce hasn't fired yet.
+    await autosave.flush()
+    const draftLetterId = autosave.draftId
+    if (!draftLetterId) {
+      throw new Error('Draft has not been saved yet — please add some text.')
+    }
+    if (!masterKey) {
+      throw new Error('Unlock Hearth first — your master key is required to seal letters.')
+    }
+    if (!recipient) throw new Error('No recipient selected.')
+
+    const combinedText = [bodyFront, bodyBack].filter(Boolean).join('\n\n')
+
+    if (recipient.recipient === 'self') {
+      const payload = await buildSelfLetterPayload({
+        draft: {
+          text: combinedText,
+          song,
+          photos: [],
+          doodles: [],
+          letterLocation: null,
+        },
+        unlockDate,
+        masterKey,
+      })
+      const res = await fetch('/api/letters/self', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload, draftLetterId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Could not save self letter.')
+      }
+      return
+    }
+
+    if (recipient.recipient === 'friend') {
+      if (!recipientEmail) throw new Error('Recipient email missing.')
+
+      // Re-fetch the draft so we get the encrypted doodle strokes in the
+      // shape the asset bundler expects. Photos are read from React state
+      // (ComposeView owns those refs); doodles come from the draft because
+      // local state holds plaintext strokes.
+      const draftRes = await fetch(`/api/letters/drafts/${draftLetterId}`)
+      if (!draftRes.ok) throw new Error('Could not load draft for sealing.')
+      const draftWire = (await draftRes.json()) as {
+        draftDoodles?: Array<{
+          strokes: { encryptedStrokes: string; e2eeIV: string } | unknown
+          spread?: number
+          positionInEntry?: number
+        }>
+      }
+
+      const draftPhotos = photos.map((p, i) => ({
+        encryptedRef: p.encryptedRef ?? null,
+        encryptedRefIV: p.encryptedRefIV ?? null,
+        url: p.url ?? null,
+        position: p.position,
+        spread: 1,
+        rotation: p.rotation,
+        ordinal: i,
+      }))
+      const draftDoodles = (draftWire.draftDoodles ?? []).map((d) => ({
+        strokes: d.strokes,
+        spread: d.spread ?? 1,
+        positionInEntry: d.positionInEntry ?? 0,
+      }))
+
+      const payload = await buildFriendLetterPayload({
+        draft: {
+          text: combinedText,
+          song,
+          photos: draftPhotos,
+          doodles: draftDoodles,
+        },
+        unlockDate,
+        recipientEmail,
+        recipientName: recipient.name ?? 'Friend',
+        senderName: userName,
+        letterLocation: null,
+        masterKey,
+      })
+      const res = await fetch('/api/letters/friend', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload, draftLetterId }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? 'Could not send friend letter.')
+      }
+      return
+    }
+
+    throw new Error(`Unknown recipient type: ${(recipient as RecipientChoice).recipient}`)
+  }
+
+  // Card flip control: front→back = 180 degrees (preserves the prior 3D flip).
+  const cardRotateY = phase === 'back' ? 180 : 0
+
+  // Pull the same cover tokens the journal uses for its leather binding.
+  // The blotter behind the postcard reads as the same physical material.
+  const diaryColors = getGlassDiaryColors(theme)
 
   return (
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 200,
+        zIndex: 30, // below Navigation (z-40/50) so the navbar stays visible
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(180deg, var(--bg-1), var(--bg-2))',
         perspective: 1600,
+        // background intentionally left transparent so the theme Background
+        // (snow, fireflies, sakura, etc.) animates behind the postcard the
+        // same way it does behind a journal spread.
       }}
     >
-      {/* Back button — returns to the inbox */}
-      <button
-        onClick={() => router.push('/letters')}
+      {/* Leather desk blotter — hugs the postcard with a small even margin.
+          The inkwell + quill sit OUTSIDE the blotter, on the bare desk, so
+          the blotter reads as a leather mat just for the letter. Same
+          theme cover token + crosshatch grain as before. */}
+      <div
         style={{
-          position: 'absolute',
-          top: 90,
-          left: 32,
-          zIndex: 210,
-          padding: '7px 16px 8px 14px',
-          borderRadius: 999,
-          border: '1px solid color-mix(in oklab, var(--text-muted) 40%, transparent)',
-          background: 'var(--paper-1)',
-          color: 'var(--text-secondary)',
-          fontFamily: 'Cormorant Garamond, serif',
-          fontStyle: 'italic',
-          fontSize: 14,
-          letterSpacing: 0.4,
-          cursor: 'pointer',
-          transition: 'background 0.2s, color 0.2s, transform 0.2s',
+          position: 'relative',
+          padding: '20px 26px',
+          borderRadius: 14,
+          backgroundColor: diaryColors.cover,
+          backgroundImage: `repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 6px)`,
+          border: `1px solid ${diaryColors.coverBorder}`,
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25), 0 35px 70px rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.28)',
         }}
-        onMouseEnter={e => {
-          const el = e.currentTarget
-          el.style.background = 'var(--paper-2)'
-          el.style.color = 'var(--text-primary)'
-          el.style.transform = 'translateX(-2px)'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget
-          el.style.background = 'var(--paper-1)'
-          el.style.color = 'var(--text-secondary)'
-          el.style.transform = 'none'
-        }}
-        aria-label="back to letters"
       >
-        ← back to letters
-      </button>
-
       {/* The postcard itself — landscape */}
       <motion.div
-        animate={
-          phase === 'sending'
-            ? { y: '-200vh', opacity: 0, scale: 0.92 }
-            : { y: 0, opacity: 1, scale: 1 }
-        }
-        transition={
-          phase === 'sending'
-            ? { duration: 0.7, ease: [0.4, 0, 0.8, 0.5] }
-            : { type: 'spring', stiffness: 280, damping: 26 }
-        }
         style={{
-          width: 'min(1100px, calc(100vw - 80px))',
-          height: 'min(640px, calc(100vh - 180px))',
+          width: 'min(1140px, calc(100vw - 80px))',
+          height: 'min(660px, calc(100vh - 140px))',
           position: 'relative',
           transformStyle: 'preserve-3d',
         }}
       >
+        {/* Quill — illustration asset standing beside the postcard. */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.35, ease: [0.2, 0.7, 0.2, 1] }}
+          style={{
+            position: 'absolute',
+            right: -300,
+            bottom: 0,
+            width: 280,
+            height: 280,
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 14px 22px rgba(0,0,0,0.32))',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/quill.png"
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </motion.div>
+
+
         {/* 3D flip wrapper */}
         <motion.div
           animate={{ rotateY: cardRotateY }}
@@ -180,61 +450,48 @@ export default function ComposeView() {
             transformStyle: 'preserve-3d',
           }}
         >
-          {/* FRONT face */}
+          {/* FRONT face. `active` toggles pointer-events on its root because
+              backface-visibility:hidden doesn't reliably block clicks on the
+              rotated-away face across browsers — without this guard, clicks
+              on the back leak through to the (invisible) front. */}
           <PostcardFront
-            recipient={recipient}
-            onRecipientChange={setRecipient}
-            closeName={closeName}
-            onCloseNameChange={setCloseName}
-            createdAt={createdAt}
+            active={phase === 'front'}
+            salutationName={salutationName}
+            body={bodyFront}
+            onBodyChange={setBodyFront}
             onTurnOver={() => setPhase('back')}
-            onClose={() => router.push('/letters')}
+            onCancel={() => router.push('/letters')}
+            createdAt={createdAt}
           />
 
-          {/* BACK face (visible when phase=back or folded) */}
-          {phase !== 'front' && phase !== 'sending' && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                transformStyle: 'preserve-3d',
-                pointerEvents: 'auto',
-              }}
-            >
-              {phase === 'back' ? (
-                <PostcardBack
-                  recipient={recipient}
-                  closeName={closeName}
-                  body={body}
-                  onBodyChange={setBody}
-                  unlock={unlock}
-                  onUnlockChange={setUnlock}
-                  photos={photos}
-                  onPhotosChange={setPhotos}
-                  song={song}
-                  onSongChange={setSong}
-                  doodleStrokes={doodleStrokes}
-                  onDoodleChange={setDoodleStrokes}
-                  onBack={() => setPhase('front')}
-                  onSeal={handleFoldAndSeal}
-                  canSeal={canSeal && !sealing}
-                  sealing={sealing}
-                />
-              ) : (
-                // folded phase — show folded face instead of back
-                <PostcardFolded
-                  recipient={recipient}
-                  closeName={closeName}
-                  unlock={unlock}
-                  createdAt={createdAt}
-                  sending={sealing}
-                  onSend={handleSend}
-                />
-              )}
-            </div>
-          )}
+          {/* BACK face — same active guard. */}
+          <PostcardBack
+            active={phase === 'back'}
+            body={bodyBack}
+            onBodyChange={setBodyBack}
+            photos={photos}
+            onPhotoAdd={handlePhotoAdd}
+            onPhotoRemove={handlePhotoRemove}
+            doodleStrokes={doodleStrokes}
+            onDoodleStrokesChange={setDoodleStrokes}
+            song={song}
+            onSongChange={setSong}
+            onTurnBack={() => setPhase('front')}
+            onSeal={() => setShowSeal(true)}
+            canSeal={canSeal}
+          />
         </motion.div>
       </motion.div>
+      </div>
+
+      {showSeal && (
+        <SealModal
+          recipient={recipient.recipient}
+          onClose={() => setShowSeal(false)}
+          onSealed={() => router.push('/letters?tab=sent')}
+          onSeal={handleSeal}
+        />
+      )}
     </div>
   )
 }

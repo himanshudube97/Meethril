@@ -10,14 +10,17 @@ export function useE2EE() {
   const encryptEntryData = useCallback(
     async (draft: EncryptableDraft): Promise<Record<string, unknown>> => {
       if (!isE2EEReady || !masterKey) {
-        return { ...draft, encryptionType: 'server' }
+        // E2EE not ready — return plaintext draft without encryption metadata.
+        // The autosave hook defers saves until the master key is available, so
+        // this path is only reached in exceptional cases (e.g. key expired mid-session).
+        return { ...draft }
       }
       try {
         const encrypted = await encryptDraft(draft, masterKey)
         return encrypted as unknown as Record<string, unknown>
       } catch (error) {
         console.error('E2EE encryption failed:', error)
-        return { ...draft, encryptionType: 'server' }
+        return { ...draft }
       }
     },
     [isE2EEReady, masterKey]
@@ -25,11 +28,11 @@ export function useE2EE() {
 
   const decryptEntryFromServer = useCallback(
     async (entry: JournalEntry): Promise<JournalEntry> => {
-      if (entry.encryptionType !== 'e2ee') return entry
+      // All entries are E2EE — always attempt decryption.
       if (!isE2EEReady || !masterKey) {
         return {
           ...entry,
-          text: '<p><em>[Encrypted — unlock to view]</em></p>',
+          text: '[Encrypted — unlock to view]',
           textPreview: '[Encrypted]',
         }
       }
@@ -40,7 +43,7 @@ export function useE2EE() {
         console.error('E2EE decryption failed for entry:', entry.id, error)
         return {
           ...entry,
-          text: '<p><em>[Decryption failed]</em></p>',
+          text: '[Decryption failed]',
           textPreview: '[Decryption failed]',
         }
       }

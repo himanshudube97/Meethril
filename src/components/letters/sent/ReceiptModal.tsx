@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import type { SentStamp } from '../letterTypes'
 import { useE2EEStore } from '@/store/e2ee'
 import { decryptString } from '@/lib/e2ee/crypto'
+import { useSubscription } from '@/hooks/useSubscription'
+import { SenderReceiptStatus } from '../SenderReceiptStatus'
+import { AskForCopyButton } from '../AskForCopyButton'
 
 interface Props {
   stamp: SentStamp | null
@@ -13,6 +16,7 @@ interface Props {
 export default function ReceiptModal({ stamp, onClose }: Props) {
   const [peeked, setPeeked] = useState<string | null>(null)
   const masterKey = useE2EEStore((s) => s.masterKey)
+  const { isPremium } = useSubscription()
 
   useEffect(() => {
     setPeeked(null)
@@ -69,6 +73,19 @@ export default function ReceiptModal({ stamp, onClose }: Props) {
         )}
         <div className={`seal-status${stamp.isDelivered ? ' delivered' : ''}`}>
           {stamp.isDelivered ? '✓ delivered' : '✦ still sealed'}
+        </div>
+
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <SenderReceiptStatus
+            unlockDate={stamp.unlockDate}
+            isDelivered={stamp.isDelivered}
+            firstReadAt={stamp.firstReadAt}
+            savedByRecipientAt={stamp.savedByRecipientAt}
+            bouncedAt={stamp.bouncedAt}
+          />
+          {stamp.savedByRecipientAt !== null && isPremium && (
+            <AskForCopyButton letterId={stamp.id} recipientName={stamp.recipientName} />
+          )}
         </div>
 
         {!stamp.isDelivered && !peeked && (

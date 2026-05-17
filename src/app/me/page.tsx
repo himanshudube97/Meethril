@@ -159,22 +159,8 @@ const E2EESettings = memo(function E2EESettings() {
   } = useE2EEStore()
 
   const [showRotate, setShowRotate] = useState(false)
-  const [expiresAt, setExpiresAt] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!isUnlocked) {
-      setExpiresAt(null)
-      return
-    }
-    try {
-      const raw = localStorage.getItem('hearth-e2ee-master-key')
-      if (!raw) { setExpiresAt(null); return }
-      const parsed = JSON.parse(raw) as { expiresAt: number }
-      setExpiresAt(parsed.expiresAt > 0 ? parsed.expiresAt : null)
-    } catch {
-      setExpiresAt(null)
-    }
-  }, [isUnlocked])
+  // The master key now lives in sessionStorage and always clears on tab
+  // close — no TTL state to track. Kept the "session only" copy below.
 
   return (
     <motion.div
@@ -253,9 +239,7 @@ const E2EESettings = memo(function E2EESettings() {
               </p>
               <p className="text-xs" style={{ color: theme.text.secondary }}>
                 {isUnlocked
-                  ? expiresAt
-                    ? `Unlocked on this device until ${new Date(expiresAt).toLocaleString()}.`
-                    : 'Unlocked on this device (session only).'
+                  ? 'Unlocked on this device (session only).'
                   : 'Locked.'}
               </p>
               <div className="flex flex-wrap gap-2 pt-1">

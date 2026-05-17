@@ -11,10 +11,10 @@ import TopHint from './TopHint'
 import NewLetterTag from './NewLetterTag'
 import LetterFanout from './LetterFanout'
 import RevealModal from './RevealModal'
+import DraftResumePrompt, { type DraftPromptInfo } from './DraftResumePrompt'
 import { MONTHS, MONTH_NAMES, groupInboxByMonth, countUnread } from '../lettersData'
 import type { InboxLetter } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
-import type { JournalEntry } from '@/store/journal'
 
 interface Props {
   onUnreadCountChange: (n: number) => void
@@ -27,24 +27,62 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   const [year, setYear] = useState(today.getFullYear())
   const [monthIdx, setMonthIdx] = useState(today.getMonth())
   const [fanTriggerKey, setFanTriggerKey] = useState(0)
+  const [lettersShown, setLettersShown] = useState(false)
   const [revealLetter, setRevealLetter] = useState<InboxLetter | null>(null)
-  const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
+  const [draftPrompt, setDraftPrompt] = useState<DraftPromptInfo[] | null>(null)
+  const { isE2EEReady } = useE2EE()
 
+  async function handleBegin() {
+    try {
+      const res = await fetch('/api/letters/drafts')
+      if (!res.ok) {
+        router.push('/letters/write')
+        return
+      }
+      const data = (await res.json()) as {
+        drafts?: Array<{
+          id: string
+          entryType: 'letter' | 'unsent_letter'
+          recipientName: string | null
+          updatedAt: string
+        }>
+      }
+      const drafts = data.drafts ?? []
+      if (drafts.length === 0) {
+        router.push('/letters/write')
+        return
+      }
+      setDraftPrompt(
+        drafts.map((d) => ({
+          id: d.id,
+          recipientName: d.recipientName,
+          isSelf: d.entryType === 'letter',
+          updatedAt: d.updatedAt,
+        })),
+      )
+    } catch {
+      router.push('/letters/write')
+    }
+  }
+
+  // List view only renders unencrypted metadata (recipient name, dates,
+  // isViewed). Don't decrypt here — RevealModal does the single decrypt
+  // when the user actually opens a letter. Decrypting in InboxView caused
+  // double-decryption: text was decrypted once here, stored as plaintext
+  // JSON in state, then RevealModal tried to decrypt the already-decrypted
+  // string and atob exploded on `{`.
   useEffect(() => {
     let cancelled = false
     fetch('/api/letters/inbox')
       .then(r => r.json())
-      .then(async d => {
+      .then(d => {
         if (cancelled) return
         const raw = (d.letters || []) as InboxLetter[]
-        const decrypted = (await decryptEntriesFromServer(
-          raw as unknown as JournalEntry[]
-        )) as unknown as InboxLetter[]
-        setLetters(decrypted)
+        setLetters(raw)
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [decryptEntriesFromServer, isE2EEReady])
+  }, [isE2EEReady])
 
   const grouped = useMemo(() => groupInboxByMonth(letters), [letters])
 
@@ -86,6 +124,10 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   // re-fan when month/year/letters count changes
   useEffect(() => { setFanTriggerKey(k => k + 1) }, [year, monthIdx, letters.length])
 
+  // Tuck letters back into the postbox whenever the user navigates to a
+  // different month — they have to click the postbox again to peek inside.
+  useEffect(() => { setLettersShown(false) }, [year, monthIdx])
+
   return (
     <section
       className="relative h-screen overflow-hidden"
@@ -96,22 +138,35 @@ export default function InboxView({ onUnreadCountChange }: Props) {
 
       <div className="absolute inset-0 z-[5] flex items-end justify-center w-full pb-[160px]">
         <div className="flex items-end gap-[60px] w-full px-[80px] justify-center">
-          <WriteCard onBegin={() => router.push('/letters/write')} />
+          <WriteCard onBegin={handleBegin} />
 
           <div className="flex items-end gap-[80px]">
             <Lamp />
-            <Postbox onClick={() => setFanTriggerKey(k => k + 1)}>
-              <PostboxControls
-                year={year}
-                monthIdx={monthIdx}
-                yearMin={yearMin}
-                yearMax={yearMax}
-                monthMaxForCurrentYear={monthMaxForCurrentYear}
-                onYearChange={setYear}
-                onMonthChange={setMonthIdx}
+            <div style={{ position: 'relative' }}>
+              <LetterFanout
+                letters={currentLetters}
+                triggerKey={fanTriggerKey}
+                onLetterClick={setRevealLetter}
+                shown={lettersShown}
               />
-              <NewLetterTag count={newCountTotal} />
-            </Postbox>
+              <Postbox
+                onClick={() => {
+                  setLettersShown((s) => !s)
+                  setFanTriggerKey((k) => k + 1)
+                }}
+              >
+                <PostboxControls
+                  year={year}
+                  monthIdx={monthIdx}
+                  yearMin={yearMin}
+                  yearMax={yearMax}
+                  monthMaxForCurrentYear={monthMaxForCurrentYear}
+                  onYearChange={setYear}
+                  onMonthChange={setMonthIdx}
+                />
+                <NewLetterTag count={newCountTotal} />
+              </Postbox>
+            </div>
           </div>
         </div>
       </div>
@@ -128,12 +183,6 @@ export default function InboxView({ onUnreadCountChange }: Props) {
         — {MONTH_NAMES[monthIdx]} · {year} · {captionFor(currentLetters)} —
       </div>
 
-      <LetterFanout
-        letters={currentLetters}
-        triggerKey={fanTriggerKey}
-        onLetterClick={setRevealLetter}
-      />
-
       <RevealModal
         letter={revealLetter}
         onClose={() => setRevealLetter(null)}
@@ -141,6 +190,19 @@ export default function InboxView({ onUnreadCountChange }: Props) {
           fetch(`/api/letters/${id}/read`, { method: 'POST' }).catch(() => {})
           setLetters(ls => ls.map(l => l.id === id ? { ...l, isViewed: true } : l))
         }}
+      />
+
+      <DraftResumePrompt
+        drafts={draftPrompt}
+        onResume={(id) => {
+          setDraftPrompt(null)
+          router.push(`/letters/write?id=${id}`)
+        }}
+        onStartNew={() => {
+          setDraftPrompt(null)
+          router.push('/letters/write')
+        }}
+        onClose={() => setDraftPrompt(null)}
       />
     </section>
   )

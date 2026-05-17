@@ -14,17 +14,11 @@ export interface JournalEntry {
   spreads?: number
   isArchived?: boolean
   style?: EntryStyle | null
-  // Letter-specific fields
+  // Letter draft marker — JournalEntry is used as a draft while composing;
+  // when sealed, the Letter row is created and the JE draft is deleted.
   entryType?: 'normal' | 'letter' | 'unsent_letter' | 'ephemeral'
-  isSealed?: boolean
-  unlockDate?: string
-  recipientEmail?: string | null
-  recipientName?: string | null
-  senderName?: string | null
-  letterLocation?: string | null
-  // E2EE fields
-  encryptionType?: 'server' | 'e2ee'
-  e2eeIV?: string | null
+  // E2EE per-field IV map — all entries are E2EE
+  e2eeIVs?: Record<string, string> | null
 }
 
 export interface Doodle {
@@ -80,7 +74,13 @@ export const useJournalStore = create<JournalStore>((set) => ({
   addDoodleStroke: (stroke) => set((state) => ({
     currentDoodleStrokes: [...state.currentDoodleStrokes, stroke]
   })),
-  setDoodleStrokes: (strokes) => set({ currentDoodleStrokes: strokes }),
+  setDoodleStrokes: (strokes) =>
+    // Defense in depth: refuse non-array input. Callers occasionally pass
+    // the raw `Doodle.strokes` JSON from the server — for an E2EE entry
+    // before decryption that's `{encryptedStrokes, e2eeIV}`, NOT an array.
+    // Feeding it into state crashes the canvas at render with
+    // `strokes.map is not a function`. Coerce to empty array instead.
+    set({ currentDoodleStrokes: Array.isArray(strokes) ? strokes : [] }),
   clearDoodleStrokes: () => set({ currentDoodleStrokes: [] }),
   resetCurrentEntry: () => set({
     currentText: '',

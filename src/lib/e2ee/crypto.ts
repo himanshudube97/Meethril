@@ -354,7 +354,6 @@ export function parseSalt(saltBase64: string): Uint8Array {
 // ============================================
 
 const MASTER_KEY_STORAGE_KEY = 'hearth-e2ee-master-key'
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000  // 7 days
 
 /** Export master key to base64. */
 export async function exportMasterKey(masterKey: CryptoKey): Promise<string> {
@@ -380,41 +379,53 @@ interface StoredKey {
 }
 
 /**
- * Store master key in localStorage with a TTL (default 7 days).
- * Pass ttlMs = 0 to use sessionStorage (cleared when tab closes).
+ * Store the master key for the duration of the browser session.
+ *
+ * Was: localStorage with a 7-day TTL. That left the raw AES key bytes
+ * readable by any JS on the origin (XSS, malicious extension) for a week.
+ * Now: sessionStorage only — key clears when the tab closes, so the
+ * exposure window is one session instead of seven days. User trades
+ * "type passphrase once a week" for "type passphrase once per session."
+ *
+ * The `_ttlMs` parameter is kept on the signature for caller-compatibility
+ * but ignored. sessionStorage has no TTL — the browser handles expiry.
  */
 export async function storeMasterKeyLocally(
   masterKey: CryptoKey,
-  ttlMs: number = DEFAULT_TTL_MS
+  _ttlMs: number = 0
 ): Promise<void> {
   const exported = await exportMasterKey(masterKey)
-  if (ttlMs <= 0) {
-    sessionStorage.setItem(MASTER_KEY_STORAGE_KEY, JSON.stringify({ key: exported, expiresAt: 0 }))
-    return
+  sessionStorage.setItem(MASTER_KEY_STORAGE_KEY, JSON.stringify({ key: exported, expiresAt: 0 }))
+  // Belt-and-braces: clear any stale localStorage entry from before this
+  // migration so the long-lived plaintext key doesn't linger.
+  try {
+    localStorage.removeItem(MASTER_KEY_STORAGE_KEY)
+  } catch {
+    /* localStorage may be disabled */
   }
-  const payload: StoredKey = { key: exported, expiresAt: Date.now() + ttlMs }
-  localStorage.setItem(MASTER_KEY_STORAGE_KEY, JSON.stringify(payload))
 }
 
 /**
- * Load master key from storage. Returns null if missing or expired.
- * If expired, also clears the stored value.
+ * Load the master key from sessionStorage. Returns null if absent
+ * (tab was closed, user logged out, or this is a fresh session).
  */
 export async function loadMasterKeyLocally(): Promise<CryptoKey | null> {
-  const raw =
-    localStorage.getItem(MASTER_KEY_STORAGE_KEY) ||
-    sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
+  // Clear any stale pre-migration localStorage entry on every load so a
+  // user upgrading from the old build doesn't carry the long-lived copy
+  // around. Idempotent and cheap.
+  try {
+    localStorage.removeItem(MASTER_KEY_STORAGE_KEY)
+  } catch {
+    /* localStorage may be disabled */
+  }
+
+  const raw = sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
   if (!raw) return null
 
   let parsed: StoredKey
   try {
     parsed = JSON.parse(raw)
   } catch {
-    clearMasterKeyLocally()
-    return null
-  }
-
-  if (parsed.expiresAt > 0 && Date.now() > parsed.expiresAt) {
     clearMasterKeyLocally()
     return null
   }
@@ -433,15 +444,12 @@ export function clearMasterKeyLocally(): void {
   sessionStorage.removeItem(MASTER_KEY_STORAGE_KEY)
 }
 
-/** True if a (non-expired) master key is stored. */
+/** True if a master key is stored for the current session. */
 export function hasMasterKeyLocally(): boolean {
-  const raw =
-    localStorage.getItem(MASTER_KEY_STORAGE_KEY) ||
-    sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
+  const raw = sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
   if (!raw) return false
   try {
-    const parsed: StoredKey = JSON.parse(raw)
-    if (parsed.expiresAt > 0 && Date.now() > parsed.expiresAt) return false
+    JSON.parse(raw) as StoredKey
     return true
   } catch {
     return false

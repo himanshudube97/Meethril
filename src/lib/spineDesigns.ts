@@ -138,6 +138,24 @@ export const spineDesigns: Record<ThemeName, SpineDesign> = {
     accent: 'rule',
     accentColor: '#FFC890',
   },
+  rain: {
+    material: 'leather',
+    baseColor: '#3A4A5C',
+    shadowColor: '#1F2A38',
+    highlightColor: '#5A7088',
+    accent: 'stitches',
+    accentColor: '#D4A878',
+    ribbon: {
+      color: '#A8C2DC',
+      width: 3,
+    },
+    medallion: {
+      color: '#D4A878',
+      position: 14,
+      size: 14,
+      rimColor: '#7A5A30',
+    },
+  },
 }
 
 export function getSpineDesign(themeName: ThemeName): SpineDesign {

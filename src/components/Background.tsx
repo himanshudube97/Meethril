@@ -371,6 +371,33 @@ const getGoldFlecksConfig = (): ISourceOptions => ({
   detectRetina: true,
 })
 
+// Rain configuration - small pale droplets falling gently straight down
+const getRainConfig = (): ISourceOptions => ({
+  fullScreen: false,
+  background: { color: { value: 'transparent' } },
+  fpsLimit: 60,
+  particles: {
+    number: { value: 90, density: { enable: true } },
+    color: { value: ['#B8C8DC', '#A8BCD0', '#CDD8E6'] },
+    shape: { type: 'circle' },
+    opacity: {
+      value: { min: 0.35, max: 0.7 },
+    },
+    size: {
+      value: { min: 1.2, max: 2.4 },
+    },
+    move: {
+      enable: true,
+      speed: { min: 1.4, max: 2.4 },
+      direction: 'bottom' as const,
+      straight: true,
+      random: false,
+      outModes: { default: 'out' as const },
+    },
+  },
+  detectRetina: true,
+})
+
 // Leaves configuration - gently falling leaves for Sage and Garden themes
 const getLeavesConfig = (color: string, count: number): ISourceOptions => ({
   fullScreen: false,
@@ -800,6 +827,7 @@ function BackgroundComponent({ bounded = false }: BackgroundProps = {}) {
     if (theme.particles === 'sunbeam') return getSunbeamConfig(mode)
     if (theme.particles === 'embers') return getEmbersConfig()
     if (theme.particles === 'goldFlecks') return getGoldFlecksConfig()
+    if (theme.particles === 'rain') return getRainConfig()
     if (theme.particles === 'leaves') {
       return getLeavesConfig(theme.accent.primary, 18)
     }
@@ -813,6 +841,7 @@ function BackgroundComponent({ bounded = false }: BackgroundProps = {}) {
   const isCandlelight = theme.particles === 'dust'
   const isOceanTwilight = theme.particles === 'foam'
   const isSunset = theme.ambience === 'sunset'
+  const isRain = theme.ambience === 'rainy'
 
   return (
     <div className={`${bounded ? 'absolute' : 'fixed'} inset-0 overflow-hidden pointer-events-none`}>
@@ -1103,6 +1132,87 @@ function BackgroundComponent({ bounded = false }: BackgroundProps = {}) {
           <FlyingBird delay={5} yPosition={22} />
           <FlyingBird delay={20} yPosition={28} />
           <FlyingBird delay={42} yPosition={18} />
+        </>
+      )}
+
+      {/* Rain ambience — overcast wash, distant window warmth, low fog */}
+      {isRain && (
+        <>
+          {/* Soft overcast top wash — diffuse cool light from a dim sky */}
+          <motion.div
+            className="absolute"
+            style={{
+              top: '-10%',
+              left: '-5%',
+              width: '110%',
+              height: '55%',
+              background: 'radial-gradient(ellipse at 50% 0%, rgba(168, 194, 220, 0.16) 0%, rgba(120, 152, 184, 0.08) 35%, transparent 70%)',
+              filter: 'blur(40px)',
+            }}
+            animate={{ opacity: [0.55, 0.75, 0.55] }}
+            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+          />
+
+          {/* Distant lit window — small warm amber smudge far away, the only
+              point of warmth on a rainy night. Slow gentle pulse. */}
+          <motion.div
+            className="absolute"
+            style={{
+              top: '32%',
+              left: '78%',
+              width: '90px',
+              height: '60px',
+              background: 'radial-gradient(ellipse at center, rgba(212, 168, 120, 0.32) 0%, rgba(212, 168, 120, 0.12) 45%, transparent 75%)',
+              filter: 'blur(8px)',
+              borderRadius: '20%',
+            }}
+            animate={{ opacity: [0.6, 0.85, 0.65, 0.8, 0.6] }}
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+          />
+
+          {/* Drifting low cloud layer */}
+          <motion.div
+            className="absolute"
+            style={{
+              top: '8%',
+              left: '-10%',
+              width: '120%',
+              height: '18%',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(108, 128, 152, 0.18) 50%, transparent 100%)',
+              filter: 'blur(30px)',
+            }}
+            animate={{ x: [-30, 30, -30] }}
+            transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
+          />
+
+          {/* Horizon haze — wet air pooling near the ground */}
+          <motion.div
+            className="absolute"
+            style={{
+              bottom: '0%',
+              left: '-5%',
+              width: '110%',
+              height: '32%',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(122, 152, 184, 0.10) 50%, rgba(80, 100, 124, 0.16) 100%)',
+              filter: 'blur(28px)',
+            }}
+            animate={{ opacity: [0.55, 0.75, 0.55] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          />
+
+          {/* Faint wet-pavement reflection — thin shimmer at the very bottom */}
+          <motion.div
+            className="absolute"
+            style={{
+              bottom: '0%',
+              left: '0%',
+              width: '100%',
+              height: '6%',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(168, 194, 220, 0.12) 100%)',
+            }}
+            animate={{ opacity: [0.4, 0.6, 0.4] }}
+            transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+          />
         </>
       )}
 

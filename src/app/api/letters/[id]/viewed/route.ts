@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { findLetterForRead } from '@/lib/letters/dual-read'
 
 export async function POST(
   request: Request,
@@ -15,22 +16,14 @@ export async function POST(
 
     const { id } = await params
 
-    // Verify the letter belongs to the user and is a self-letter
-    const letter = await prisma.journalEntry.findFirst({
-      where: {
-        id,
-        userId: user.id,
-        entryType: 'letter',
-        recipientEmail: null, // Self-letter only
-      },
-    })
-
-    if (!letter) {
+    const letter = await findLetterForRead({ id, userId: user.id })
+    // Only self-letters (no recipientEmail) can be marked as viewed by the sender/recipient.
+    if (!letter || letter.recipientEmail !== null) {
       return NextResponse.json({ error: 'Letter not found' }, { status: 404 })
     }
 
-    // Mark as viewed
-    await prisma.journalEntry.update({
+    // Mark as viewed on the Letter table (letters no longer live on JournalEntry).
+    await prisma.letter.update({
       where: { id },
       data: { isViewed: true },
     })

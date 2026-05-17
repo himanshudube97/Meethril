@@ -7,7 +7,6 @@ import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { useJournalStore } from '@/store/journal'
 import { useDeskStore } from '@/store/desk'
 import SongEmbed from '@/components/SongEmbed'
-import { JOURNAL } from '@/lib/journal-constants'
 import { htmlToSplitPlainText } from '@/lib/text-utils'
 import {
   isCaretOnLastVisualRow,
@@ -242,7 +241,6 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value
     const newCursorPos = e.target.selectionStart
-    if (newText.length > JOURNAL.MAX_CHARS) return
 
     const textarea = textareaRef.current
     if (!textarea) {

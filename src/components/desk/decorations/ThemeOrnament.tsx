@@ -131,6 +131,20 @@ const ornaments: Record<ThemeName, React.ReactNode> = {
       <line x1="11" y1="27" x2="21" y2="27" stroke="currentColor" strokeWidth="0.7" strokeLinecap="round" opacity="0.45" />
     </>
   ),
+  rain: (
+    <>
+      {/* Soft cloud */}
+      <path
+        d="M9 14 Q 7 14 7 11.5 Q 7 9 10 9 Q 11 6.5 14 6.5 Q 17.5 6.5 18.5 9 Q 22 9 23 11 Q 25 11.5 25 13.5 Q 25 15 23 15 L 10 15 Q 9 15 9 14 Z"
+        fill="currentColor"
+        opacity="0.9"
+      />
+      {/* Three falling raindrops */}
+      <path d="M12 19 L 11 22 Q 11 23 12 23 Q 13 23 13 22 Z" fill="currentColor" opacity="0.85" />
+      <path d="M16 21 L 15 24 Q 15 25 16 25 Q 17 25 17 24 Z" fill="currentColor" opacity="0.85" />
+      <path d="M20 19 L 19 22 Q 19 23 20 23 Q 21 23 21 22 Z" fill="currentColor" opacity="0.85" />
+    </>
+  ),
 }
 
 interface ThemeOrnamentProps {

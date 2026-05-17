@@ -80,21 +80,23 @@ export function useAutosaveScrapbook({ boardId }: Options): UseAutosaveScrapbook
       const masterKey = state.masterKey
       const isE2EEReady = state.isEnabled && state.isUnlocked && masterKey !== null
 
-      let payload: Record<string, unknown>
-      if (isE2EEReady && masterKey) {
-        const titleEnc = draft.title ? await encryptString(draft.title, masterKey) : null
-        const itemsEnc = await encryptString(JSON.stringify(draft.items), masterKey)
-        payload = {
-          title: titleEnc?.ciphertext ?? null,
-          items: itemsEnc.ciphertext,
-          encryptionType: 'e2ee',
-          e2eeIVs: {
-            ...(titleEnc ? { title: titleEnc.iv } : {}),
-            items: itemsEnc.iv,
-          },
-        }
-      } else {
-        payload = { ...draft, encryptionType: 'server' }
+      // All scrapbooks are E2EE — always encrypt before saving.
+      if (!isE2EEReady || !masterKey) {
+        // E2EE not ready — defer; the guard above already handles this case.
+        // This branch is only reached in exceptional mid-session key-expiry.
+        setStatus('idle')
+        inFlightRef.current = false
+        return
+      }
+      const titleEnc = draft.title ? await encryptString(draft.title, masterKey) : null
+      const itemsEnc = await encryptString(JSON.stringify(draft.items), masterKey)
+      const payload: Record<string, unknown> = {
+        title: titleEnc?.ciphertext ?? null,
+        items: itemsEnc.ciphertext,
+        e2eeIVs: {
+          ...(titleEnc ? { title: titleEnc.iv } : {}),
+          items: itemsEnc.iv,
+        },
       }
 
       const res = await fetch(`/api/scrapbooks/${boardId}`, {

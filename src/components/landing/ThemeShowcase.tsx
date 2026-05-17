@@ -12,6 +12,7 @@ const themeList: { key: ThemeName; emoji: string }[] = [
   { key: 'sage', emoji: '🌿' },
   { key: 'postal', emoji: '✉️' },
   { key: 'ocean', emoji: '🌊' },
+  { key: 'rain', emoji: '🌧️' },
   { key: 'rivendell', emoji: '🌲' },
   { key: 'sunset', emoji: '🌅' },
 ]

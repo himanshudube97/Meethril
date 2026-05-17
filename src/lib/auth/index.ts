@@ -117,3 +117,20 @@ async function getSupabaseUser(): Promise<AuthUser | null> {
 }
 
 export { isDevAuth } from './config'
+
+/**
+ * Returns true if the user has completed mandatory E2EE setup.
+ * A user is "onboarded" when they have both an encryptedMasterKey (passphrase wrap)
+ * and a recoveryKeyHash (recovery key was generated and acknowledged saved).
+ */
+export function hasCompletedE2EEOnboarding(user: {
+  e2eeEnabled: boolean
+  encryptedMasterKey: string | null
+  recoveryKeyHash: string | null
+}): boolean {
+  return (
+    user.e2eeEnabled &&
+    user.encryptedMasterKey !== null &&
+    user.recoveryKeyHash !== null
+  )
+}

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { safeDecrypt } from '@/lib/encryption'
+import { findLetterForRead } from '@/lib/letters/dual-read'
 
 export async function POST(
   _req: Request,
@@ -12,24 +12,20 @@ export async function POST(
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const letter = await prisma.journalEntry.findFirst({
-    where: { id, userId: user.id, isSealed: true },
-    select: { id: true, text: true, encryptionType: true, e2eeIVs: true, letterPeekedAt: true },
-  })
+  const letter = await findLetterForRead({ id, userId: user.id, requireSealed: true })
   if (!letter) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
+  // Record the peek on the Letter table. Letters no longer live on JournalEntry.
   if (!letter.letterPeekedAt) {
-    await prisma.journalEntry.update({
+    await prisma.letter.update({
       where: { id },
       data: { letterPeekedAt: new Date() },
     })
   }
 
-  // For E2EE return ciphertext + IVs so client decrypts; otherwise decrypt server-side.
-  const body = letter.encryptionType === 'server' ? safeDecrypt(letter.text) : letter.text
+  // Return ciphertext + IVs so client decrypts with its master key.
   return NextResponse.json({
-    body,
-    encryptionType: letter.encryptionType,
+    body: letter.text,
     e2eeIVs: letter.e2eeIVs,
   })
 }

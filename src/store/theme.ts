@@ -7,7 +7,7 @@ const LEGACY_THEME_REMAP: Record<string, ThemeName> = {
   winterSunset: 'hearth',
   northernLights: 'rose',
   mistyMountains: 'linen',
-  gentleRain: 'ocean',
+  gentleRain: 'rain',
   cosmos: 'rose',
   midnight: 'rose',
   candlelight: 'hearth',

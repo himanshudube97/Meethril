@@ -488,6 +488,13 @@ const PAPER_PRESETS: Record<ThemeName, PaperPreset> = {
     highlight: 'rgba(255, 230, 200, 0.48)',
     shadow: 'rgba(150, 60, 40, 0.12)',
   },
+  // cool slate cream — damp, overcast paper with a faint blue undertone
+  rain: {
+    base: '#d6dae0',
+    grain: 'rgba(50, 70, 95, 0.07)',
+    highlight: 'rgba(232, 238, 246, 0.42)',
+    shadow: 'rgba(40, 60, 85, 0.12)',
+  },
 }
 
 export function paperForTheme(themeName: ThemeName): PaperPreset {

@@ -9,17 +9,23 @@ interface Props {
   onLetterClick: (l: InboxLetter) => void
   /** Bumped to re-trigger the fan animation (e.g. on month change). */
   triggerKey: number
+  /**
+   * When false the fan stays empty — letters are tucked inside the postbox.
+   * Toggled by clicking the postbox above which this component sits.
+   */
+  shown: boolean
 }
 
 const TILTS = [-3, 4, -5, 2, -1, 3]
 
-export default function LetterFanout({ letters, onLetterClick, triggerKey }: Props) {
+export default function LetterFanout({ letters, onLetterClick, triggerKey, shown }: Props) {
   const fanRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const fan = fanRef.current
     if (!fan) return
     fan.innerHTML = ''
+    if (!shown) return
     if (letters.length === 0) return
 
     letters.forEach((l, i) => {
@@ -33,35 +39,41 @@ export default function LetterFanout({ letters, onLetterClick, triggerKey }: Pro
         <div class="seal"></div>
         <div class="arrived">${isUnread ? 'sealed' : 'arrived'}</div>
       `
-      el.style.left = '-65px'
-      el.style.bottom = '120px'
-      el.style.transform = 'translate(-50%, 50%) rotate(0deg) scale(0.4)'
+      // Start tucked at the postbox slot (which sits ~130px below the top of
+      // the postbox / fanout anchor). Letters are then animated up to their
+      // final fanned position above the dome.
+      el.style.left = '0'
+      el.style.top = '0'
+      el.style.transform = 'translate(-50%, -50%) translateY(130px) scale(0.25)'
       el.style.opacity = '0'
       const offset = i - (letters.length - 1) / 2
       const finalRot = offset * 14 + tilt
-      const finalX = -65 + offset * 80
-      const finalY = -40 - Math.abs(offset) * 12
-      const dur = isUnread ? 1.4 : 0.9
-      const stagger = isUnread ? 280 : 180
+      const finalX = offset * 80
+      const finalY = -120 - Math.abs(offset) * 12
+      const dur = isUnread ? 1.2 : 0.85
+      const stagger = isUnread ? 220 : 150
 
       fan.appendChild(el)
       requestAnimationFrame(() => {
         setTimeout(() => {
           el.style.transition = `transform ${dur}s cubic-bezier(.25,.7,.4,1), opacity 0.7s ease`
-          el.style.transform = `translateY(${finalY}px) translateX(${finalX}px) rotate(${finalRot}deg) scale(1)`
+          el.style.transform = `translate(-50%, -50%) translateY(${finalY}px) translateX(${finalX}px) rotate(${finalRot}deg) scale(1)`
           el.style.opacity = '1'
         }, i * stagger)
       })
       el.addEventListener('click', () => onLetterClick(l))
     })
-  }, [letters, triggerKey, onLetterClick])
+  }, [letters, triggerKey, onLetterClick, shown])
 
   return (
-    <div ref={fanRef} className="fanout" aria-hidden={letters.length === 0}>
-      <style jsx>{`
+    <div ref={fanRef} className="fanout" aria-hidden={!shown || letters.length === 0}>
+      {/* styled-jsx must be `global` here because the .fan-letter elements
+          are created imperatively via document.createElement above — they
+          never pass through React, so the per-component scope class is
+          never applied to them, and a non-global rule won't match. */}
+      <style jsx global>{`
         .fanout {
-          position: absolute; left: 50%; bottom: 28%;
-          transform: translateX(-50%);
+          position: absolute; left: 50%; top: 0;
           width: 0; height: 0; z-index: 9; pointer-events: none;
         }
         .fan-letter {

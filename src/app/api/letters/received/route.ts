@@ -1,60 +1,44 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
-import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
   try {
     const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const letters = await prisma.journalEntry.findMany({
+    const letters = await listLettersForRead({
+      userId: user.id,
       where: {
-        userId: user.id,
         entryType: 'letter',
         isReceivedLetter: true,
       },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        unlockDate: true,
-        isSealed: true,
-        letterLocation: true,
-        senderName: true,
-        originalSenderId: true,
-        isViewed: true,
-        isDelivered: true,
-        deliveredAt: true,
-        song: true,
-        photos: {
-          select: { url: true, position: true, spread: true, rotation: true }
-        },
-        doodles: {
-          select: { strokes: true, positionInEntry: true, spread: true }
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
-    // Determine if letters have arrived and decrypt sensitive fields
+    if (letters.length === 0) {
+      return NextResponse.json({ letters: [] })
+    }
+
+    // Photos/doodles/song are bundled inside contentCiphertext for native
+    // letters; the client decrypts the bundle if it wants to render those
+    // extras. We no longer look them up from journal_entries — letters live
+    // only in the letters table.
     const now = new Date()
-    const lettersWithStatus = letters.map(letter => ({
-      ...letter,
-      // Decrypt sensitive fields
-      text: safeDecrypt(letter.text),
-      letterLocation: safeDecrypt(letter.letterLocation),
-      senderName: safeDecrypt(letter.senderName),
-      // Format dates
+    const lettersWithStatus = letters.map((letter) => ({
+      id: letter.id,
+      text: letter.text,
       createdAt: letter.createdAt.toISOString(),
       unlockDate: letter.unlockDate?.toISOString() || null,
+      isSealed: letter.isSealed,
+      letterLocation: letter.letterLocation,
+      senderName: letter.senderName,
+      originalSenderId: letter.originalSenderId,
+      isViewed: letter.isViewed,
+      isDelivered: letter.isDelivered,
       deliveredAt: letter.deliveredAt?.toISOString() || null,
-      hasArrived: letter.unlockDate ? new Date(letter.unlockDate) <= now : true,
+      e2eeIVs: letter.e2eeIVs,
+      hasArrived: letter.unlockDate ? letter.unlockDate <= now : true,
     }))
 
     return NextResponse.json({ letters: lettersWithStatus })

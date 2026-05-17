@@ -6,6 +6,7 @@ import { isEmailVerified } from '@/lib/auth/email-verified'
 
 const PUBLIC_PATHS = [
   '/login',
+  '/onboarding',
   '/api/auth',
   '/api/cron',
   '/api/webhooks',
@@ -15,6 +16,10 @@ const PUBLIC_PATHS = [
   '/letter',
 ]
 const PUBLIC_EXACT_PATHS = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download']
+
+// Must stay in sync with E2EE_ONBOARDED_COOKIE in src/lib/auth/e2ee-cookie.ts.
+// Kept local here so middleware stays safe on the edge runtime.
+const E2EE_ONBOARDED_COOKIE = 'hearth-e2ee-onboarded'
 const STATIC_PATHS = ['/_next', '/favicon.ico', '/images', '/icons', '/manifest.json', '/sw.js', '/workbox']
 
 const isDevAuth = process.env.USE_DEV_AUTH === 'true'
@@ -31,7 +36,7 @@ export async function middleware(request: NextRequest) {
   if (isDevAuth) {
     const authenticated = await checkDevAuth(request)
     if (!authenticated) return unauthorized(request, pathname)
-    return passThrough(request)
+    return applyE2EEGate(request, pathname, passThrough(request))
   }
 
   return checkSupabaseAuth(request, pathname)
@@ -110,7 +115,28 @@ async function checkSupabaseAuth(request: NextRequest, pathname: string): Promis
   pendingCookies.forEach(({ name, value, options }) =>
     response.cookies.set(name, value, options)
   )
-  return response
+  return applyE2EEGate(request, pathname, response)
+}
+
+/**
+ * After a user is confirmed authenticated, redirect them to /onboarding if
+ * they haven't completed E2EE setup (cookie missing), or away from /onboarding
+ * if they already have (cookie present). This keeps Prisma out of middleware.
+ */
+function applyE2EEGate(request: NextRequest, pathname: string, passThroughResponse: NextResponse): NextResponse {
+  const onboarded = request.cookies.get(E2EE_ONBOARDED_COOKIE)?.value === '1'
+
+  // Already on /onboarding (or a sub-path) and onboarded → send to /me
+  if (onboarded && pathname.startsWith('/onboarding')) {
+    return NextResponse.redirect(new URL('/me', request.url))
+  }
+
+  // Not onboarded, not already heading to /onboarding, not an API call → gate
+  if (!onboarded && !pathname.startsWith('/onboarding') && !pathname.startsWith('/api/')) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
+  return passThroughResponse
 }
 
 function unauthorized(request: NextRequest, pathname: string): NextResponse {

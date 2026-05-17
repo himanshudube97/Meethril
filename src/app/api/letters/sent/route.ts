@@ -1,8 +1,7 @@
 // src/app/api/letters/sent/route.ts
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
-import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +12,10 @@ interface SentStamp {
   unlockDate: string | null
   isDelivered: boolean
   letterPeekedAt: string | null
-  encryptionType: string
+  firstReadAt: string | null
+  savedByRecipientAt: string | null
+  bouncedAt: string | null
+  bouncedReason: string | null
   e2eeIVs: unknown
 }
 
@@ -21,38 +23,29 @@ export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const letters = await prisma.journalEntry.findMany({
+  const letters = await listLettersForRead({
+    userId: user.id,
     where: {
-      userId: user.id,
       isSealed: true,
       entryType: { in: ['letter', 'unsent_letter'] },
       isReceivedLetter: false,
     },
     orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      recipientName: true,
-      createdAt: true,
-      unlockDate: true,
-      isDelivered: true,
-      letterPeekedAt: true,
-      encryptionType: true,
-      e2eeIVs: true,
-    },
   })
 
-  const result: SentStamp[] = letters.map(l => ({
+  const result: SentStamp[] = letters.map((l) => ({
     id: l.id,
-    recipientName: l.recipientName && l.encryptionType === 'server'
-      ? safeDecrypt(l.recipientName)
-      : l.recipientName,
+    recipientName: l.recipientName,
     sealedAt: l.createdAt.toISOString(),
     unlockDate: l.unlockDate ? l.unlockDate.toISOString() : null,
     isDelivered: l.isDelivered,
     letterPeekedAt: l.letterPeekedAt ? l.letterPeekedAt.toISOString() : null,
-    encryptionType: l.encryptionType,
+    firstReadAt: l.firstReadAt ? l.firstReadAt.toISOString() : null,
+    savedByRecipientAt: l.savedByRecipientAt ? l.savedByRecipientAt.toISOString() : null,
+    bouncedAt: l.bouncedAt ? l.bouncedAt.toISOString() : null,
+    bouncedReason: l.bouncedReason ?? null,
     e2eeIVs: l.e2eeIVs,
   }))
 
-  return NextResponse.json({ stamps: result })
+  return NextResponse.json({ stamps: result }) // PRESERVE 'stamps' key — frontend depends on it
 }

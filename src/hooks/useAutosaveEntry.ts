@@ -13,7 +13,11 @@ const RETRY_DELAY_MS = 2000
 export interface AutosaveDraft {
   text: string
   song: string | null
-  photos: {
+  // Optional — when omitted the server skips the destructive replace block
+  // entirely, preserving any photos/doodles already on the entry. Letter
+  // compose omits these so PostcardBack's CollagePhoto uploads are not wiped
+  // on the next autosave tick.
+  photos?: {
     url?: string                 // mark optional to support E2EE-uploaded photos
     encryptedRef?: string        // set when E2EE photo upload
     encryptedRefIV?: string      // IV for encryptedRef
@@ -21,19 +25,11 @@ export interface AutosaveDraft {
     rotation: number
     spread: number
   }[]
-  doodles: { strokes: StrokeData[]; spread: number }[]
+  doodles?: { strokes: StrokeData[]; spread: number }[]
   // Per-entry display style. Always present in the draft (possibly empty {}),
   // sent to the server only when non-empty so existing letter saves don't
   // pick up an empty `style: {}` over the wire.
   style?: EntryStyle
-  // Letter-only fields. Absent for normal journal entries; present (possibly
-  // null) for letter drafts so the server can persist recipient/scheduling.
-  entryType?: string
-  recipientEmail?: string | null
-  recipientName?: string | null
-  senderName?: string | null
-  letterLocation?: string | null
-  unlockDate?: string | null
 }
 
 // Re-exported so existing callers that imported `AutosaveStatus` from this
@@ -50,8 +46,8 @@ export interface UseAutosaveResult {
 function isDraftEmpty(d: AutosaveDraft): boolean {
   if (d.text && d.text.trim().length > 0) return false
   if (d.song && d.song.trim().length > 0) return false
-  if (d.photos.length > 0) return false
-  if (d.doodles.some(x => x.strokes.length > 0)) return false
+  if (d.photos && d.photos.length > 0) return false
+  if (d.doodles && d.doodles.some(x => x.strokes.length > 0)) return false
   return true
 }
 
@@ -130,12 +126,6 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       photos: draft.photos,
       doodles: draft.doodles,
       style: draft.style,
-      entryType: draft.entryType,
-      recipientEmail: draft.recipientEmail,
-      recipientName: draft.recipientName,
-      senderName: draft.senderName,
-      letterLocation: draft.letterLocation,
-      unlockDate: draft.unlockDate,
     })
     if (draftSig === lastSavedSigRef.current) {
       setStatus('saved')
@@ -155,12 +145,10 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       text: draft.text,
       textPreview: createTextPreview(draft.text),
       song: draft.song,
-      // Pass through letter metadata only when present in the draft
-      ...(draft.senderName !== undefined ? { senderName: draft.senderName } : {}),
-      ...(draft.recipientName !== undefined ? { recipientName: draft.recipientName } : {}),
-      ...(draft.letterLocation !== undefined ? { letterLocation: draft.letterLocation } : {}),
-      // Doodles transit through encryption — strokes JSON gets encrypted
-      doodles: draft.doodles,
+      // Doodles transit through encryption — strokes JSON gets encrypted.
+      // Omit entirely when the caller didn't supply doodles (e.g. letter
+      // compose) so the server skips its destructive deleteMany block.
+      ...(draft.doodles !== undefined ? { doodles: draft.doodles } : {}),
     }
 
     const encryptedFields = isE2EEReadyRef.current
@@ -169,19 +157,20 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
 
     const body = JSON.stringify({
       ...(encryptedFields ?? baseDraft),
-      // Photos and structural fields stay outside the encryption layer
-      photos: draft.photos.map(p => ({
-        url: p.url,
-        encryptedRef: p.encryptedRef,
-        encryptedRefIV: p.encryptedRefIV,
-        position: p.position,
-        rotation: p.rotation,
-        spread: p.spread ?? 1,
-      })),
+      // Photos stay outside the encryption layer. Omit the key entirely when
+      // the caller didn't supply photos (e.g. letter compose) so the server
+      // skips its destructive deleteMany + createMany block.
+      ...(draft.photos !== undefined ? {
+        photos: draft.photos.map(p => ({
+          url: p.url,
+          encryptedRef: p.encryptedRef,
+          encryptedRefIV: p.encryptedRefIV,
+          position: p.position,
+          rotation: p.rotation,
+          spread: p.spread ?? 1,
+        })),
+      } : {}),
       ...(draft.style && Object.keys(draft.style).length > 0 ? { style: draft.style } : {}),
-      ...(draft.entryType !== undefined ? { entryType: draft.entryType } : {}),
-      ...(draft.recipientEmail !== undefined ? { recipientEmail: draft.recipientEmail } : {}),
-      ...(draft.unlockDate !== undefined ? { unlockDate: draft.unlockDate } : {}),
     })
 
     try {
@@ -220,12 +209,6 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
           photos: draft.photos,
           doodles: draft.doodles,
           style: draft.style,
-          entryType: draft.entryType,
-          recipientEmail: draft.recipientEmail,
-          recipientName: draft.recipientName,
-          senderName: draft.senderName,
-          letterLocation: draft.letterLocation,
-          unlockDate: draft.unlockDate,
         })
         inFlightRef.current = false
         if (dirtyRef.current) {

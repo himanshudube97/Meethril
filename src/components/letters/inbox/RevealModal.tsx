@@ -23,6 +23,42 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
     if (!letter) return
     setPhase(letter.isViewed ? 'shown' : 'sealed')
     setBody('')
+
+    // Prefer the ciphertext/text that is included inline in the inbox response
+    // (added in Phase 4). This avoids a /api/entries/[id] roundtrip that would
+    // 404 for native self-letters whose id is a Letter.id with no JournalEntry.
+    if (letter.text !== undefined) {
+      const inlineEntry = {
+        id: letter.id,
+        text: letter.text,
+        encryptionType: letter.encryptionType,
+        e2eeIVs: letter.e2eeIVs,
+      } as unknown as JournalEntry
+      decryptEntryFromServer(inlineEntry)
+        .then(decrypted => {
+          // Self-letters (new flow) encrypt a JSON blob `{text, song,
+          // photos, doodles}` as one string. After decrypt, the result IS
+          // that JSON. Parse it and surface the inner text. Legacy / friend
+          // letters whose body is plain text decrypt to a non-JSON string
+          // and skip the parse.
+          let body = (decrypted?.text || '').toString()
+          if (body.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(body) as { text?: unknown }
+              if (typeof parsed.text === 'string') body = parsed.text
+            } catch {
+              // not JSON — fall through and show the raw decrypted string
+            }
+          }
+          setBody(body)
+        })
+        .catch(() => setBody(''))
+      return
+    }
+
+    // Legacy fallback: fetch from /api/entries/[id] for older letters that
+    // don't carry inline text. Only applies to JournalEntry-anchored rows
+    // (where letter.id is a JournalEntry.id).
     fetch(`/api/entries/${letter.id}`)
       .then(r => r.json())
       .then(async d => {

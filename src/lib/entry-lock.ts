@@ -110,7 +110,10 @@ function dayKey(date: Date, tz: string): string {
 
 export interface EntryLockOpts {
   /** Entry kind. 'normal' (or undefined) → calendar-day lock applies. Anything
-   *  else (letter, unsent_letter, ephemeral) → lock only when sealed. */
+   *  else (letter, unsent_letter, ephemeral) → lock only when sealed.
+   *  Note: JournalEntry no longer has an isSealed column — letter drafts are
+   *  always unsealed (the JE draft is deleted when the Letter row is created).
+   *  Pass isSealed: false (or omit) for letter drafts. */
   entryType?: string | null
   isSealed?: boolean | null
 }

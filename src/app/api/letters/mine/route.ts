@@ -1,65 +1,43 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
-import { safeDecrypt } from '@/lib/encryption'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET() {
   try {
     const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const letters = await prisma.journalEntry.findMany({
+    const letters = await listLettersForRead({
+      userId: user.id,
       where: {
-        userId: user.id,
         entryType: 'letter',
         isReceivedLetter: false,
       },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        unlockDate: true,
-        isSealed: true,
-        letterLocation: true,
-        recipientEmail: true,
-        recipientName: true,
-        isViewed: true,
-        song: true,
-        encryptionType: true,
-        e2eeIVs: true,
-        photos: {
-          select: { url: true, position: true, spread: true, rotation: true }
-        },
-        doodles: {
-          select: { strokes: true, positionInEntry: true, spread: true }
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
-    // For E2EE letters, return ciphertext + IVs untouched so the client can
-    // decrypt with its master key. For server-encrypted, decrypt server-side.
+    if (letters.length === 0) {
+      return NextResponse.json({ letters: [] })
+    }
+
+    // Photos/doodles/song are bundled inside contentCiphertext for native
+    // letters; the client decrypts the bundle if it wants to render those
+    // extras. We no longer look them up from journal_entries — letters live
+    // only in the letters table.
     const now = new Date()
-    const lettersWithStatus = letters.map(letter => {
-      const isE2EE = letter.encryptionType === 'e2ee'
-      return {
-        ...letter,
-        text: isE2EE ? letter.text : safeDecrypt(letter.text),
-        letterLocation: isE2EE ? letter.letterLocation : safeDecrypt(letter.letterLocation),
-        recipientName: isE2EE ? letter.recipientName : safeDecrypt(letter.recipientName),
-        createdAt: letter.createdAt.toISOString(),
-        unlockDate: letter.unlockDate?.toISOString() || null,
-        hasArrived: letter.unlockDate && new Date(letter.unlockDate) <= now && !letter.recipientEmail,
-        song: letter.song,
-        photos: letter.photos || [],
-        doodles: letter.doodles || [],
-      }
-    })
+    const lettersWithStatus = letters.map((letter) => ({
+      id: letter.id,
+      text: letter.text,
+      createdAt: letter.createdAt.toISOString(),
+      unlockDate: letter.unlockDate?.toISOString() || null,
+      isSealed: letter.isSealed,
+      letterLocation: letter.letterLocation,
+      recipientEmail: letter.recipientEmail,
+      recipientName: letter.recipientName,
+      isViewed: letter.isViewed,
+      e2eeIVs: letter.e2eeIVs,
+      hasArrived: letter.unlockDate && letter.unlockDate <= now && !letter.recipientEmail,
+    }))
 
     return NextResponse.json({ letters: lettersWithStatus })
   } catch (error) {

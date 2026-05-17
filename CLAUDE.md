@@ -98,10 +98,14 @@ src/
 - Production: Supabase OAuth with auto user creation
 
 ### Encryption Pattern
-Entry text and letter metadata are encrypted with AES-256-GCM:
-- Format: `iv:authTag:encryptedData` (hex)
-- Encrypt on save, decrypt on retrieve (see `lib/encryption.ts`)
-- Fields: `text`, `textPreview`, letter recipient info
+
+**Read [`docs/encryption-strategy.md`](docs/encryption-strategy.md) before touching any encryption code.** Hearth uses three tiers (E2EE under master key, server-encrypted under `ENCRYPTION_KEY`, plaintext) — which tier applies depends on the content type. The doc explains why and gives a decision heuristic for new content.
+
+Quick reference:
+- **Journals, letters, scrapbook items, photos, doodles** → Tier 1 (E2EE under master key, AES-256-GCM, browser-only). Server cannot decrypt.
+- **`User.profile` (nickname/birthday)** → Tier 2 (server-encrypted via `lib/encryption.ts` `encryptJson`/`decryptJson`). Used by the reminder cron.
+- **`StrangerNote.text` / `StrangerReply.text`** → Tier 2 (server-encrypted). Permanent design: moderation requires server reads.
+- **Schedules, recipient emails, status flags, IDs** → Tier 3 (plaintext).
 
 ### Photo / Image Storage Flow
 Both journal entries and scrapbook photos go through the **same storage adapter** at `POST /api/photos`. Nothing else writes image bytes — never inline a `data:` URL into an entry or scrapbook item again.
@@ -149,6 +153,14 @@ Time-delayed letters to self or friends:
 - Color palette (background, text, accent)
 - Particle effects (snow, fireflies, sakura, rain, stars, etc.)
 - Theme-specific "whispers" (writing prompts)
+
+**New pages must integrate with the active theme — never paint over it.** Every new route inherits the user's selected theme through three coordinated pieces, and skipping any of them is a recurring source of UI bugs (nav chrome bleeding through, hardcoded cream/brown panels that ignore the user's chosen palette, scrollbars caused by stacked backgrounds):
+
+1. **`LayoutContent` (`src/components/LayoutContent.tsx`)** is the gatekeeper for page chrome (Navigation, Background, padding, fullscreen + gear icons). It branches on `pathname`. Any new route that needs special chrome — typically a full-bleed scene with no nav (`/onboarding`, `/letter/[token]`, future cinematic screens) — MUST be added as an explicit case here. Don't rely on the page's own `layout.tsx` to fight the global chrome.
+2. **Background + theme bg colour**. The `Background` component renders the theme's particles. The body background colour is set globally by `LayoutContent`'s `useEffect` from `useThemeStore().theme.bg.primary`. New routes either render `<Background />` (preferred — particles match the theme) or rely on body bg alone (no particles). They should NEVER set their own `bg-[#xxxxxx]` on a wrapping div — that hides the theme.
+3. **Theme-aware text/border colours via `useThemeStore`**. Tailwind arbitrary values like `text-[#3d342a]` are baked at build time and ignore the runtime theme. For any colour that needs to follow the theme, read it from `useThemeStore` in a client component and apply via inline style (`style={{ color: theme.text.primary }}`). Static brand colours (the dark button on the landing CTA, etc.) can stay as Tailwind literals — those are intentional brand constants, not user-themed UI.
+
+When you create a new route, the mental checklist is: *Does this need the nav bar? Does the background need to match the theme? Will my text/borders still look right on every theme (rivendell dark, rose light, sunset, etc.)?* Walk through `LayoutContent` first, then style your components against `useThemeStore`.
 
 ### Component Patterns
 - `Background.tsx`: Renders theme-specific particles/effects

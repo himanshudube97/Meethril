@@ -28,6 +28,10 @@ export default function LayoutContent({
   // /scrapbook (the listing) is a full-bleed scene like /letters; the
   // per-scrapbook canvas at /scrapbook/[id] keeps the padded <main> wrapper.
   const isScrapbookListingPage = pathname === '/scrapbook'
+  // /onboarding is a forced flow: themed Background, no Navigation, no
+  // padded main wrapper — the page lays itself out full-bleed so it feels
+  // like a moment, not another tab.
+  const isOnboardingPage = pathname.startsWith('/onboarding')
 
   // Apply the active cursor styles globally. The cursor selection now
   // lives entirely in the gear's DeskSettingsPanel, but the style
@@ -81,6 +85,19 @@ export default function LayoutContent({
         <FullscreenButton />
         <DeskSettingsPanel />
         <InstallPrompt />
+      </>
+    )
+  }
+
+  if (isOnboardingPage) {
+    // Forced flow — themed bg + ambience but nothing else competing for
+    // attention. No Navigation, no gear, no main padding. The onboarding
+    // page renders its own full-bleed layout on top.
+    return (
+      <>
+        <Background />
+        <AmbientSoundLayer />
+        {children}
       </>
     )
   }

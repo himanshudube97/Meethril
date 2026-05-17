@@ -82,6 +82,10 @@ export interface InboxLetter {
   isViewed: boolean
   encryptionType?: string
   e2eeIVs?: unknown
+  // Ciphertext (E2EE) or decrypted text (server). Included inline so RevealModal
+  // can decrypt without a second /api/entries/[id] roundtrip — required for
+  // Phase 4 native self-letters whose id is a Letter.id with no JournalEntry.
+  text?: string
 }
 
 export interface SentStamp {
@@ -91,8 +95,16 @@ export interface SentStamp {
   unlockDate: string | null
   isDelivered: boolean
   letterPeekedAt: string | null
+  firstReadAt: string | null
+  savedByRecipientAt: string | null
+  bouncedAt: string | null
+  bouncedReason: string | null
   encryptionType?: string
   e2eeIVs?: unknown
 }
 
 export type LettersTab = 'inbox' | 'sent' | 'lights'
+
+export type RecipientChoice =
+  | { recipient: 'self' }
+  | { recipient: 'friend'; name: string }

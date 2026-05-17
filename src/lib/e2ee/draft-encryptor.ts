@@ -18,9 +18,6 @@ export interface EncryptableDraft {
   textPreview?: string | null
   tags?: string[] | null
   song?: string | null
-  senderName?: string | null
-  recipientName?: string | null
-  letterLocation?: string | null
   doodles?: Array<{ strokes: unknown; spread?: number; positionInEntry?: number }>
   // photos and scrapbook items handled via separate flows (see PhotoSlot, scrapbook hooks)
 }
@@ -31,9 +28,6 @@ export interface EncryptedDraft {
   textPreview?: string
   tags?: string
   song?: string
-  senderName?: string
-  recipientName?: string
-  letterLocation?: string
   doodles?: Array<{
     // Stored under `strokes` so the server's `Doodle.strokes Json` column
     // accepts the payload as-is. The decryptor reads back from this nested
@@ -49,9 +43,6 @@ const STRING_FIELDS = [
   'text',
   'textPreview',
   'song',
-  'senderName',
-  'recipientName',
-  'letterLocation',
 ] as const
 
 const JSON_FIELDS = ['tags'] as const
@@ -113,9 +104,15 @@ export async function decryptEntry(
   // the caller should render the placeholder.
   let textFailure: unknown = null
 
+  // e2eeIVs is null for rows with no encrypted content (friend-letter sender
+  // receipts: contentCiphertext is null by design, so the dual-read mapper
+  // synthesizes e2eeIVs as null). Guard before iterating so we don't crash
+  // on `null[field]`. Loops below short-circuit cleanly when ivs is empty.
+  const ivs = encrypted.e2eeIVs ?? {}
+
   for (const field of STRING_FIELDS) {
     const ct = encrypted[field]
-    const iv = encrypted.e2eeIVs[field]
+    const iv = ivs[field]
     if (!ct || !iv) continue
     try {
       out[field] = await decryptString(ct, iv, masterKey)
@@ -129,7 +126,7 @@ export async function decryptEntry(
 
   for (const field of JSON_FIELDS) {
     const ct = encrypted[field]
-    const iv = encrypted.e2eeIVs[field]
+    const iv = ivs[field]
     if (!ct || !iv) continue
     try {
       const json = await decryptString(ct, iv, masterKey)

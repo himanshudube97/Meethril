@@ -9,6 +9,7 @@ export const ambientSources: Record<Theme['ambience'], string | null> = {
   postal: null,
   linen: null,
   sunset: null,
+  rainy: '/sounds/ambient/rainy.mp3',
 }
 
 export type SfxName = 'pageTurn'

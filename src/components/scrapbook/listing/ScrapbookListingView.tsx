@@ -17,6 +17,9 @@ import {
   pickerBounds,
   MONTH_NAMES,
 } from './listingHelpers'
+import { makeDateItem } from '@/lib/scrapbook'
+import { useE2EEStore } from '@/store/e2ee'
+import { encryptString } from '@/lib/e2ee/crypto'
 
 /**
  * Memory-chest listing scene for /scrapbook. Mirrors the Letters page
@@ -72,12 +75,25 @@ export default function ScrapbookListingView() {
     if (creating) return
     setCreating(true)
     try {
-      const res = await fetch('/api/scrapbooks', { method: 'POST' })
+      const { masterKey, isEnabled, isUnlocked } = useE2EEStore.getState()
+      if (!isEnabled || !isUnlocked || !masterKey) {
+        throw new Error('Unlock E2EE to create a scrapbook.')
+      }
+      const initialItems = [makeDateItem(new Date(), [])]
+      const itemsEnc = await encryptString(JSON.stringify(initialItems), masterKey)
+      const res = await fetch('/api/scrapbooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: itemsEnc.ciphertext,
+          e2eeIVs: { items: itemsEnc.iv },
+        }),
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const created = await res.json()
       router.push(`/scrapbook/${created.id}`)
     } catch (err) {
-      setError(String(err))
+      setError(err instanceof Error ? err.message : String(err))
       setCreating(false)
     }
   }
