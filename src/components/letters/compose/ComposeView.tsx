@@ -59,12 +59,11 @@ export default function ComposeView() {
   const params = useSearchParams()
   const draftId = params.get('id')
 
-  const { profile, fetchProfile } = useProfileStore()
+  const { fetchProfile } = useProfileStore()
   const { isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
   const autosave = useAutosaveLetterDraft(draftId ?? null)
   const masterKey = useE2EEStore((s) => s.masterKey)
   const theme = useThemeStore((s) => s.theme)
-  const userName = profile?.nickname ?? 'A friend'
 
   const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
   const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
