@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { parseStoredSong, highResArt, appleMusicLink } from '@/lib/song'
 
 let _resend: Resend | null = null
 function getResend() {
@@ -75,28 +76,66 @@ function generateLetterEmail({
               </table>`
     : ''
 
-  // Build music HTML
-  const musicHtml = songLink
-    ? `
-              <!-- Music Section -->
+  // Build music HTML — rich card with album art + Play button for iTunes picks,
+  // simpler card with a Listen link for URL-shaped songs. Email clients block
+  // <audio>/<iframe>/JS, so the button just opens the song in its native app.
+  const musicHtml = (() => {
+    if (!songLink) return ''
+    const parsed = parseStoredSong(songLink)
+
+    if (parsed.kind === 'itunes') {
+      const safeTitle = escapeHtml(parsed.title || 'Untitled')
+      const safeArtist = escapeHtml(parsed.artist || '')
+      const artUrl = escapeHtml(highResArt(parsed.art, 240))
+      const playUrl = escapeHtml(appleMusicLink(parsed.id))
+      return `
+              <!-- Music Section (iTunes) -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td style="padding: 0 32px 24px 32px;">
-                    <div style="margin-top: 24px; padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(232,148,90,0.3); border-radius: 12px;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td style="width: 36px; font-size: 24px; vertical-align: middle;">&#127925;</td>
-                          <td style="padding-left: 12px;">
-                            <div style="font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(232,148,90,0.8);">A song was shared with this letter</div>
-                            <a href="${songLink}" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #e8945a; text-decoration: none; word-break: break-all;">${songLink}</a>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(232,148,90,0.3); border-radius: 12px;">
+                      <tr>
+                        <td valign="middle" style="width: 88px; padding: 16px 0 16px 16px;">
+                          <img src="${artUrl}" width="80" height="80" alt="" style="display: block; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);" />
+                        </td>
+                        <td valign="middle" style="padding: 16px;">
+                          <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(232,148,90,0.7); text-transform: uppercase; letter-spacing: 1px;">&#9834; A song for you</div>
+                          <div style="font-family: 'Crimson Pro', Georgia, serif; font-size: 18px; color: #f5e6d3; margin-top: 4px; line-height: 1.3;">${safeTitle}</div>
+                          <div style="font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(232,148,90,0.85); margin-top: 2px;">${safeArtist}</div>
+                          <a href="${playUrl}" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background: #e8945a; color: #1a1215; border-radius: 20px; text-decoration: none; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;">Play this song &#9654;</a>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>`
-    : ''
+    }
+
+    if (parsed.kind === 'url') {
+      const safeUrl = escapeHtml(parsed.url)
+      return `
+              <!-- Music Section (URL) -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="padding: 0 32px 24px 32px;">
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(232,148,90,0.3); border-radius: 12px;">
+                      <tr>
+                        <td valign="middle" style="width: 60px; padding: 16px 0 16px 20px; font-size: 32px; color: #e8945a;">&#9834;</td>
+                        <td valign="middle" style="padding: 16px;">
+                          <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: rgba(232,148,90,0.7); text-transform: uppercase; letter-spacing: 1px;">A song was shared</div>
+                          <a href="${safeUrl}" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #e8945a; color: #1a1215; border-radius: 20px; text-decoration: none; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;">Listen &#9654;</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>`
+    }
+
+    // Free text or empty — skip the card; the song name (if any) is preserved
+    // in the stored value but a bare text snippet without a play link adds noise.
+    return ''
+  })()
 
   return `
 <!DOCTYPE html>
@@ -144,7 +183,7 @@ function generateLetterEmail({
                   </td>
                 </tr>
               </table>
-
+${photosHtml}
               <!-- Letter Content -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
@@ -155,7 +194,7 @@ function generateLetterEmail({
                   </td>
                 </tr>
               </table>
-${photosHtml}${doodleHtml}${musicHtml}
+${doodleHtml}${musicHtml}
               <!-- Letter Footer -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
