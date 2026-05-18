@@ -24,7 +24,7 @@ interface Body {
   // that row in-place instead of creating a new Letter. The draft scratch
   // fields are nulled — friend letters keep `contentCiphertext = null`
   // because the owner has no readable copy after seal (the recipient gets
-  // it via tlock + LetterDelivery.transientCiphertext).
+  // it via the Argon2id-derived letterKey stored in LetterDelivery.transientCiphertext).
   draftLetterId?: string | null
   photoAssets?: Array<{
     ciphertext: string

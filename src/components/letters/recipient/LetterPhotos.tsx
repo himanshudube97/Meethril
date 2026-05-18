@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { decryptTransient } from '@/lib/letters/transient-crypto'
+import { decryptWithLetterKey } from '@/lib/letters/answer-crypto'
 
 interface AssetMeta {
   id: string
@@ -38,7 +38,7 @@ export function LetterPhotos({ token, assets, K }: Props) {
           const res = await fetch(`/api/letter/${token}/asset/${a.id}`)
           if (!res.ok) throw new Error(`asset ${a.id}: ${res.status}`)
           const data = (await res.json()) as { ciphertext: string; iv: string }
-          const bytes = await decryptTransient(data.ciphertext, data.iv, K)
+          const bytes = await decryptWithLetterKey(data.ciphertext, data.iv, K)
           const blob = new Blob([bytes as BlobPart])
           const url = URL.createObjectURL(blob)
           urls.push(url)
