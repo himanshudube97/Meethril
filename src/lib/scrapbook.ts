@@ -275,6 +275,15 @@ function parseSongProvider(url: string): SongItemData['provider'] {
 }
 
 function parseSongTitle(url: string): string {
+  const trimmed = url.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && parsed._h === 'itunes') return parsed.t || 'Song'
+    } catch {
+      // not JSON → fall through
+    }
+  }
   // Best-effort: pull a slug out of common URLs. We deliberately skip
   // opaque IDs (YouTube video IDs, raw track hashes) and fall back to
   // a human label — users can rename inline.
