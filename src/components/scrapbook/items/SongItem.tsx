@@ -272,6 +272,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
                 }}
                 placeholder="Search or paste a link…"
                 autoFocus
+                darkSurface
               />
             </div>
           ) : (

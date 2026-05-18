@@ -18,6 +18,9 @@ interface Props {
   onChange: (next: string | null) => void
   placeholder?: string
   autoFocus?: boolean
+  /** Set true when the picker sits on a dark surface (e.g. scrapbook vinyl card)
+      so the input text stays legible. Defaults to false (theme text color). */
+  darkSurface?: boolean
 }
 
 const DEBOUNCE_MS = 350
@@ -27,6 +30,7 @@ export default function SongPicker({
   onChange,
   placeholder = 'Search a song or paste a link…',
   autoFocus = false,
+  darkSurface = false,
 }: Props) {
   const { theme } = useThemeStore()
   const [query, setQuery] = useState(displayValue(value))
@@ -140,9 +144,9 @@ export default function SongPicker({
         autoFocus={autoFocus}
         className="w-full px-3 py-2 rounded-lg text-sm outline-none"
         style={{
-          background: `${theme.accent.warm}10`,
-          color: theme.text.primary,
-          border: `1px solid ${theme.glass.border}`,
+          background: darkSurface ? 'rgba(255,255,255,0.06)' : `${theme.accent.warm}10`,
+          color: darkSurface ? '#fefaf0' : theme.text.primary,
+          border: `1px solid ${darkSurface ? 'rgba(255,255,255,0.15)' : theme.glass.border}`,
         }}
       />
 
