@@ -7,6 +7,7 @@ import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { useJournalStore } from '@/store/journal'
 import { useDeskStore } from '@/store/desk'
 import SongEmbed from '@/components/SongEmbed'
+import SongPicker from '@/components/SongPicker'
 import { htmlToSplitPlainText } from '@/lib/text-utils'
 import {
   isCaretOnLastVisualRow,
@@ -337,17 +338,13 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
                   </button>
                 )}
               </div>
-              <input
-                type="text"
+              <SongPicker
                 value={songInput}
-                onChange={(e) => handleSongChange(e.target.value)}
-                placeholder="Paste Spotify, YouTube, or SoundCloud link..."
-                className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-                style={{
-                  border: `1px solid ${colors.doodleBorder}`,
-                  color: textColor,
-                  background: colors.doodleBg,
+                onChange={(next) => {
+                  handleSongChange(next ?? '')
+                  if (next) setIsEditingSong(false)
                 }}
+                placeholder="Search a song or paste a link…"
               />
             </>
           ) : (
