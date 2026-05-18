@@ -4,14 +4,15 @@ import { randomBytes } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { sendFriendLetterTransientEmail } from '@/lib/email'
+import { sendFriendLetterEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
 interface Body {
   transientCiphertext: string
   transientIV: string
-  tlockedKey: string
+  salt: string
+  question: string
   recipientEmail: string
   recipientName: string
   // senderName from client is ignored — server derives it from the
@@ -23,7 +24,7 @@ interface Body {
   // that row in-place instead of creating a new Letter. The draft scratch
   // fields are nulled — friend letters keep `contentCiphertext = null`
   // because the owner has no readable copy after seal (the recipient gets
-  // it via tlock + LetterDelivery.transientCiphertext).
+  // it via the Argon2id-derived letterKey stored in LetterDelivery.transientCiphertext).
   draftLetterId?: string | null
   photoAssets?: Array<{
     ciphertext: string
@@ -52,8 +53,17 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 })
   }
-  if (!body.transientCiphertext || !body.transientIV || !body.tlockedKey) {
+  if (
+    !body.transientCiphertext ||
+    !body.transientIV ||
+    !body.salt ||
+    !body.question ||
+    !body.question.trim()
+  ) {
     return NextResponse.json({ error: 'missing crypto fields' }, { status: 400 })
+  }
+  if (body.question.trim().length > 500) {
+    return NextResponse.json({ error: 'question too long (max 500 chars)' }, { status: 400 })
   }
   if (!EMAIL_RE.test(body.recipientEmail ?? '')) {
     return NextResponse.json({ error: 'bad recipientEmail' }, { status: 400 })
@@ -156,7 +166,8 @@ export async function POST(request: NextRequest) {
         letterId,
         transientCiphertext: body.transientCiphertext,
         transientIV: body.transientIV,
-        tlockedKey: body.tlockedKey,
+        salt: body.salt,
+        question: body.question.trim(),
         publicToken,
       },
       select: { id: true, publicToken: true },
@@ -188,13 +199,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { id } = await sendFriendLetterTransientEmail({
+    const { id } = await sendFriendLetterEmail({
       to: body.recipientEmail,
       recipientName: body.recipientName,
       senderName,
       scheduledFor,
       publicToken,
-      tlockedKey: body.tlockedKey,
     })
     await prisma.letterDelivery.update({
       where: { id: created.delivery.id },

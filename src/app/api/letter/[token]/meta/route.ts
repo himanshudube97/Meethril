@@ -1,9 +1,10 @@
 // src/app/api/letter/[token]/meta/route.ts
 //
 // Public, no-auth metadata for a friend letter delivery. Returns the
-// scheduledFor (so the client can compute the drand round to fetch),
-// sender/recipient display names (plaintext on the row), and a flag
-// indicating whether the 24h read window is already used up.
+// scheduledFor, sender/recipient display names, the Argon2 salt + the
+// plaintext question (so the recipient can derive their letterKey from
+// the answer they type), and a flag for whether the 24h read window is
+// already used up.
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
@@ -20,6 +21,8 @@ export async function GET(
     where: { publicToken: token },
     select: {
       firstReadAt: true,
+      salt: true,
+      question: true,
       letter: {
         select: {
           scheduledFor: true,
@@ -55,6 +58,8 @@ export async function GET(
     recipientName: delivery.letter.recipientName ?? null,
     alreadyExpired,
     firstReadAt: delivery.firstReadAt?.toISOString() ?? null,
-    assets: delivery.assets, // [{id, type, position, spread, rotation, ordinal}]
+    salt: delivery.salt,
+    question: delivery.question,
+    assets: delivery.assets,
   })
 }

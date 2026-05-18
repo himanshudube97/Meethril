@@ -1,6 +1,6 @@
 # Encryption Strategy in Hearth
 
-> **Snapshot:** 2026-05-16. Reflects the state after Phase 5 letters cleanup + the JournalEntry/Scrapbook E2EE-only follow-up.
+> **Snapshot:** 2026-05-18. Reflects the state after Phase 5 letters cleanup + the JournalEntry/Scrapbook E2EE-only follow-up, and the friend-letter password+Argon2id e2ee migration.
 > **Read this when:** you're about to add a new content type, touch a model that stores user-authored data, or change an encryption path.
 
 This doc captures the load-bearing decision about WHICH content uses WHICH encryption strategy and WHY. Hearth has three tiers, and the choice between them is per-content-type, not user-level.
@@ -37,7 +37,7 @@ Stored as-is. Schedules, recipient emails, status flags, IDs, etc.
 
 | Content | Tier | Why |
 |---|---|---|
-| **Letters** (`Letter`, `LetterDelivery`, `LetterDeliveryAsset`) | **1 (E2EE)** | The whole point of the letters feature is privacy. Tier 1 was always the destination; Phase 4 + 4.1 + 5 got us there. |
+| **Letters** (`Letter`, `LetterDelivery`, `LetterDeliveryAsset`) | **1 (E2EE)** | The whole point of the letters feature is privacy. Tier 1 was always the destination; Phase 4 + 4.1 + 5 got us there. **Friend letter body + photos** are encrypted under a `letterKey` derived from the sender's chosen answer via Argon2id (`m=19MB, t=2, p=1`) with a per-letter random salt. The salt and question are stored server-side plaintext; the answer — and therefore `letterKey` — is never sent to or stored by the server. **Self letters** and **received-friend letters** are encrypted under the user's master key (PBKDF2, standard E2EE path). |
 | **Journal entries** (`JournalEntry.text`, `textPreview`, doodle strokes, photos) | **1 (E2EE)** | The user's diary. The single most sensitive content in the app. |
 | **Scrapbook** (`Scrapbook.title`, `Scrapbook.items`, photo bytes) | **1 (E2EE)** | Same as journals — personal creative content. |
 | **Profile** (`User.profile` JSON: nickname, birthday, etc.) | **2 (server-encrypted)** | The reminder cron needs to greet users by name. Personalized email subject lines like "Hi Bob, your letter is ready" require the server to read `profile.nickname`. The data is low-sensitivity (nickname, optional birthday) and the UX value of personalized emails outweighs the privacy cost. If this calculus changes, this is the single easiest tier to move to E2EE. |

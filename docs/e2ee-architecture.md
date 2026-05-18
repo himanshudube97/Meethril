@@ -31,6 +31,10 @@
 
 The master key encrypts all user data. The two wrapping keys exist only in the user's head and on paper. Server has both wrapped versions but cannot unwrap either.
 
+### Friend letters — answer-derived key
+
+Friend letters use a separate key path from journals and self-letters. While journals and self-letters are encrypted under the user's **master key** (PBKDF2 from the user's passphrase), friend letters are encrypted under a **letterKey** derived per-letter from a sender-chosen answer via Argon2id (`m=19MB, t=2, p=1`). This lets the recipient — who has no Hearth account or master key — decrypt by typing the answer the sender told them about (or that they share by shared knowledge). The Argon2id salt and the question are stored server-side in plaintext; the answer and `letterKey` are never stored. See `docs/letters-architecture.md` for the full flow.
+
 ## What the server sees
 
 | Field | When E2EE on |

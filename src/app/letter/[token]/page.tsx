@@ -3,14 +3,15 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { tlockDecryptKey } from '@/lib/letters/tlock'
-import { decryptTransient } from '@/lib/letters/transient-crypto'
+import {
+  deriveLetterKey,
+  decryptWithLetterKey,
+  rawKeyToBase64,
+} from '@/lib/letters/answer-crypto'
 import DOMPurify from 'dompurify'
 import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
 import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
 
-// TipTap output uses these — keep the allow-list tight so injected
-// tags/attrs/handlers can't execute. NO 'script', NO 'iframe', NO 'on*'.
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
   ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
@@ -37,20 +38,42 @@ type AssetMeta = {
   ordinal: number
 }
 
+type Meta = {
+  scheduledFor: string | null
+  senderName: string | null
+  recipientName: string | null
+  alreadyExpired: boolean
+  firstReadAt: string | null
+  salt: string
+  question: string
+  assets: AssetMeta[]
+}
+
+type CachedAsset = {
+  id: string
+  type: string
+  position: number
+  spread: number
+  rotation: number
+  ordinal: number
+  ciphertext: string
+  iv: string
+}
+
 type State =
-  | { kind: 'loading'; stage: string }
+  | { kind: 'loading_meta' }
   | { kind: 'not_yet'; scheduledFor: string }
   | { kind: 'expired' }
   | { kind: 'not_found' }
   | { kind: 'error'; message: string }
+  | { kind: 'sealed'; meta: Meta; attempts: number; attempting: boolean; error: string | null }
   | {
-      kind: 'ok'
+      kind: 'unlocked'
       data: LetterContent
-      senderName: string
-      recipientName: string
+      meta: Meta
       expiresAt: Date
-      K: Uint8Array
-      assets: AssetMeta[]
+      letterKey: Uint8Array
+      cachedAssets: CachedAsset[]
     }
 
 const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
@@ -58,137 +81,129 @@ const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 export default function LetterPage() {
   const params = useParams<{ token: string }>()
   const router = useRouter()
-  const [state, setState] = useState<State>({ kind: 'loading', stage: 'reading link' })
+  const [state, setState] = useState<State>({ kind: 'loading_meta' })
   const ranRef = useRef(false)
+  const latestKeyRef = useRef<Uint8Array | null>(null)
+
+  // Best-effort zeroize the in-memory letterKey when the page unmounts.
+  // Matches the sender path's finally-block wipe in friend-letter-client.ts.
+  useEffect(() => {
+    return () => {
+      latestKeyRef.current?.fill(0)
+    }
+  }, [])
 
   useEffect(() => {
     if (ranRef.current) return
     ranRef.current = true
-
-    async function run() {
+    async function loadMeta() {
       try {
-        // 1) URL fragment carries the tlocked key
-        const hash = typeof window !== 'undefined' ? window.location.hash : ''
-        const m = hash.match(/(?:^#|&)k=([^&]+)/)
-        if (!m) {
-          setState({ kind: 'error', message: 'Missing key in URL. The letter link is incomplete.' })
-          return
-        }
-        const tlockedKey = decodeURIComponent(m[1])
-
-        // 2) Meta
-        setState({ kind: 'loading', stage: 'fetching letter info' })
         const metaRes = await fetch(`/api/letter/${params.token}/meta`)
         if (metaRes.status === 404) return setState({ kind: 'not_found' })
         if (!metaRes.ok) throw new Error(`meta ${metaRes.status}`)
-        const meta = (await metaRes.json()) as {
-          scheduledFor: string | null
-          senderName: string | null
-          recipientName: string | null
-          alreadyExpired: boolean
-          firstReadAt: string | null
-          assets: AssetMeta[]
-        }
+        const meta = (await metaRes.json()) as Meta
         if (meta.alreadyExpired) return setState({ kind: 'expired' })
         if (!meta.scheduledFor) throw new Error('letter has no scheduledFor')
         const scheduledFor = new Date(meta.scheduledFor)
         if (scheduledFor.getTime() > Date.now()) {
           return setState({ kind: 'not_yet', scheduledFor: meta.scheduledFor })
         }
-
-        // 3) Tlock-decrypt K (drand round must be available)
-        setState({ kind: 'loading', stage: 'fetching time-lock beacon' })
-        const K = await tlockDecryptKey(tlockedKey, scheduledFor)
-
-        // 4) Fetch ciphertext (sets firstReadAt server-side)
-        setState({ kind: 'loading', stage: 'fetching ciphertext' })
-        const ctRes = await fetch(`/api/letter/${params.token}/ciphertext`)
-        if (ctRes.status === 410) return setState({ kind: 'expired' })
-        if (ctRes.status === 425) return setState({ kind: 'not_yet', scheduledFor: meta.scheduledFor })
-        if (ctRes.status === 404) return setState({ kind: 'not_found' })
-        if (!ctRes.ok) throw new Error(`ciphertext ${ctRes.status}`)
-        const { transientCiphertext, transientIV } = await ctRes.json()
-
-        // 5) AES-decrypt with K
-        setState({ kind: 'loading', stage: 'decrypting' })
-        const plaintextBytes = await decryptTransient(transientCiphertext, transientIV, K)
-        const json = new TextDecoder().decode(plaintextBytes)
-        const data: LetterContent = JSON.parse(json)
-
-        // Cache decrypted content + K + asset blobs for the Keep-forever
-        // flow (sessionStorage, tab-scoped). Cleared after save.
-        // K is base64-encoded; asset ciphertexts are already base64 strings.
-        try {
-          const Kbase64 = btoa(String.fromCharCode(...K))
-
-          // Pre-fetch each asset blob so the Save page can re-encrypt them
-          // without needing the URL fragment (which won't survive navigation).
-          const cachedAssets: Array<{
-            id: string
-            type: string
-            position: number
-            spread: number
-            rotation: number
-            ordinal: number
-            ciphertext: string
-            iv: string
-          }> = []
-          for (const a of meta.assets ?? []) {
-            try {
-              const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
-              if (!r.ok) continue
-              const j = (await r.json()) as { ciphertext: string; iv: string }
-              cachedAssets.push({
-                id: a.id,
-                type: a.type,
-                position: a.position,
-                spread: a.spread,
-                rotation: a.rotation,
-                ordinal: a.ordinal,
-                ciphertext: j.ciphertext,
-                iv: j.iv,
-              })
-            } catch {
-              /* skip — Save flow can still proceed without this asset */
-            }
-          }
-
-          sessionStorage.setItem(
-            `${SESSION_KEY_PREFIX}${params.token}`,
-            JSON.stringify({
-              content: data,
-              senderName: meta.senderName ?? 'Someone special',
-              recipientName: meta.recipientName ?? 'Friend',
-              scheduledFor: meta.scheduledFor,
-              K: Kbase64,
-              assets: cachedAssets,
-            })
-          )
-        } catch {
-          /* sessionStorage might be disabled; not fatal */
-        }
-
-        const expiresAt = meta.firstReadAt
-          ? new Date(new Date(meta.firstReadAt).getTime() + 24 * 60 * 60 * 1000)
-          : new Date(Date.now() + 24 * 60 * 60 * 1000)
-        setState({
-          kind: 'ok',
-          data,
-          senderName: meta.senderName ?? 'Someone special',
-          recipientName: meta.recipientName ?? 'Friend',
-          expiresAt,
-          K,
-          assets: meta.assets ?? [],
-        })
+        setState({ kind: 'sealed', meta, attempts: 0, attempting: false, error: null })
       } catch (e) {
         setState({ kind: 'error', message: e instanceof Error ? e.message : 'Unknown error' })
       }
     }
-    run()
+    loadMeta()
   }, [params.token])
 
-  if (state.kind === 'loading') {
-    return <CenteredMessage title="Reading your letter" sub={state.stage} />
+  async function tryUnlock(answer: string) {
+    if (state.kind !== 'sealed') return
+    const meta = state.meta
+    setState({ ...state, attempting: true, error: null })
+
+    try {
+      const letterKey = await deriveLetterKey(answer, meta.salt)
+      latestKeyRef.current = letterKey
+
+      const ctRes = await fetch(`/api/letter/${params.token}/ciphertext`)
+      if (ctRes.status === 410) return setState({ kind: 'expired' })
+      if (ctRes.status === 425) {
+        return setState({ kind: 'not_yet', scheduledFor: meta.scheduledFor ?? '' })
+      }
+      if (ctRes.status === 404) return setState({ kind: 'not_found' })
+      if (!ctRes.ok) throw new Error(`ciphertext ${ctRes.status}`)
+      const { transientCiphertext, transientIV } = await ctRes.json()
+
+      let plaintextBytes: Uint8Array
+      try {
+        plaintextBytes = await decryptWithLetterKey(transientCiphertext, transientIV, letterKey)
+      } catch {
+        setState({
+          kind: 'sealed',
+          meta,
+          attempts: state.attempts + 1,
+          attempting: false,
+          error: 'the seal holds. try again?',
+        })
+        return
+      }
+
+      const data: LetterContent = JSON.parse(new TextDecoder().decode(plaintextBytes))
+
+      await fetch(`/api/letter/${params.token}/opened`, { method: 'POST' }).catch(() => {})
+
+      const cachedAssets: CachedAsset[] = []
+      for (const a of meta.assets ?? []) {
+        try {
+          const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
+          if (!r.ok) continue
+          const j = (await r.json()) as { ciphertext: string; iv: string }
+          cachedAssets.push({
+            id: a.id,
+            type: a.type,
+            position: a.position,
+            spread: a.spread,
+            rotation: a.rotation,
+            ordinal: a.ordinal,
+            ciphertext: j.ciphertext,
+            iv: j.iv,
+          })
+        } catch {
+          /* skip — Save flow can still proceed without this asset */
+        }
+      }
+
+      try {
+        sessionStorage.setItem(
+          `${SESSION_KEY_PREFIX}${params.token}`,
+          JSON.stringify({
+            content: data,
+            senderName: meta.senderName ?? 'Someone special',
+            recipientName: meta.recipientName ?? 'Friend',
+            scheduledFor: meta.scheduledFor,
+            letterKey: rawKeyToBase64(letterKey),
+            assets: cachedAssets,
+          })
+        )
+      } catch {
+        /* sessionStorage may be disabled or quota-exceeded; not fatal */
+      }
+
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      setState({ kind: 'unlocked', data, meta, expiresAt, letterKey, cachedAssets })
+    } catch (e) {
+      setState({
+        kind: 'sealed',
+        meta,
+        attempts: state.attempts + 1,
+        attempting: false,
+        error: e instanceof Error ? e.message : 'Something went wrong.',
+      })
+    }
+  }
+
+  if (state.kind === 'loading_meta') {
+    return <CenteredMessage title="Reading your letter" sub="just a moment" />
   }
   if (state.kind === 'not_yet') {
     return (
@@ -207,8 +222,10 @@ export default function LetterPage() {
   if (state.kind === 'error') {
     return <CenteredMessage title="Something went wrong." sub={state.message} />
   }
+  if (state.kind === 'sealed') {
+    return <SealedScene state={state} onSubmit={tryUnlock} />
+  }
 
-  // OK — render the letter
   return (
     <div
       style={{
@@ -221,7 +238,7 @@ export default function LetterPage() {
     >
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ opacity: 0.6, fontSize: 14, marginBottom: 24 }}>
-          From <strong>{state.senderName}</strong> · For <strong>{state.recipientName}</strong>
+          From <strong>{state.meta.senderName ?? 'Someone special'}</strong> · For <strong>{state.meta.recipientName ?? 'Friend'}</strong>
         </div>
         <Countdown expiresAt={state.expiresAt} />
         <article
@@ -233,9 +250,141 @@ export default function LetterPage() {
             Song they sent: <a href={state.data.song}>{state.data.song}</a>
           </p>
         )}
-        <LetterPhotos token={params.token} assets={state.assets} K={state.K} />
+        <LetterPhotos
+          token={params.token}
+          assets={state.meta.assets ?? []}
+          letterKey={state.letterKey}
+          cachedAssets={state.cachedAssets}
+        />
         <LetterDoodles doodles={state.data.doodles as never} />
         <KeepForeverCTA token={params.token} router={router} />
+      </div>
+    </div>
+  )
+}
+
+function SealedScene({
+  state,
+  onSubmit,
+}: {
+  state: Extract<State, { kind: 'sealed' }>
+  onSubmit: (answer: string) => void
+}) {
+  const [value, setValue] = useState('')
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f6efe2',
+        color: '#3d342a',
+        padding: 24,
+        fontFamily: 'Georgia, serif',
+      }}
+    >
+      <div style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
+        <p style={{ opacity: 0.7, fontSize: 14, marginBottom: 8 }}>
+          {state.meta.senderName ?? 'Someone'} left you something
+        </p>
+        {state.meta.scheduledFor && (
+          <p style={{ opacity: 0.5, fontSize: 12, marginBottom: 32 }}>
+            sealed for {new Date(state.meta.scheduledFor).toLocaleDateString()}
+          </p>
+        )}
+
+        <div
+          aria-hidden
+          style={{
+            fontSize: 96,
+            lineHeight: 1,
+            marginBottom: 24,
+            animation: state.attempting ? 'hearth-tremor 1.2s ease-in-out infinite' : undefined,
+          }}
+        >
+          ✉
+        </div>
+
+        <p
+          style={{
+            fontStyle: 'italic',
+            fontSize: 22,
+            marginBottom: 16,
+            opacity: 0.85,
+          }}
+        >
+          {state.meta.question}
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (state.attempting || !value.trim()) return
+            onSubmit(value)
+            setValue('')
+          }}
+        >
+          <input
+            type="password"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="whisper the answer…"
+            autoFocus
+            disabled={state.attempting}
+            style={{
+              width: '100%',
+              padding: '12px 0',
+              fontSize: 18,
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid #3d342a55',
+              color: '#3d342a',
+              outline: 'none',
+              textAlign: 'center',
+              fontFamily: 'inherit',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={state.attempting || !value.trim()}
+            style={{
+              marginTop: 24,
+              padding: '10px 24px',
+              background: '#3d342a',
+              color: '#f6efe2',
+              border: 'none',
+              borderRadius: 999,
+              fontSize: 14,
+              fontFamily: 'inherit',
+              cursor: state.attempting ? 'wait' : 'pointer',
+              opacity: state.attempting ? 0.6 : 1,
+            }}
+          >
+            {state.attempting ? 'trying to break the seal…' : 'break the seal'}
+          </button>
+        </form>
+
+        {state.error && (
+          <p style={{ marginTop: 20, fontSize: 14, opacity: 0.7, fontStyle: 'italic' }}>
+            {state.error}
+          </p>
+        )}
+
+        {state.attempts >= 3 && state.meta.senderName && (
+          <p style={{ marginTop: 16, fontSize: 13, opacity: 0.55, fontStyle: 'italic' }}>
+            Stuck? You could ask {state.meta.senderName} for a hint — but they might not remember either.
+          </p>
+        )}
+
+        <style>{`
+          @keyframes hearth-tremor {
+            0%, 100% { transform: translateX(0) rotate(0); }
+            25% { transform: translateX(-2px) rotate(-1deg); }
+            75% { transform: translateX(2px) rotate(1deg); }
+          }
+        `}</style>
       </div>
     </div>
   )
@@ -286,13 +435,10 @@ function KeepForeverCTA({ token, router }: { token: string; router: ReturnType<t
   async function onSave() {
     setBusy(true); setErr(null)
     try {
-      // Check whether the recipient is logged in. /api/auth/me returns 401 if not.
       const meRes = await fetch('/api/auth/me')
       if (meRes.ok) {
-        // Logged in — drive the save inline (Task 13).
         router.push(`/letter/${token}/save?logged_in=1`)
       } else {
-        // Not logged in — magic-link signup flow (Task 14).
         router.push(`/letter/${token}/save`)
       }
     } catch (e) {

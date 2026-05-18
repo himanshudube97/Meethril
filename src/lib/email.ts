@@ -343,24 +343,22 @@ export async function sendSelfLetterEmail({
 }
 
 /**
- * Phase 4 friend-letter transient delivery. Schedules a Resend email at
- * unlockDate with the magic URL. Returns Resend's email id so the
- * webhook can correlate later.
+ * Schedules a Resend email at scheduledFor with the magic-link URL.
+ * Returns Resend's email id so the webhook can correlate later.
  */
-export async function sendFriendLetterTransientEmail(args: {
+export async function sendFriendLetterEmail(args: {
   to: string
-  recipientName: string | null
+  recipientName: string
   senderName: string
   scheduledFor: Date
   publicToken: string
-  tlockedKey: string
 }): Promise<{ id: string }> {
   const from = process.env.RESEND_FROM_LETTERS
   if (!from) throw new Error('RESEND_FROM_LETTERS not set')
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
   if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not set')
 
-  const url = `${appUrl}/letter/${args.publicToken}#k=${encodeURIComponent(args.tlockedKey)}`
+  const url = `${appUrl}/letter/${args.publicToken}`
   const safeSender = escapeHtml(args.senderName)
   const safeRecipient = args.recipientName ? escapeHtml(args.recipientName) : null
   const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hello,'
