@@ -8,6 +8,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
+import SongPicker from '@/components/SongPicker'
 import PhotoBlock, { type Photo } from '@/components/desk/PhotoBlock'
 import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import type { StrokeData } from '@/store/journal'
@@ -75,7 +76,7 @@ export function PostcardBack({
   const handleSongChange = (value: string) => {
     setSongInput(value)
     onSongChange?.(value || null)
-    if (value && /https?:\/\//.test(value)) {
+    if (value && (/^https?:\/\//i.test(value) || value.startsWith('{'))) {
       setIsEditingSong(false)
     }
   }
@@ -233,22 +234,15 @@ export function PostcardBack({
                   >
                     add a song
                   </div>
-                  <input
-                    type="text"
+                  <SongPicker
                     value={songInput}
-                    onChange={(e) => handleSongChange(e.target.value)}
-                    placeholder="Paste Spotify, YouTube, or SoundCloud link..."
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      border: `1px solid ${DOODLE_BORDER}`,
-                      background: DOODLE_BG,
-                      color: PAPER_INK,
-                      fontFamily: 'Cormorant Garamond, Georgia, serif',
-                      fontSize: 13,
-                      outline: 'none',
+                    onChange={(next) => {
+                      handleSongChange(next ?? '')
+                      if (next && (/^https?:\/\//i.test(next) || next.startsWith('{'))) {
+                        setIsEditingSong(false)
+                      }
                     }}
+                    placeholder="Search a song or paste a link…"
                   />
                 </>
               ) : (
