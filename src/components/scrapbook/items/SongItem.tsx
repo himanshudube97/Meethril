@@ -34,7 +34,9 @@ const HIDDEN_AUDIO_PROVIDERS: SongItemData['provider'][] = ['youtube', 'soundclo
 export default function SongItem({ item, isEditing, onChange }: Props) {
   const titleRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [editingUrl, setEditingUrl] = useState(false)
+  // Blank items (dropped from the toolbar with an empty URL) open straight into
+  // the picker — no second click required.
+  const [editingUrl, setEditingUrl] = useState(!item.url)
   useEffect(() => {
     if (titleRef.current && titleRef.current.innerText !== item.title) {
       titleRef.current.innerText = item.title

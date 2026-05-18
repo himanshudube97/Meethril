@@ -35,20 +35,14 @@ export default function CanvasToolbar({
   onReset,
 }: Props) {
   const [stickerOpen, setStickerOpen] = useState(false)
-  const [songPromptOpen, setSongPromptOpen] = useState(false)
-  const [songUrl, setSongUrl] = useState('')
   const [clipOpen, setClipOpen] = useState(false)
   const stickerWrapRef = useRef<HTMLDivElement>(null)
-  const songWrapRef = useRef<HTMLDivElement>(null)
   const clipWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (stickerWrapRef.current && !stickerWrapRef.current.contains(e.target as Node)) {
         setStickerOpen(false)
-      }
-      if (songWrapRef.current && !songWrapRef.current.contains(e.target as Node)) {
-        setSongPromptOpen(false)
       }
       if (clipWrapRef.current && !clipWrapRef.current.contains(e.target as Node)) {
         setClipOpen(false)
@@ -57,15 +51,6 @@ export default function CanvasToolbar({
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
-
-  function submitSong() {
-    const trimmed = songUrl.trim()
-    if (trimmed) {
-      onAddSong(trimmed)
-      setSongUrl('')
-      setSongPromptOpen(false)
-    }
-  }
 
   return (
     <div
@@ -82,75 +67,9 @@ export default function CanvasToolbar({
 
       <ToolbarButton onClick={onAddPhoto} icon="◰" label="photo" />
 
-      <div className="relative" ref={songWrapRef}>
-        <ToolbarButton
-          onClick={() => setSongPromptOpen((o) => !o)}
-          icon="♪"
-          label="song"
-          active={songPromptOpen}
-        />
-        {songPromptOpen && (
-          <div
-            className="absolute p-3 rounded-2xl flex flex-col gap-2"
-            style={{
-              top: 0,
-              left: '100%',
-              marginLeft: 10,
-              background: '#fefaf0',
-              border: '1px solid rgba(58, 52, 41, 0.18)',
-              boxShadow: '0 8px 24px rgba(20, 14, 4, 0.22)',
-              zIndex: 50,
-              width: 280,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                color: 'rgba(58, 52, 41, 0.7)',
-                fontFamily: 'var(--font-caveat), cursive',
-              }}
-            >
-              paste a spotify, youtube, or apple music link
-            </div>
-            <input
-              type="text"
-              value={songUrl}
-              onChange={(e) => setSongUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') submitSong()
-                if (e.key === 'Escape') setSongPromptOpen(false)
-              }}
-              placeholder="https://..."
-              autoFocus
-              style={{
-                padding: '6px 10px',
-                border: '1px solid rgba(58, 52, 41, 0.22)',
-                borderRadius: 8,
-                fontSize: 13,
-                fontFamily: 'system-ui, sans-serif',
-                color: '#3a3429',
-                background: '#fefdf8',
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={submitSong}
-              style={{
-                padding: '6px 12px',
-                border: 'none',
-                background: '#3a3429',
-                color: '#f4ecd8',
-                borderRadius: 8,
-                fontSize: 14,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-caveat), cursive',
-              }}
-            >
-              add song
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Drops a blank song item on the canvas — the user searches/picks via
+          the SongPicker inside the item itself (auto-opens for empty items). */}
+      <ToolbarButton onClick={() => onAddSong('')} icon="♪" label="song" />
 
       <div className="relative" ref={stickerWrapRef}>
         <ToolbarButton
