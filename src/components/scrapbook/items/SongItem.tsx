@@ -251,7 +251,9 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
         </div>
 
         {/* === Title + provider + equalizer === */}
-        <div className="flex-1 min-w-0 overflow-hidden">
+        {/* overflow-visible while editing so the SongPicker dropdown isn't clipped;
+            the title row uses `truncate` which carries its own overflow rule. */}
+        <div className={`flex-1 min-w-0 ${editingUrl ? '' : 'overflow-hidden'}`}>
           {editingUrl ? (
             <div
               onPointerDown={(e) => e.stopPropagation()}
