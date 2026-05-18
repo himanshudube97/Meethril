@@ -263,9 +263,13 @@ export default function ComposeView() {
   async function handleSeal({
     unlockDate,
     recipientEmail,
+    question,
+    answer,
   }: {
     unlockDate: Date
     recipientEmail?: string
+    question?: string
+    answer?: string
   }) {
     // Flush the pending autosave so the seal request sees the final body /
     // recipient state. autosave.draftId becomes available only after the
@@ -309,6 +313,12 @@ export default function ComposeView() {
 
     if (recipient.recipient === 'friend') {
       if (!recipientEmail) throw new Error('Recipient email missing.')
+      if (!question || !question.trim()) {
+        throw new Error('Question missing.')
+      }
+      if (!answer) {
+        throw new Error('Answer missing.')
+      }
 
       // Re-fetch the draft so we get the encrypted doodle strokes in the
       // shape the asset bundler expects. Photos are read from React state
@@ -348,10 +358,11 @@ export default function ComposeView() {
         },
         unlockDate,
         recipientEmail,
-        recipientName: recipient.name ?? 'Friend',
-        senderName: userName,
+        recipientName: recipient.name ?? '',
         letterLocation: null,
         masterKey,
+        question: question.trim(),
+        answer,
       })
       const res = await fetch('/api/letters/friend', {
         method: 'POST',
