@@ -178,21 +178,26 @@ model LetterDelivery {
   letterId String @unique
   letter   Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
 
-  // Phase 4 (friend letters): the ciphertext that gets delivered.
-  // Encrypted with a random per-letter K (NOT the master key).
+  // Friend letters: AES-256-GCM ciphertext of body_json. Encrypted with
+  // letterKey = Argon2id(normalize(answer), salt). Neither the answer nor
+  // letterKey ever reach the server.
   transientCiphertext String @db.Text
   transientIV         String
 
-  // K time-locked to letter.scheduledFor via Drand
-  tlockedKey String @db.Text
+  // Argon2id salt, 16 random bytes base64. Not secret.
+  salt String
 
-  // Public token used in the URL path. Fragment carries tlockedKey.
+  // Plaintext: shown to the recipient on the unlock page so they know what
+  // answer to type. Visible to anyone with DB access — metadata leak by
+  // design (the magic-link recipient has no account, so we have no
+  // pre-shared key to encrypt this under).
+  question String @db.Text
+
+  // Public token in the URL path. No fragment.
   publicToken String @unique
 
-  // Resend tracking
   resendEmailId String?
 
-  // 24h read window tracking
   firstReadAt        DateTime?
   transientExpiresAt DateTime?
 
@@ -209,9 +214,9 @@ model LetterDeliveryAsset {
   deliveryId String
   delivery   LetterDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
 
-  // K-encrypted asset bytes (base64). Recipient has K via the URL
-  // fragment + tlock; decrypts with K to recover the original photo
-  // or doodle bytes.
+  // letterKey-encrypted asset bytes (base64). Recipient derives letterKey
+  // from their typed answer + LetterDelivery.salt and decrypts to recover
+  // the original photo bytes.
   ciphertext String @db.Text
   iv         String
 
