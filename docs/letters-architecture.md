@@ -132,8 +132,11 @@ Friend letters use **password+question+Argon2id e2ee**. The sender writes a ques
 3. Browser normalizes the answer → runs Argon2id with the `salt` from the meta response → derives `letterKey`.
 4. `GET /api/letter/[token]/ciphertext` — server-side:
    - Returns 404 / 425 ("not_yet") / 410 ("expired") on the obvious sad paths.
-   - **Atomically claims `firstReadAt`** via `updateMany({where: {id, firstReadAt: null}, data: {firstReadAt: now, transientExpiresAt: now + 24h}})`. Only the request that finds it null wins. Mirrors `firstReadAt` onto the parent `Letter` row.
+   - **Idempotent — does NOT claim `firstReadAt`.** Returns `{transientCiphertext, transientIV}` unconditionally (subject to the gates above). Wrong-answer attempts can retry without burning the 24h read window.
 5. Client `decryptTransient(transientCiphertext, transientIV, letterKey)` → plaintext JSON `{text, song, doodles}` → renders text + song + doodles. If decryption fails (wrong answer), the UI shows an error prompt — no server round-trip needed to detect a wrong answer.
+5a. `POST /api/letter/[token]/opened` — called **only after a successful client-side decrypt**:
+   - **Atomically claims `firstReadAt`** via `updateMany({where: {id, firstReadAt: null}, data: {firstReadAt: now, transientExpiresAt: now + 24h}})`. Only the request that finds it null wins. Mirrors `firstReadAt` onto the parent `Letter` row.
+   - Idempotent on second call — if `firstReadAt` is already set, the `updateMany` matches zero rows and is a no-op.
 6. For each asset in `meta.assets`: client fetches `GET /api/letter/[token]/asset/[assetId]` (24h gate identical to the ciphertext route, plus a path-token check to prevent asset-id grinding) → returns `{ciphertext, iv, position, spread, rotation, ordinal}` → client `decryptTransient(...)` with the same `letterKey` → renders as a polaroid in [`LetterPhotos`](../src/components/letters/recipient/LetterPhotos.tsx).
 7. Decrypted content + `letterKey` (base64) + pre-fetched asset blobs are stashed in `sessionStorage` keyed on `publicToken` so the Keep-forever flow can pick it up across navigation.
 
@@ -203,9 +206,10 @@ Friend letters use **password+question+Argon2id e2ee**. The sender writes a ques
    Recipient browser:
    1. sees question → types answer
    2. Argon2id(normalize(answer), salt) → letterKey
-   3. fetch ciphertext (sets server firstReadAt)
+   3. fetch ciphertext (idempotent — no firstReadAt write)
    4. AES-GCM decrypt with letterKey → plaintext
-   5. (optional) "Keep forever" ──────────────┘
+   5. on success: POST /opened (server claims firstReadAt + starts 24h window)
+   6. (optional) "Keep forever" ──────────────┘
 ```
 
 - **Self letters**: one encryption, one decryption, both with the owner's master key.
