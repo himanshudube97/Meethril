@@ -6,6 +6,11 @@ import { useThemeStore } from '@/store/theme'
 import { searchItunes, serializeItunesSong, highResArt, type ItunesTrack } from '@/lib/song'
 import { isMusicUrl } from '@/components/SongEmbed'
 
+function displayValue(v: string): string {
+  if (v && v.startsWith('{')) return ''
+  return v
+}
+
 interface Props {
   /** Current stored string (URL, iTunes JSON, free text, or empty). */
   value: string
@@ -24,7 +29,7 @@ export default function SongPicker({
   autoFocus = false,
 }: Props) {
   const { theme } = useThemeStore()
-  const [query, setQuery] = useState(value)
+  const [query, setQuery] = useState(displayValue(value))
   const [results, setResults] = useState<ItunesTrack[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -33,7 +38,7 @@ export default function SongPicker({
 
   // Keep input synced if parent resets value externally
   useEffect(() => {
-    setQuery(value)
+    setQuery(displayValue(value))
   }, [value])
 
   // Click-outside closes dropdown
@@ -53,7 +58,7 @@ export default function SongPicker({
       setOpen(false)
       return
     }
-    if (isMusicUrl(trimmed) || /^https?:\/\//i.test(trimmed)) {
+    if (isMusicUrl(trimmed) || /^https?:\/\//i.test(trimmed) || trimmed.startsWith('{')) {
       setResults([])
       setOpen(false)
       return

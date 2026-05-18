@@ -169,7 +169,7 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
   const handleSongChange = useCallback((value: string) => {
     setSongInput(value)
     setCurrentSong(value)
-    if (value && /https?:\/\//.test(value)) {
+    if (value && (/^https?:\/\//i.test(value) || value.startsWith('{'))) {
       setIsEditingSong(false)
     }
   }, [setCurrentSong])
