@@ -1,9 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import type { Theme } from '@/lib/themes'
+import { parseStoredSong, highResArt, appleMusicLink } from '@/lib/song'
+import { useActiveSong } from '@/store/activeSong'
 
 interface SongEmbedProps {
   url: string
@@ -195,6 +197,173 @@ function VinylRecord({ isPlaying, color, size = 'md' }: { isPlaying: boolean; co
       />
       {/* Center hole */}
       <div className={`absolute ${holeSize} rounded-full bg-black/80`} />
+    </motion.div>
+  )
+}
+
+function ItunesPlayer({
+  id,
+  title,
+  artist,
+  art,
+  preview,
+  theme,
+  compact,
+}: {
+  id: string
+  title: string
+  artist: string
+  art: string
+  preview: string
+  theme: Theme
+  compact: boolean
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const instanceId = useId()
+  const { activeId, play, stop } = useActiveSong()
+  const isPlaying = activeId === instanceId
+  const [progress, setProgress] = useState(0) // 0..1
+  const [errored, setErrored] = useState(false)
+
+  // Pause when another SongEmbed becomes active
+  useEffect(() => {
+    if (!isPlaying && audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause()
+    }
+  }, [isPlaying])
+
+  // Pause on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) audioRef.current.pause()
+      if (activeId === instanceId) stop()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (errored) return
+    if (isPlaying) {
+      audioRef.current?.pause()
+      stop()
+    } else {
+      audioRef.current?.play().catch(() => setErrored(true))
+      play(instanceId)
+    }
+  }
+
+  const onTimeUpdate = () => {
+    const a = audioRef.current
+    if (!a || !a.duration) return
+    setProgress(a.currentTime / a.duration)
+  }
+
+  const onEnded = () => {
+    setProgress(0)
+    if (activeId === instanceId) stop()
+  }
+
+  const artUrl = highResArt(art, compact ? 200 : 300)
+  const size = compact ? 'w-12 h-12' : 'w-16 h-16'
+  const padding = compact ? 'p-3' : 'p-4'
+
+  return (
+    <motion.div
+      className={`rounded-2xl overflow-hidden relative flex items-center ${padding}`}
+      onClick={(e) => { e.stopPropagation(); handlePlay(e) }}
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        background: `linear-gradient(135deg, ${theme.glass.bg} 0%, ${theme.accent.warm}10 100%)`,
+        border: `1px solid ${isPlaying ? theme.accent.warm + '40' : theme.glass.border}`,
+        backdropFilter: 'blur(20px)',
+        cursor: 'pointer',
+      }}
+      whileHover={!isPlaying ? { scale: 1.01 } : {}}
+      whileTap={{ scale: 0.99 }}
+    >
+      <audio
+        ref={audioRef}
+        src={preview}
+        preload="none"
+        onTimeUpdate={onTimeUpdate}
+        onEnded={onEnded}
+        onError={() => setErrored(true)}
+      />
+
+      <div className="flex items-center gap-3 w-full">
+        {/* Album art as vinyl center */}
+        <motion.div
+          className={`relative ${size} rounded-full shrink-0 overflow-hidden`}
+          style={{
+            background: '#1a1a1a',
+            boxShadow: `0 0 20px ${theme.accent.warm}40`,
+          }}
+          animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+          transition={isPlaying ? { duration: 3, repeat: Infinity, ease: 'linear' } : { duration: 0.5 }}
+        >
+          {artUrl ? (
+            <img src={artUrl} alt="" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-white text-lg">♫</div>
+          )}
+          {/* Center hole */}
+          <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-black/80 -translate-x-1/2 -translate-y-1/2" />
+        </motion.div>
+
+        {/* Title + artist */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate" style={{ color: theme.text.primary }}>
+            {title || 'Untitled'}
+          </p>
+          {!compact && (
+            <p className="text-xs truncate" style={{ color: theme.text.muted }}>
+              {artist}
+            </p>
+          )}
+          {!compact && !errored && (
+            <div className="mt-2 h-0.5 rounded-full overflow-hidden" style={{ background: `${theme.text.muted}25` }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: theme.accent.warm, width: `${progress * 100}%` }}
+                transition={{ duration: 0.15 }}
+              />
+            </div>
+          )}
+          {errored && (
+            <a
+              href={appleMusicLink(id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs underline"
+              style={{ color: theme.accent.warm }}
+            >
+              Open in Apple Music
+            </a>
+          )}
+        </div>
+
+        {/* Play/pause button */}
+        {!errored && (
+          <motion.div
+            className={`shrink-0 ${compact ? 'w-8 h-8' : 'w-10 h-10'} rounded-full flex items-center justify-center`}
+            style={{
+              background: isPlaying
+                ? `${theme.accent.warm}30`
+                : `linear-gradient(135deg, ${theme.accent.warm} 0%, ${theme.accent.secondary} 100%)`,
+              color: isPlaying ? theme.accent.warm : '#fff',
+              boxShadow: isPlaying ? 'none' : `0 4px 15px ${theme.accent.warm}40`,
+            }}
+            whileHover={{ scale: 1.1 }}
+          >
+            <span className={compact ? 'text-sm' : 'text-base'}>
+              {isPlaying ? '■' : '▶'}
+            </span>
+          </motion.div>
+        )}
+      </div>
     </motion.div>
   )
 }
@@ -473,6 +642,21 @@ export default function SongEmbed({ url, compact = false, audioOnly = true }: So
   const { theme } = useThemeStore()
 
   const embedInfo = useMemo(() => parseUrl(url), [url])
+
+  const stored = parseStoredSong(url)
+  if (stored.kind === 'itunes') {
+    return (
+      <ItunesPlayer
+        id={stored.id}
+        title={stored.title}
+        artist={stored.artist}
+        art={stored.art}
+        preview={stored.preview}
+        theme={theme}
+        compact={compact}
+      />
+    )
+  }
 
   // For non-URL text (just song names), show simple text
   if (embedInfo.type === 'unknown' && !embedInfo.title) {
