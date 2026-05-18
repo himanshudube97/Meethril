@@ -327,7 +327,7 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
                 style={{ color: mutedColor }}
               >
                 <span>Add a Song</span>
-                {songInput && /https?:\/\//.test(songInput) && (
+                {songInput && (/^https?:\/\//i.test(songInput) || songInput.startsWith('{')) && (
                   <button
                     onClick={() => setIsEditingSong(false)}
                     className="text-[10px] normal-case tracking-normal opacity-60 hover:opacity-100 transition-opacity"
@@ -342,7 +342,9 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
                 value={songInput}
                 onChange={(next) => {
                   handleSongChange(next ?? '')
-                  if (next) setIsEditingSong(false)
+                  if (next && (/^https?:\/\//i.test(next) || next.startsWith('{'))) {
+                    setIsEditingSong(false)
+                  }
                 }}
                 placeholder="Search a song or paste a link…"
               />
