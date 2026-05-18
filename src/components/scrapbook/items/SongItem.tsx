@@ -410,7 +410,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
       )}
 
       {/* iTunes embed — delegates to SongEmbed */}
-      {isPlaying && item.provider === 'itunes' && (
+      {item.provider === 'itunes' && (
         <div
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
