@@ -58,10 +58,10 @@ export default function SongPicker({
       setOpen(false)
       return
     }
-    setLoading(true)
     setOpen(true)
     const ctrl = new AbortController()
     const handle = window.setTimeout(async () => {
+      setLoading(true)
       try {
         const tracks = await searchItunes(trimmed, ctrl.signal)
         setResults(tracks)
@@ -82,6 +82,7 @@ export default function SongPicker({
     onChange(serializeItunesSong(track))
     setOpen(false)
     setResults([])
+    setHighlight(0)
     setQuery('') // parent will display via SongEmbed; clear local input
   }
 
@@ -112,7 +113,8 @@ export default function SongPicker({
       setHighlight((h) => Math.max(h - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      pick(results[highlight])
+      const track = results[highlight] ?? results[0]
+      if (track) pick(track)
     } else if (e.key === 'Escape') {
       setOpen(false)
     }
@@ -125,7 +127,10 @@ export default function SongPicker({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
-        onFocus={() => query.trim() && !isMusicUrl(query) && setOpen(true)}
+        onFocus={() => {
+          const trimmed = query.trim()
+          if (trimmed && !isMusicUrl(trimmed)) setOpen(true)
+        }}
         placeholder={placeholder}
         autoFocus={autoFocus}
         className="w-full px-3 py-2 rounded-lg text-sm outline-none"
@@ -137,6 +142,8 @@ export default function SongPicker({
       />
 
       <AnimatePresence>
+        {/* `open && (loading || results.length > 0 || query.trim().length > 0)` — third clause keeps
+            the "No songs found" message visible after a query returns empty. */}
         {open && (loading || results.length > 0 || query.trim().length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
