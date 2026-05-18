@@ -4,12 +4,19 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 
-type SelfPill = '1w' | '1m' | '6m' | '1y' | 'custom'
-type FriendPill = '1w' | '2w' | '30d' | 'custom'
+// TEST-PILL: '1h' on both SelfPill and FriendPill is a staging-only shortcut
+// to smoke-test delivery end-to-end without waiting a week. The matching
+// server lead-time relaxations live in /api/letters/self/route.ts and
+// /api/letters/friend/route.ts (also marked TEST-PILL). Remove all three
+// before a real public launch — grep for TEST-PILL.
+type SelfPill = '1h' | '1w' | '1m' | '6m' | '1y' | 'custom'
+type FriendPill = '1h' | '1w' | '2w' | '30d' | 'custom'
 
 function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
   const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+  if (p === '1h') return new Date(now + hour)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '1m') return new Date(now + 30 * day)
   if (p === '6m') return new Date(now + 182 * day)
@@ -18,7 +25,9 @@ function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
 
 function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
   const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+  if (p === '1h') return new Date(now + hour)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '2w') return new Date(now + 14 * day)
   return new Date(now + 30 * day)
@@ -27,7 +36,9 @@ function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function labelForSelf(p: SelfPill): string {
-  return p === '1w'
+  return p === '1h'
+    ? '1 hr (test)'
+    : p === '1w'
     ? '1 week'
     : p === '1m'
     ? '1 month'
@@ -39,7 +50,9 @@ function labelForSelf(p: SelfPill): string {
 }
 
 function labelForFriend(p: FriendPill): string {
-  return p === '1w'
+  return p === '1h'
+    ? '1 hr (test)'
+    : p === '1w'
     ? '1 week'
     : p === '2w'
     ? '2 weeks'
@@ -196,7 +209,8 @@ export function SealModal({
 
               <div className="flex flex-wrap gap-2 mb-3">
                 {recipient === 'self'
-                  ? (['1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
+                  // TEST-PILL: drop '1h' before a real public launch.
+                  ? (['1h', '1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"
@@ -215,7 +229,8 @@ export function SealModal({
                         {labelForSelf(p)}
                       </button>
                     ))
-                  : (['1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
+                  // TEST-PILL: drop '1h' before a real public launch.
+                  : (['1h', '1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"

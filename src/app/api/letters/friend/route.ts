@@ -62,10 +62,15 @@ export async function POST(request: NextRequest) {
   if (Number.isNaN(scheduledFor.valueOf())) {
     return NextResponse.json({ error: 'bad scheduledFor' }, { status: 400 })
   }
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  // TEST-PILL: minimum lead time relaxed to ~1 hour so SealModal's 1h test
+  // pill works end-to-end on staging. Tighten back to 7 days
+  //   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  //   if (scheduledFor.getTime() < Date.now() + sevenDaysMs - 60_000) ...
+  // before a real public launch. Grep for TEST-PILL to find every spot.
+  const oneHourMs = 60 * 60 * 1000
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
-  if (scheduledFor.getTime() < Date.now() + sevenDaysMs - 60_000) {
-    return NextResponse.json({ error: 'scheduledFor too soon (min 7 days)' }, { status: 400 })
+  if (scheduledFor.getTime() < Date.now() + oneHourMs - 60_000) {
+    return NextResponse.json({ error: 'scheduledFor too soon (min 1 hour)' }, { status: 400 })
   }
   if (scheduledFor.getTime() > Date.now() + thirtyDaysMs + 60_000) {
     return NextResponse.json({ error: 'scheduledFor too late (max 30 days)' }, { status: 400 })
