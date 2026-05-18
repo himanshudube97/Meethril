@@ -60,6 +60,60 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
   const accent = providerAccent[item.provider]
   const hiddenAudio = HIDDEN_AUDIO_PROVIDERS.includes(item.provider)
 
+  // iTunes items use the SongEmbed sticker as the entire canvas item — no
+  // wooden card / duplicate vinyl. The scrapbook chrome (X, drag, rotate,
+  // resize) is rendered by the parent canvas, so it stays attached to this
+  // wrapper.
+  if (item.provider === 'itunes') {
+    return (
+      <div className="w-full h-full relative">
+        {editingUrl ? (
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SongPicker
+              value={item.url}
+              onChange={(next) => {
+                if (!next) return
+                const meta = deriveSongMeta(next)
+                onChange({ ...item, url: next, title: meta.title, provider: meta.provider })
+                setEditingUrl(false)
+                setIsPlaying(false)
+              }}
+              placeholder="Search or paste a link…"
+              autoFocus
+            />
+          </div>
+        ) : (
+          <>
+            <SongEmbed url={item.url} compact audioOnly />
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingUrl(true)
+              }}
+              className="absolute top-1 right-1 rounded-md flex items-center justify-center"
+              style={{
+                width: 22,
+                height: 22,
+                background: 'rgba(0,0,0,0.25)',
+                color: 'rgba(255,255,255,0.85)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+              title="change song"
+            >
+              ✎
+            </button>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
       className="w-full h-full relative overflow-visible"
@@ -212,10 +266,10 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
-              if (!embed && item.provider !== 'itunes') return
+              if (!embed) return
               setIsPlaying((p) => !p)
             }}
-            disabled={!embed && item.provider !== 'itunes'}
+            disabled={!embed}
             className="absolute flex items-center justify-center transition-all"
             style={{
               top: '50%',
@@ -228,8 +282,8 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
                 'radial-gradient(circle at 30% 30%, #fefaf0 0%, #d8cdb4 100%)',
               color: '#1a1614',
               border: '1px solid rgba(0,0,0,0.3)',
-              cursor: (embed || item.provider === 'itunes') ? 'pointer' : 'not-allowed',
-              opacity: (embed || item.provider === 'itunes') ? 1 : 0.5,
+              cursor: embed ? 'pointer' : 'not-allowed',
+              opacity: embed ? 1 : 0.5,
               fontSize: 11,
               boxShadow:
                 '0 2px 6px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)',
@@ -238,7 +292,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
               zIndex: 3,
             }}
             onMouseEnter={(e) => {
-              if (embed || item.provider === 'itunes')
+              if (embed)
                 (e.currentTarget as HTMLElement).style.transform =
                   'translate(-50%, -50%) scale(1.12)'
             }}
@@ -246,7 +300,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
               ;(e.currentTarget as HTMLElement).style.transform =
                 'translate(-50%, -50%)'
             }}
-            title={(embed || item.provider === 'itunes') ? (isPlaying ? 'pause' : 'play') : 'no embed available'}
+            title={embed ? (isPlaying ? 'pause' : 'play') : 'no embed available'}
           >
             {isPlaying ? '❚❚' : '▶'}
           </button>
@@ -414,22 +468,6 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
         </div>
       )}
 
-      {/* iTunes embed — delegates to SongEmbed */}
-      {item.provider === 'itunes' && (
-        <div
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          className="absolute"
-          style={{
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: 6,
-          }}
-        >
-          <SongEmbed url={item.url} compact audioOnly />
-        </div>
-      )}
     </div>
   )
 }
