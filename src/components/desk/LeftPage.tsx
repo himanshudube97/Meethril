@@ -7,6 +7,7 @@ import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { useJournalStore } from '@/store/journal'
 import { useDeskStore } from '@/store/desk'
 import SongEmbed from '@/components/SongEmbed'
+import SongPicker from '@/components/SongPicker'
 import { htmlToSplitPlainText } from '@/lib/text-utils'
 import {
   isCaretOnLastVisualRow,
@@ -168,7 +169,7 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
   const handleSongChange = useCallback((value: string) => {
     setSongInput(value)
     setCurrentSong(value)
-    if (value && /https?:\/\//.test(value)) {
+    if (value && (/^https?:\/\//i.test(value) || value.startsWith('{'))) {
       setIsEditingSong(false)
     }
   }, [setCurrentSong])
@@ -326,7 +327,7 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
                 style={{ color: mutedColor }}
               >
                 <span>Add a Song</span>
-                {songInput && /https?:\/\//.test(songInput) && (
+                {songInput && (/^https?:\/\//i.test(songInput) || songInput.startsWith('{')) && (
                   <button
                     onClick={() => setIsEditingSong(false)}
                     className="text-[10px] normal-case tracking-normal opacity-60 hover:opacity-100 transition-opacity"
@@ -337,17 +338,15 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
                   </button>
                 )}
               </div>
-              <input
-                type="text"
+              <SongPicker
                 value={songInput}
-                onChange={(e) => handleSongChange(e.target.value)}
-                placeholder="Paste Spotify, YouTube, or SoundCloud link..."
-                className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-                style={{
-                  border: `1px solid ${colors.doodleBorder}`,
-                  color: textColor,
-                  background: colors.doodleBg,
+                onChange={(next) => {
+                  handleSongChange(next ?? '')
+                  if (next && (/^https?:\/\//i.test(next) || next.startsWith('{'))) {
+                    setIsEditingSong(false)
+                  }
                 }}
+                placeholder="Search a song or paste a link…"
               />
             </>
           ) : (

@@ -10,6 +10,7 @@ import { htmlToPlainText } from '@/lib/text-utils'
 import { getRandomPrompt } from '@/lib/themes'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
+import SongPicker from '@/components/SongPicker'
 import PhotoBlock from './PhotoBlock'
 import CompactDoodleCanvas from './CompactDoodleCanvas'
 import EntrySelector from './EntrySelector'
@@ -253,7 +254,7 @@ export default function MobileJournalEntry({ onClose }: MobileJournalEntryProps)
     const rawText = pages.join('')
     const fullText = rawText.replace(/\n{3,}/g, '\n').replace(/^\n+|\n+$/g, '')
     const hasContent = fullText.trim().length > 0
-      || (songInput && /https?:\/\//.test(songInput))
+      || (songInput && (/^https?:\/\//i.test(songInput) || songInput.startsWith('{')))
       || pendingPhotos.length > 0
       || currentDoodleStrokes.length > 0
     // Don't POST a new entry until there's actually something to save.
@@ -261,7 +262,7 @@ export default function MobileJournalEntry({ onClose }: MobileJournalEntryProps)
     const html = '<p>' + fullText.replace(/\n/g, '</p><p>') + '</p>'
     autosaveTrigger({
       text: html,
-      song: songInput && /https?:\/\//.test(songInput) ? songInput : null,
+      song: songInput && (/^https?:\/\//i.test(songInput) || songInput.startsWith('{')) ? songInput : null,
       photos: pendingPhotos.map(p => ({
         url: p.url,
         encryptedRef: p.encryptedRef,
@@ -611,7 +612,7 @@ function WritingPage({
             style={{ color: colors.sectionLabel }}>
             Add a Song
           </div>
-          {songInput && /https?:\/\//.test(songInput) ? (
+          {songInput && (/^https?:\/\//i.test(songInput) || songInput.startsWith('{')) ? (
             <div className="relative">
               <SongEmbed url={songInput} compact audioOnly />
               <button onClick={onSongClear}
@@ -621,17 +622,12 @@ function WritingPage({
               </button>
             </div>
           ) : (
-            <input
-              type="text"
+            <SongPicker
               value={songInput}
-              onChange={e => onSongChange(e.target.value)}
-              placeholder="Paste Spotify, YouTube, or SoundCloud..."
-              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-              style={{
-                border: `1px solid ${colors.pageBorder}`,
-                color: colors.bodyText,
-                background: 'rgba(255,255,255,0.03)',
+              onChange={(next) => {
+                onSongChange(next ?? '')
               }}
+              placeholder="Search a song or paste a link…"
             />
           )}
         </div>

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { SongItemData, deriveSongMeta, getSongEmbedUrl } from '@/lib/scrapbook'
+import SongPicker from '@/components/SongPicker'
+import SongEmbed from '@/components/SongEmbed'
 
 interface Props {
   item: SongItemData
@@ -14,6 +16,7 @@ const providerLabel: Record<SongItemData['provider'], string> = {
   youtube: 'youtube',
   apple: 'apple music',
   soundcloud: 'soundcloud',
+  itunes: 'itunes',
   unknown: 'song',
 }
 
@@ -22,6 +25,7 @@ const providerAccent: Record<SongItemData['provider'], string> = {
   youtube: '#cc1b1b',
   apple: '#fa57c1',
   soundcloud: '#ff7700',
+  itunes: '#fc3c44',
   unknown: '#8b6f47',
 }
 
@@ -31,8 +35,6 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
   const titleRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [editingUrl, setEditingUrl] = useState(false)
-  const [draftUrl, setDraftUrl] = useState(item.url)
-
   useEffect(() => {
     if (titleRef.current && titleRef.current.innerText !== item.title) {
       titleRef.current.innerText = item.title
@@ -52,28 +54,9 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
     }
   }, [isEditing, editingUrl])
 
-  useEffect(() => {
-    setDraftUrl(item.url)
-  }, [item.url])
-
   const embed = getSongEmbedUrl(item)
   const accent = providerAccent[item.provider]
   const hiddenAudio = HIDDEN_AUDIO_PROVIDERS.includes(item.provider)
-
-  function commitUrl() {
-    const url = draftUrl.trim()
-    if (url && url !== item.url) {
-      const meta = deriveSongMeta(url)
-      onChange({ ...item, url, title: meta.title, provider: meta.provider })
-      setIsPlaying(false)
-    }
-    setEditingUrl(false)
-  }
-
-  function cancelUrlEdit() {
-    setDraftUrl(item.url)
-    setEditingUrl(false)
-  }
 
   return (
     <div
@@ -227,10 +210,10 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
-              if (!embed) return
+              if (!embed && item.provider !== 'itunes') return
               setIsPlaying((p) => !p)
             }}
-            disabled={!embed}
+            disabled={!embed && item.provider !== 'itunes'}
             className="absolute flex items-center justify-center transition-all"
             style={{
               top: '50%',
@@ -243,8 +226,8 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
                 'radial-gradient(circle at 30% 30%, #fefaf0 0%, #d8cdb4 100%)',
               color: '#1a1614',
               border: '1px solid rgba(0,0,0,0.3)',
-              cursor: embed ? 'pointer' : 'not-allowed',
-              opacity: embed ? 1 : 0.5,
+              cursor: (embed || item.provider === 'itunes') ? 'pointer' : 'not-allowed',
+              opacity: (embed || item.provider === 'itunes') ? 1 : 0.5,
               fontSize: 11,
               boxShadow:
                 '0 2px 6px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)',
@@ -253,7 +236,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
               zIndex: 3,
             }}
             onMouseEnter={(e) => {
-              if (embed)
+              if (embed || item.provider === 'itunes')
                 (e.currentTarget as HTMLElement).style.transform =
                   'translate(-50%, -50%) scale(1.12)'
             }}
@@ -261,7 +244,7 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
               ;(e.currentTarget as HTMLElement).style.transform =
                 'translate(-50%, -50%)'
             }}
-            title={embed ? (isPlaying ? 'pause' : 'play') : 'no embed available'}
+            title={(embed || item.provider === 'itunes') ? (isPlaying ? 'pause' : 'play') : 'no embed available'}
           >
             {isPlaying ? '❚❚' : '▶'}
           </button>
@@ -270,53 +253,22 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
         {/* === Title + provider + equalizer === */}
         <div className="flex-1 min-w-0 overflow-hidden">
           {editingUrl ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={draftUrl}
-                onChange={(e) => setDraftUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitUrl()
-                  if (e.key === 'Escape') cancelUrlEdit()
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SongPicker
+                value={item.url}
+                onChange={(next) => {
+                  if (!next) return
+                  const meta = deriveSongMeta(next)
+                  onChange({ ...item, url: next, title: meta.title, provider: meta.provider })
+                  setEditingUrl(false)
+                  setIsPlaying(false)
                 }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
+                placeholder="Search or paste a link…"
                 autoFocus
-                placeholder="paste a song URL…"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  padding: '4px 8px',
-                  border: `1px solid ${accent}`,
-                  borderRadius: 6,
-                  fontSize: 13,
-                  fontFamily: 'system-ui, sans-serif',
-                  color: '#fefaf0',
-                  background: '#0d0a08',
-                  outline: 'none',
-                }}
               />
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  commitUrl()
-                }}
-                style={{
-                  flexShrink: 0,
-                  padding: '4px 8px',
-                  background: accent,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-caveat), cursive',
-                }}
-                title="save"
-              >
-                ✓
-              </button>
             </div>
           ) : (
             <>
@@ -454,6 +406,23 @@ export default function SongItem({ item, isEditing, onChange }: Props) {
             style={{ border: 'none', display: 'block' }}
             title={item.title}
           />
+        </div>
+      )}
+
+      {/* iTunes embed — delegates to SongEmbed */}
+      {item.provider === 'itunes' && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute"
+          style={{
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: 6,
+          }}
+        >
+          <SongEmbed url={item.url} compact audioOnly />
         </div>
       )}
     </div>
