@@ -71,7 +71,7 @@ export interface SongItemData extends BaseItem {
   type: 'song'
   url: string
   title: string
-  provider: 'spotify' | 'youtube' | 'apple' | 'soundcloud' | 'unknown'
+  provider: 'spotify' | 'youtube' | 'apple' | 'soundcloud' | 'itunes' | 'unknown'
 }
 
 export interface DoodleStroke {
@@ -219,10 +219,22 @@ export function makeDoodleItem(items: ScrapbookItem[]): DoodleItemData {
 }
 
 export function deriveSongMeta(url: string): { title: string; provider: SongItemData['provider'] } {
+  const trimmed = url.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && parsed._h === 'itunes') {
+        return { title: parsed.t || 'Song', provider: 'itunes' }
+      }
+    } catch {
+      // not JSON → fall through
+    }
+  }
   return { title: parseSongTitle(url), provider: parseSongProvider(url) }
 }
 
 export function getSongEmbedUrl(item: SongItemData): { src: string; height: number } | null {
+  if (item.provider === 'itunes') return null
   const url = item.url
   if (item.provider === 'youtube') {
     const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/)
@@ -245,6 +257,15 @@ export function getSongEmbedUrl(item: SongItemData): { src: string; height: numb
 }
 
 function parseSongProvider(url: string): SongItemData['provider'] {
+  const trimmed = url.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && parsed._h === 'itunes') return 'itunes'
+    } catch {
+      // not JSON → fall through to URL checks
+    }
+  }
   const u = url.toLowerCase()
   if (u.includes('spotify.com')) return 'spotify'
   if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube'
