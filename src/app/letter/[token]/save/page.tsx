@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useE2EEStore } from '@/store/e2ee'
 import { encryptString, encryptBytes } from '@/lib/e2ee/crypto'
-import { decryptTransient } from '@/lib/letters/transient-crypto'
+import { decryptWithLetterKey, rawKeyFromBase64 } from '@/lib/letters/answer-crypto'
 
 const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 
@@ -14,7 +14,7 @@ interface CachedLetter {
   senderName: string
   recipientName: string
   scheduledFor: string
-  K?: string // base64-encoded — present for letters with photo/doodle assets
+  letterKey?: string // base64-encoded raw 32-byte AES-GCM key
   assets?: Array<{
     id: string
     type: string
@@ -38,22 +38,22 @@ type PhotoRef = {
 
 /**
  * For each photo asset cached from the read page:
- * 1. Decrypt the asset bytes using the transient key K.
+ * 1. Decrypt the asset bytes using the letter key.
  * 2. Re-encrypt under the recipient's master key.
  * 3. Upload to /api/photos (raw binary body).
  * 4. Pack the resulting handle + iv into an encryptedRef (same shape as
  *    EntryPhoto.encryptedRef in the main journal).
  */
 async function uploadKeptPhotos(args: {
-  K: Uint8Array
+  rawKey: Uint8Array
   assets: NonNullable<CachedLetter['assets']>
   masterKey: CryptoKey
 }): Promise<PhotoRef[]> {
   const photoRefs: PhotoRef[] = []
   for (const a of args.assets) {
     if (a.type !== 'photo') continue
-    // 1. Decrypt under transient key K
-    const bytes = await decryptTransient(a.ciphertext, a.iv, args.K)
+    // 1. Decrypt under letter key
+    const bytes = await decryptWithLetterKey(a.ciphertext, a.iv, args.rawKey)
     // 2. Re-encrypt under recipient's master key
     const { ciphertext: photoCt, iv: photoIv } = await encryptBytes(
       bytes.buffer as ArrayBuffer,
@@ -118,10 +118,10 @@ export default function SavePage() {
       // Branch 1: already logged in + unlocked
       if (loggedInHint && masterKey) {
         setState({ kind: 'saving' })
-        const K = cached.K ? Uint8Array.from(atob(cached.K), (c) => c.charCodeAt(0)) : null
+        const rawKey = cached.letterKey ? rawKeyFromBase64(cached.letterKey) : null
         const photoRefs =
-          K && cached.assets && cached.assets.length > 0
-            ? await uploadKeptPhotos({ K, assets: cached.assets, masterKey })
+          rawKey && cached.assets && cached.assets.length > 0
+            ? await uploadKeptPhotos({ rawKey, assets: cached.assets, masterKey })
             : []
         const { ciphertext, iv } = await encryptString(
           JSON.stringify(cached.content),
@@ -260,10 +260,10 @@ function OtpFlow({ token }: { token: string }) {
         const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${token}`)
         if (!raw) throw new Error('Lost the decrypted letter — try reopening the original link.')
         const cached: CachedLetter = JSON.parse(raw)
-        const K = cached.K ? Uint8Array.from(atob(cached.K), (c) => c.charCodeAt(0)) : null
+        const rawKey = cached.letterKey ? rawKeyFromBase64(cached.letterKey) : null
         const photoRefs =
-          K && cached.assets && cached.assets.length > 0
-            ? await uploadKeptPhotos({ K, assets: cached.assets, masterKey })
+          rawKey && cached.assets && cached.assets.length > 0
+            ? await uploadKeptPhotos({ rawKey, assets: cached.assets, masterKey })
             : []
         const { ciphertext, iv } = await encryptString(JSON.stringify(cached.content), masterKey)
         const r = await fetch('/api/letters/save-received', {

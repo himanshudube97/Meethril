@@ -35,6 +35,15 @@ function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function normalizeForLengthCheck(s: string): string {
+  return s
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/\s+/gu, '')
+    .replace(/[\p{P}\p{S}]+/gu, '')
+}
+
 function labelForSelf(p: SelfPill): string {
   return p === '1h'
     ? '1 hr (test)'
@@ -70,7 +79,12 @@ export function SealModal({
   recipient: 'self' | 'friend'
   onClose: () => void
   onSealed: () => void
-  onSeal: (data: { unlockDate: Date; recipientEmail?: string }) => Promise<void>
+  onSeal: (data: {
+    unlockDate: Date
+    recipientEmail?: string
+    question?: string
+    answer?: string
+  }) => Promise<void>
 }) {
   const theme = useThemeStore((s) => s.theme)
 
@@ -80,6 +94,9 @@ export function SealModal({
   const [friendPill, setFriendPill] = useState<FriendPill>('1w')
   const [friendCustom, setFriendCustom] = useState<string>('')
   const [email, setEmail] = useState<string>('')
+  const [question, setQuestion] = useState<string>('')
+  const [answer, setAnswer] = useState<string>('')
+  const [showExamples, setShowExamples] = useState(false)
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -131,6 +148,14 @@ export function SealModal({
         setError('Enter a valid email.')
         return
       }
+      if (!question.trim()) {
+        setError('Add a question only you both know the answer to.')
+        return
+      }
+      if (normalizeForLengthCheck(answer).length === 0) {
+        setError('Add the answer your friend will type.')
+        return
+      }
     }
 
     setBusy(true)
@@ -138,6 +163,8 @@ export function SealModal({
       await onSeal({
         unlockDate: date,
         recipientEmail: recipient === 'friend' ? email.trim() : undefined,
+        question: recipient === 'friend' ? question.trim() : undefined,
+        answer: recipient === 'friend' ? answer : undefined,
       })
       setPhase('folding')
       setTimeout(() => {
@@ -204,6 +231,89 @@ export function SealModal({
                       color: theme.text.primary,
                     }}
                   />
+
+                  <div className="flex items-center justify-between mb-2">
+                    <label
+                      className="block text-xs uppercase tracking-wider"
+                      style={{ color: theme.text.muted }}
+                    >
+                      A question only you both know
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowExamples((v) => !v)}
+                      className="text-xs italic"
+                      style={{ color: theme.text.muted, opacity: 0.7 }}
+                      aria-label="See example questions"
+                    >
+                      {showExamples ? 'hide examples' : 'examples?'}
+                    </button>
+                  </div>
+                  {showExamples && (
+                    <ul
+                      className="text-xs italic mb-3 list-disc list-inside"
+                      style={{ color: theme.text.muted, opacity: 0.8 }}
+                    >
+                      <li>Where did we meet?</li>
+                      <li>Your birthday in DDMMYYYY</li>
+                      <li>The nickname only you call me</li>
+                      <li>The book we both cried over</li>
+                    </ul>
+                  )}
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder="What's the name of our favorite cafe?"
+                    maxLength={500}
+                    className="w-full px-4 py-3 mb-3 rounded-xl outline-none"
+                    style={{
+                      border: `1px solid ${theme.text.primary}33`,
+                      backgroundColor: `${theme.bg.primary}b3`,
+                      color: theme.text.primary,
+                    }}
+                  />
+
+                  <label
+                    className="block text-xs uppercase tracking-wider mb-2"
+                    style={{ color: theme.text.muted }}
+                  >
+                    The answer
+                  </label>
+                  <input
+                    type="password"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="they'll type this to unlock"
+                    className="w-full px-4 py-3 mb-1 rounded-xl outline-none"
+                    style={{
+                      border: `1px solid ${theme.text.primary}33`,
+                      backgroundColor: `${theme.bg.primary}b3`,
+                      color: theme.text.primary,
+                    }}
+                  />
+                  <p
+                    className="text-xs italic mb-4"
+                    style={{ color: theme.text.muted, opacity: 0.7 }}
+                  >
+                    Type it exactly the way they will. Capitalization, spaces, and punctuation are ignored.
+                  </p>
+                  {answer && (() => {
+                    const n = normalizeForLengthCheck(answer)
+                    const tooShort = n.length < 4
+                    const tooNumeric = /^\d+$/.test(n) && n.length <= 6
+                    if (tooShort || tooNumeric) {
+                      return (
+                        <p
+                          className="text-xs italic mb-4"
+                          style={{ color: '#b91c1c', opacity: 0.85 }}
+                        >
+                          That might be too easy to guess. Try something only the two of you would know.
+                        </p>
+                      )
+                    }
+                    return null
+                  })()}
                 </>
               )}
 

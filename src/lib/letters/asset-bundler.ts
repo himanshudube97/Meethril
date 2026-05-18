@@ -6,7 +6,7 @@
 // as inline plaintext-JSON ready to embed in the transient body.
 
 import { decryptString, decryptBytes } from '@/lib/e2ee/crypto'
-import { encryptTransient } from './transient-crypto'
+import { encryptWithLetterKey } from './answer-crypto'
 
 export interface DraftPhoto {
   encryptedRef: string | null
@@ -96,37 +96,34 @@ async function decryptDoodleStrokes(strokes: unknown, masterKey: CryptoKey): Pro
 /**
  * Bundle every photo and doodle on a friend-letter draft for delivery.
  *
- * For each photo: decrypt-with-master-key → re-encrypt-with-K → return
- * the upload payload. The K-encrypted blob will land in a
+ * For each photo: decrypt-with-master-key → re-encrypt-with-letterKey →
+ * return the upload payload. The letterKey-encrypted blob will land in a
  * LetterDeliveryAsset row.
  *
  * For each doodle: decrypt-with-master-key → return plaintext strokes.
- * The recipient page will read them inline from the transient JSON.
+ * The recipient page reads them inline from the transient JSON.
  */
 export async function bundleFriendLetterAssets(args: {
   photos: DraftPhoto[]
   doodles: DraftDoodle[]
   masterKey: CryptoKey
-  K: Uint8Array
+  letterKey: Uint8Array
 }): Promise<AssetBundle> {
   const photoAssets: BundledPhotoAsset[] = []
   for (const p of args.photos) {
     let plaintextBytes: ArrayBuffer | null = null
 
     if (p.encryptedRef && p.encryptedRefIV) {
-      // E2EE path — fetch + decrypt with master key
       plaintextBytes = await fetchAndDecryptPhoto(p.encryptedRef, p.encryptedRefIV, args.masterKey)
     } else if (p.url) {
-      // Legacy plain-URL path — just fetch the bytes
       const res = await fetch(p.url)
       if (!res.ok) throw new Error(`photo url fetch ${res.status}: ${p.url}`)
       plaintextBytes = await res.arrayBuffer()
     } else {
-      // Skip: photo row has neither a ref nor a url. Shouldn't normally happen.
       continue
     }
 
-    const { ciphertext, iv } = await encryptTransient(plaintextBytes, args.K)
+    const { ciphertext, iv } = await encryptWithLetterKey(plaintextBytes, args.letterKey)
     photoAssets.push({
       ciphertext,
       iv,

@@ -1,6 +1,6 @@
 # Letters in Hearth — Architecture & Current State
 
-> **Snapshot:** 2026-05-16. Reflects the state of branch `feat/e2ee-onboarding` after Phase 4 (friend letters with tlock), Phase 4.1 (photo + doodle assets), and Phase 5 cleanup (legacy infrastructure removed — `LetterAccessToken`, dual-read JournalEntry fallback, `Letter` transitional columns, and 13 letter-specific columns on `JournalEntry` all dropped).
+> **Snapshot:** 2026-05-18. Reflects the state after Phase 4 (friend letters — originally tlock, replaced before public launch with password+question+Argon2id e2ee), Phase 4.1 (photo + doodle assets), and Phase 5 cleanup (legacy infrastructure removed — `LetterAccessToken`, dual-read JournalEntry fallback, `Letter` transitional columns, and 13 letter-specific columns on `JournalEntry` all dropped).
 > **Read this when:** you're about to touch any code under `src/app/api/letters/*`, `src/app/api/letter/*`, `src/app/letter/*`, `src/lib/letters/*`, or the compose flow under `src/components/letters/compose/*`.
 
 ---
@@ -12,7 +12,7 @@ Letters are time-delayed messages a user writes either to themselves, to a frien
 | Type | Crypto | Delivery | Owner of content | Server can read? |
 |---|---|---|---|---|
 | **Self** | Master key (E2EE) | Daily cron sends a nudge; in-app reveal on/after `scheduledFor` | Sender | Never |
-| **Friend** | Random K + tlock(K) | Resend `scheduled_at` email at `scheduledFor`; 24h read window | Sender holds only a receipt (no content). Recipient can `Keep forever` → own E2EE copy. | Never |
+| **Friend** | `letterKey` derived from sender's answer via Argon2id | Resend `scheduled_at` email at `scheduledFor`; 24h read window | Sender holds only a receipt (no content). Recipient can `Keep forever` → own E2EE copy. | Never |
 
 > "E2EE" in Hearth means: the user's master key never leaves the browser. The master key is unwrapped from `User.encryptedMasterKey` using a key derived from the user's passphrase via PBKDF2 (100k iters, SHA-256). Master key lives in `useE2EEStore` (zustand) as a `CryptoKey` reference. AES-256-GCM with 96-bit random IVs is used everywhere underneath.
 
@@ -39,8 +39,9 @@ Three Postgres tables matter:
 
 ### `LetterDelivery` (Phase 2 schema, populated in Phase 4)
 - The transient vessel for **friend letters only**. Self letters never get a row here.
-- `transientCiphertext`, `transientIV` — letter content (text + song + inline doodles) encrypted under a random per-letter K.
-- `tlockedKey` — K time-lock-encrypted against the drand quicknet round for `scheduledFor`.
+- `transientCiphertext`, `transientIV` — letter content (text + song + inline doodles) AES-256-GCM encrypted under `letterKey` (Argon2id-derived from sender's answer).
+- `salt` — random 16-byte hex salt used during key derivation. Stored plaintext; the answer itself is never stored.
+- `question` — the question the sender chose (plaintext). Shown to the recipient to prompt their answer.
 - `publicToken` — 24-byte base64url random; appears in the URL path (`/letter/<publicToken>`).
 - `resendEmailId` — populated after the Resend `scheduled_at` call.
 - `firstReadAt`, `transientExpiresAt` — 24h read window markers.
@@ -49,7 +50,7 @@ Three Postgres tables matter:
 ### `LetterDeliveryAsset` (Phase 4.1, populated for friend letters with photos)
 - Out-of-band photo storage. One row per attached photo. Doodles are inlined into `LetterDelivery.transientCiphertext`, not stored here.
 - `deliveryId` — FK to `LetterDelivery` with `ON DELETE CASCADE`. When the parent delivery expires, the assets go with it for free.
-- `ciphertext` (text), `iv` — photo bytes encrypted under the same K as the parent delivery's transient ciphertext. Recipient already has K from the URL fragment + tlock; one fetch per asset, one decrypt per asset.
+- `ciphertext` (text), `iv` — photo bytes encrypted under the same `letterKey` as the parent delivery's transient ciphertext. Recipient derives `letterKey` from their answer; one fetch per asset, one decrypt per asset.
 - `type` — `'photo'` (`'doodle'` reserved for future per-stroke separation).
 - `position`, `spread`, `rotation`, `ordinal` — plaintext layout metadata. Server-readable because it's not sensitive (positions on a card, not content).
 
@@ -94,42 +95,54 @@ Three Postgres tables matter:
 
 ## 4. Friend-letter flow
 
+Friend letters use **password+question+Argon2id e2ee**. The sender writes a question and an answer at seal time; the recipient sees the question on the unlock page and types the answer to decrypt.
+
+### Crypto
+- **Key derivation:** `letterKey = Argon2id(normalize(answer), salt, m=19MB, t=2, p=1)` → 32 bytes
+- **Normalization** (must be byte-identical on sender and recipient): NFKD → strip combining marks → lowercase → strip whitespace → strip punctuation/symbols
+- **Body and photos:** AES-256-GCM under `letterKey`. Body lives in `LetterDelivery.transientCiphertext`. Photos live in `LetterDeliveryAsset` rows.
+- **Server stores:** ciphertext, salt, question (plaintext), scheduledFor, recipient email. Never the answer or `letterKey`.
+
 ### Write (sender, client)
 1. `handleSeal` for `recipient.recipient === 'friend'` first fetches the draft entry (`GET /api/entries/{draftEntryId}`) to gather attached photos + doodles, then calls `buildFriendLetterPayload(...)` at [src/lib/letters/friend-letter-client.ts](../src/lib/letters/friend-letter-client.ts).
 2. Inside the builder:
-   - `K = crypto.getRandomValues(new Uint8Array(32))` — fresh ephemeral 256-bit key generated FIRST so it's available to bundle assets too.
-   - `bundleFriendLetterAssets({photos, doodles, masterKey, K})` — [src/lib/letters/asset-bundler.ts](../src/lib/letters/asset-bundler.ts):
-     - For each photo: `decryptString(encryptedRef, encryptedRefIV, masterKey)` → `{handle, iv}` → fetch `/api/photos/{handle}` → `decryptBytes(...)` with master key → re-encrypt the plaintext bytes under K via `encryptTransient`. The K-encrypted blob lands as a `LetterDeliveryAsset` row.
+   - SealModal collects `question`, `answer`, `scheduledFor`, and `recipientEmail` from the sender.
+   - `salt = crypto.getRandomValues(new Uint8Array(16))` — fresh per-letter salt.
+   - `letterKey = argon2id(normalize(answer), salt, {m: 19456, t: 2, p: 1})` → 32-byte key.
+   - `bundleFriendLetterAssets({photos, doodles, masterKey, letterKey})` — [src/lib/letters/asset-bundler.ts](../src/lib/letters/asset-bundler.ts):
+     - For each photo: `decryptString(encryptedRef, encryptedRefIV, masterKey)` → `{handle, iv}` → fetch `/api/photos/{handle}` → `decryptBytes(...)` with master key → re-encrypt the plaintext bytes under `letterKey` via `encryptTransient`. The `letterKey`-encrypted blob lands as a `LetterDeliveryAsset` row.
      - For each doodle: detect the `{encryptedStrokes, e2eeIV}` shape, decrypt with master key → plaintext strokes. **Doodles ride inline** in the transient body (small enough to embed).
-   - `encryptTransient(plaintextJson, K)` — [src/lib/letters/transient-crypto.ts](../src/lib/letters/transient-crypto.ts) — AES-256-GCM with a fresh 96-bit IV over `{text, song, doodles}`. Photos do NOT ride in this blob — they ride out-of-band as asset rows.
-   - `tlockEncryptKey(K, unlockDate)` — [src/lib/letters/tlock.ts](../src/lib/letters/tlock.ts) — computes the drand quicknet round number for `unlockDate` (3-second period) and passes K to `timelockEncrypt`. Returns an Age-format armored string.
-   - `K.fill(0)` — best-effort memory wipe.
-3. POST `/api/letters/friend` with `{transientCiphertext, transientIV, tlockedKey, recipientEmail, recipientName, scheduledFor, letterLocation, photoAssets}`. **No plaintext, no K.** `senderName` may be in the body but the server ignores it. `photoAssets` is an array of `{ciphertext, iv, type, position, spread, rotation, ordinal}` — each item is the K-encrypted bytes of one photo.
+   - `encryptTransient(plaintextJson, letterKey)` — [src/lib/letters/answer-crypto.ts](../src/lib/letters/answer-crypto.ts) — AES-256-GCM with a fresh 96-bit IV over `{text, song, doodles}`. Photos do NOT ride in this blob — they ride out-of-band as asset rows.
+   - `letterKey` bytes are wiped after use (best-effort).
+3. POST `/api/letters/friend` with `{transientCiphertext, transientIV, salt, question, recipientEmail, recipientName, scheduledFor, letterLocation, photoAssets}`. **No answer, no `letterKey`.** `senderName` may be in the body but the server ignores it. `photoAssets` is an array of `{ciphertext, iv, type, position, spread, rotation, ordinal}` — each item is the `letterKey`-encrypted bytes of one photo.
 
 ### Server-side write
 [src/app/api/letters/friend/route.ts](../src/app/api/letters/friend/route.ts):
 1. Validates: crypto fields present, email format, min lead time (currently 1 min in dev — see PRELAUNCH-TEST-PILLS), max 30 days, max 20 assets per letter.
 2. **Derives `senderName` from the authenticated user** via `User.profile.nickname` → `User.name` → `'A friend'`. Client-supplied senderName is ignored.
-3. `prisma.$transaction` creates `Letter { letterType: 'friend', contentCiphertext: null, ...metadata }` + `LetterDelivery { transientCiphertext, transientIV, tlockedKey, publicToken: randomBytes(24).toString('base64url') }` + `LetterDeliveryAsset[]` (createMany). Cascade FK on the delivery means cleanup (cron or rollback) deletes the assets automatically.
-4. Calls `sendFriendLetterTransientEmail` — schedules a Resend email at `scheduledAt: scheduledFor.toISOString()`, body links to `${NEXT_PUBLIC_APP_URL}/letter/<publicToken>#k=<urlencoded-tlockedKey>`. From-address from `RESEND_FROM_LETTERS`. Stores returned `resendEmailId` on the delivery row.
-5. **On Resend failure**: deletes both rows (currently as two separate `.delete()` calls — see bug #4 below).
+3. `prisma.$transaction` creates `Letter { letterType: 'friend', contentCiphertext: null, ...metadata }` + `LetterDelivery { transientCiphertext, transientIV, salt, question, publicToken: randomBytes(24).toString('base64url') }` + `LetterDeliveryAsset[]` (createMany). Cascade FK on the delivery means cleanup (cron or rollback) deletes the assets automatically.
+4. Calls `sendFriendLetterEmail` — schedules a Resend email at `scheduledAt: scheduledFor.toISOString()`, body links to `${NEXT_PUBLIC_APP_URL}/letter/<publicToken>`. From-address from `RESEND_FROM_LETTERS`. Stores returned `resendEmailId` on the delivery row.
+5. **On Resend failure**: both rows are deleted in `prisma.$transaction([...])`.
 6. Best-effort `journalEntry.deleteMany` of the draft.
 
 ### Recipient read (no auth)
 [src/app/letter/[token]/page.tsx](../src/app/letter/[token]/page.tsx):
-1. Client reads `tlockedKey` from `window.location.hash` (fragment never sent to the server).
-2. `GET /api/letter/[token]/meta` — public, no auth — returns `{scheduledFor, senderName, recipientName, alreadyExpired, firstReadAt, assets}`. The `assets` array lists each `LetterDeliveryAsset` belonging to the delivery (just metadata: `{id, type, position, spread, rotation, ordinal}` — no ciphertext yet). If `scheduledFor` is still future → page renders "not_yet".
-3. `tlockDecryptKey(tlockedKey, scheduledFor)` — fetches the drand round; throws until the round is produced (~3s after `scheduledFor`).
+1. `GET /api/letter/[token]/meta` — public, no auth — returns `{scheduledFor, senderName, recipientName, question, alreadyExpired, firstReadAt, assets}`. The `assets` array lists each `LetterDeliveryAsset` belonging to the delivery (just metadata: `{id, type, position, spread, rotation, ordinal}` — no ciphertext yet). If `scheduledFor` is still future → page renders "not_yet" (also enforced server-side: returns `425 not_yet` before `scheduledFor`).
+2. Recipient sees the question and types their answer in the unlock form.
+3. Browser normalizes the answer → runs Argon2id with the `salt` from the meta response → derives `letterKey`.
 4. `GET /api/letter/[token]/ciphertext` — server-side:
    - Returns 404 / 425 ("not_yet") / 410 ("expired") on the obvious sad paths.
+   - **Idempotent — does NOT claim `firstReadAt`.** Returns `{transientCiphertext, transientIV}` unconditionally (subject to the gates above). Wrong-answer attempts can retry without burning the 24h read window.
+5. Client `decryptTransient(transientCiphertext, transientIV, letterKey)` → plaintext JSON `{text, song, doodles}` → renders text + song + doodles. If decryption fails (wrong answer), the UI shows an error prompt — no server round-trip needed to detect a wrong answer.
+5a. `POST /api/letter/[token]/opened` — called **only after a successful client-side decrypt**:
    - **Atomically claims `firstReadAt`** via `updateMany({where: {id, firstReadAt: null}, data: {firstReadAt: now, transientExpiresAt: now + 24h}})`. Only the request that finds it null wins. Mirrors `firstReadAt` onto the parent `Letter` row.
-5. Client `decryptTransient(transientCiphertext, transientIV, K)` → plaintext JSON `{text, song, doodles}` → renders text + song + doodles.
-6. For each asset in `meta.assets`: client fetches `GET /api/letter/[token]/asset/[assetId]` (24h gate identical to the ciphertext route, plus a path-token check to prevent asset-id grinding) → returns `{ciphertext, iv, position, spread, rotation, ordinal}` → client `decryptTransient(...)` with the same K → renders as a polaroid in [`LetterPhotos`](../src/components/letters/recipient/LetterPhotos.tsx).
-7. Decrypted content + K (base64) + pre-fetched asset blobs are stashed in `sessionStorage` keyed on `publicToken` so the Keep-forever flow can pick it up across navigation.
+   - Idempotent on second call — if `firstReadAt` is already set, the `updateMany` matches zero rows and is a no-op.
+6. For each asset in `meta.assets`: client fetches `GET /api/letter/[token]/asset/[assetId]` (24h gate identical to the ciphertext route, plus a path-token check to prevent asset-id grinding) → returns `{ciphertext, iv, position, spread, rotation, ordinal}` → client `decryptTransient(...)` with the same `letterKey` → renders as a polaroid in [`LetterPhotos`](../src/components/letters/recipient/LetterPhotos.tsx).
+7. Decrypted content + `letterKey` (base64) + pre-fetched asset blobs are stashed in `sessionStorage` keyed on `publicToken` so the Keep-forever flow can pick it up across navigation.
 
 ### Keep forever (recipient → Hearth user)
 [src/app/letter/[token]/save/page.tsx](../src/app/letter/[token]/save/page.tsx):
-- **Logged-in recipient**: pulls cached blob (including K and the asset ciphertexts) from `sessionStorage`. For each asset: `decryptTransient(asset.ciphertext, asset.iv, K)` → plaintext bytes → `encryptBytes(bytes, masterKey)` → `POST /api/photos` (raw binary, returns `{handle}`) → pack into an `encryptedRef` (encrypted JSON of `{handle, iv}` under recipient's master key). Re-encrypts the text/song/doodles payload under the recipient's master key. `POST /api/letters/save-received` with `{publicToken, contentCiphertext, contentIVs, photoRefs}`. Server creates a `Letter { letterType: 'received-friend', contentCiphertext, contentIVs, keptPhotoRefs, ...originalIds }` and atomically mirrors `savedByRecipientAt` onto the original sender's `friend` row.
+- **Logged-in recipient**: pulls cached blob (including `letterKey` and the asset ciphertexts) from `sessionStorage`. For each asset: `decryptTransient(asset.ciphertext, asset.iv, letterKey)` → plaintext bytes → `encryptBytes(bytes, masterKey)` → `POST /api/photos` (raw binary, returns `{handle}`) → pack into an `encryptedRef` (encrypted JSON of `{handle, iv}` under recipient's master key). Re-encrypts the text/song/doodles payload under the recipient's master key. `POST /api/letters/save-received` with `{publicToken, contentCiphertext, contentIVs, photoRefs}`. Server creates a `Letter { letterType: 'received-friend', contentCiphertext, contentIVs, keptPhotoRefs, ...originalIds }` and atomically mirrors `savedByRecipientAt` onto the original sender's `friend` row.
 - **Logged-out recipient**: OTP signup → forced Phase 1 E2EE onboarding (passphrase + recovery key) → master key in memory → same save path. SessionStorage survives because the OTP flow stays in the same tab.
 
 ### Resend webhook
@@ -144,9 +157,9 @@ Three Postgres tables matter:
 - Parent `Letter` rows persist with status fields intact. The receipt UI handles missing delivery gracefully ("Faded").
 
 ### Threat model (verified)
-- **Server cannot read content during the wait**: tlock-encrypted K requires a drand round that doesn't exist yet.
-- **Server cannot read content after delivery**: the server stored only `transientCiphertext` and `tlockedKey`. The URL fragment with `tlockedKey` was never sent to it. To recover K, you'd need access to the email itself.
-- **The honest limit**: after delivery the letter is as private as the recipient's email account. If their inbox is compromised, the link → K → content is recoverable for as long as the LetterDelivery row exists (≤24h post-firstRead or ≤60d if never opened).
+- **Server cannot read content at any time**: server stores ciphertext, salt, and question. `letterKey` requires the answer, which is never sent to the server.
+- **Wrong-answer detection is client-side**: AES-256-GCM authentication tag failure when decrypting with a wrong-answer-derived key. No server oracle needed.
+- **The honest limit**: letter security depends on the secrecy of the answer. A weak or guessable answer is a weak key. The Argon2id parameters (m=19MB, t=2, p=1) make brute-force costly but not impossible for very short/common answers.
 - **Sender holds no content**: even with full sender-account access, no content can be recovered after the LetterDelivery row is cleaned up.
 
 ---
@@ -173,37 +186,40 @@ Three Postgres tables matter:
    │ (sender side)   │                    │
    └────┬────────────┘                    │
         │                                  │
-        │ generate K (random 32B)           │
-        │ encrypt content with K (AES-GCM)  │
-        │ tlock-encrypt K @ drand round     │
+        │ sender types question + answer    │
+        │ salt = random 16B                 │
+        │ letterKey = Argon2id(answer, salt)│
+        │ encrypt content + photos with     │
+        │   letterKey (AES-256-GCM)         │
         │                                   │
         ▼                                   │
    ┌───────────────────────────────┐        │
-   │ transientCiphertext + IV  ─── │        │
-   │ tlockedKey                    │        │
+   │ transientCiphertext + IV      │        │
+   │ salt (plaintext)              │        │
+   │ question (plaintext)          │        │
    └────┬──────────────────────────┘        │
         │                                   │
         ▼                                   │
-   Email (Resend scheduled_at, k= fragment)
+   Email (Resend scheduled_at)
         │
         ▼
    Recipient browser:
-   1. fetch drand round (after scheduledFor)
-   2. tlock-decrypt tlockedKey → K
-   3. fetch ciphertext (sets server firstReadAt)
-   4. AES-decrypt with K → plaintext
-   5. (optional) "Keep forever" ──────────────┘
+   1. sees question → types answer
+   2. Argon2id(normalize(answer), salt) → letterKey
+   3. fetch ciphertext (idempotent — no firstReadAt write)
+   4. AES-GCM decrypt with letterKey → plaintext
+   5. on success: POST /opened (server claims firstReadAt + starts 24h window)
+   6. (optional) "Keep forever" ──────────────┘
 ```
 
 - **Self letters**: one encryption, one decryption, both with the owner's master key.
-- **Friend letters during wait**: two layers — content encrypted with K, K time-locked to drand. Server holds the ciphertext and the tlockedKey; can't decrypt either without help from the future.
-- **Friend letters at delivery**: drand round produced → anyone with `tlockedKey` (the email recipient) derives K → decrypts.
+- **Friend letters during wait**: content AES-256-GCM encrypted under `letterKey`. Server holds ciphertext, salt, and question. Cannot derive `letterKey` without the answer.
+- **Friend letters at delivery**: recipient types the answer → browser derives `letterKey` → decrypts locally. Wrong answer = AES-GCM authentication failure (no server round-trip needed).
 - **Friend letters post-Keep-forever**: re-encrypted under recipient's master key. Recipient owns an independent E2EE copy; the original sender still has only a receipt.
 
 Crypto primitives in code:
 - `src/lib/e2ee/crypto.ts` — master key derivation, master-key encrypt/decrypt (`encryptString`, `encryptBytes`, etc.).
-- `src/lib/letters/transient-crypto.ts` — raw-key AES-GCM (for the friend-letter ephemeral K path).
-- `src/lib/letters/tlock.ts` — tlock-js wrapper, drand quicknet config from `DRAND_CHAIN_HASH` + `DRAND_API_URLS`.
+- `src/lib/letters/answer-crypto.ts` — Argon2id key derivation, answer normalization, and raw-key AES-GCM (for the friend-letter `letterKey` path).
 - `src/lib/letters/self-letter-client.ts` — self-letter compose/decompose.
 - `src/lib/letters/friend-letter-client.ts` — friend-letter compose (server has no equivalent).
 
@@ -241,8 +257,7 @@ Crypto primitives in code:
 ### Libs
 | Path | Purpose |
 |---|---|
-| `src/lib/letters/tlock.ts` | Quicknet timelock encrypt/decrypt |
-| `src/lib/letters/transient-crypto.ts` | Raw-key AES-GCM |
+| `src/lib/letters/answer-crypto.ts` | Argon2id key derivation, answer normalization, and raw-key AES-GCM |
 | `src/lib/letters/self-letter-client.ts` | Self-letter payload build/decrypt |
 | `src/lib/letters/friend-letter-client.ts` | Friend-letter payload build |
 | `src/lib/letters/resend-webhook.ts` | Svix signature verification |
@@ -255,18 +270,14 @@ Crypto primitives in code:
 ## 7. Environment variables
 
 ```bash
-# Drand quicknet (Phase 4)
-DRAND_CHAIN_HASH=52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
-DRAND_API_URLS=https://api.drand.sh,https://api2.drand.sh,https://api3.drand.sh
-
-# Resend (Phase 4 helpers use these env-driven addresses; the legacy helpers in src/lib/email.ts still hardcode 'Hearth <letters@hearth.app>' — Phase 5 cleanup)
+# Resend
 RESEND_API_KEY=re_xxx
 RESEND_FROM_LETTERS=Hearth <letters@hearth.app>
 RESEND_FROM_SYSTEM=Hearth <hello@hearth.app>
 RESEND_WEBHOOK_SECRET=whsec_xxx
 
 # App
-NEXT_PUBLIC_APP_URL=http://localhost:3111  # used to build /letter/<token>#k=... links
+NEXT_PUBLIC_APP_URL=http://localhost:3111  # used to build /letter/<token> links in emails
 CRON_SECRET=xxx
 NEXT_PUBLIC_USE_DEV_AUTH=true  # exposed for the SealModal dev-mode toggles (currently the pills are unconditional pre-launch — see PRELAUNCH-TEST-PILLS)
 ```
@@ -311,7 +322,7 @@ Things you must verify or undo before going public:
 - [ ] Strip control chars from `senderName` in the email subject line (Lower #9).
 - [ ] Confirm `RESEND_WEBHOOK_SECRET` is set in production and the Resend dashboard webhook points at `${NEXT_PUBLIC_APP_URL}/api/webhooks/resend`.
 - [ ] Confirm both crons are scheduled (Vercel Cron or external) — daily `self-letter-reminders` and daily `letter-cleanup`.
-- [ ] Confirm `RESEND_FROM_LETTERS`, `RESEND_FROM_SYSTEM`, `DRAND_CHAIN_HASH`, `DRAND_API_URLS` are set in production.
+- [ ] Confirm `RESEND_FROM_LETTERS` and `RESEND_FROM_SYSTEM` are set in production.
 - [ ] Pen-test a malicious sender attempting XSS in letter body to confirm the DOMPurify allow-list is tight enough.
 
 ---
@@ -319,9 +330,8 @@ Things you must verify or undo before going public:
 ## 10. Glossary
 
 - **Master key**: AES-256 CryptoKey held in browser memory, derived from the user's passphrase. Wrapped at rest in `User.encryptedMasterKey`.
-- **K (transient key)**: 32 random bytes generated client-side per friend letter. AES-encrypts the letter content. Tlock-encrypted against a future drand round.
-- **tlock**: Time-lock encryption. Uses BLS pairing-based cryptography against drand's threshold beacon. Decryption is only possible after the targeted round has been produced.
-- **drand quicknet**: A specific drand network (chain hash `52db9ba7…`) with 3-second rounds and G1-group signatures — the only public chain supporting timelock encryption today.
+- **letterKey**: 32 bytes derived per friend letter via Argon2id from the sender's chosen answer and a random per-letter salt. Used for AES-256-GCM of the letter body and photos. Never stored; must be re-derived from the answer.
+- **question/answer**: The question is stored plaintext in `LetterDelivery`. The answer is never sent to or stored by the server — it is the only secret that gates decryption.
 - **Receipt**: The sender's `Letter` row for a friend letter. Has metadata but no content blob.
 - **Faded**: A friend letter whose `LetterDelivery` row has been cleaned up (24h post-firstRead). The receipt row persists; the content is permanently inaccessible.
 - **Keep forever**: The recipient's option to save a friend letter into their own E2EE-encrypted Hearth account.
@@ -333,5 +343,6 @@ Things you must verify or undo before going public:
 
 - Master spec: [docs/superpowers/plans/2026-05-15-e2ee-first-architecture.md](superpowers/plans/2026-05-15-e2ee-first-architecture.md)
 - Phase 2 plan (shipped): [docs/superpowers/plans/2026-05-15-letter-table-extraction.md](superpowers/plans/2026-05-15-letter-table-extraction.md)
-- Phase 4 spec: [docs/superpowers/specs/2026-05-16-friend-letters-tlock-design.md](superpowers/specs/2026-05-16-friend-letters-tlock-design.md)
-- Phase 4 plan: [docs/superpowers/plans/2026-05-16-friend-letters-tlock.md](superpowers/plans/2026-05-16-friend-letters-tlock.md)
+- Phase 4 spec (historical — tlock design, superseded): [docs/superpowers/specs/2026-05-16-friend-letters-tlock-design.md](superpowers/specs/2026-05-16-friend-letters-tlock-design.md)
+- Phase 4 plan (historical — tlock plan, superseded): [docs/superpowers/plans/2026-05-16-friend-letters-tlock.md](superpowers/plans/2026-05-16-friend-letters-tlock.md)
+- Password+Argon2id migration plan: [docs/superpowers/plans/2026-05-18-letters-password-e2ee.md](superpowers/plans/2026-05-18-letters-password-e2ee.md)

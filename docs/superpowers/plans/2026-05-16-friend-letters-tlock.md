@@ -1,3 +1,6 @@
+> **SUPERSEDED** by [2026-05-18-letters-password-e2ee](2026-05-18-letters-password-e2ee.md).
+> The tlock/drand approach below was implemented but replaced before public launch. Kept for historical reference.
+
 # Friend Letters E2EE Implementation Plan (Phase 4)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
