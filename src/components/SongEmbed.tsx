@@ -232,14 +232,14 @@ function ItunesPlayer({
     }
   }, [isPlaying])
 
-  // Pause on unmount
+  // Pause on unmount. Read the current activeId at cleanup time via getState()
+  // rather than the (stale) closure value — instanceId and stop are stable.
   useEffect(() => {
     return () => {
       if (audioRef.current) audioRef.current.pause()
-      if (activeId === instanceId) stop()
+      if (useActiveSong.getState().activeId === instanceId) stop()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [instanceId, stop])
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -249,8 +249,10 @@ function ItunesPlayer({
       audioRef.current?.pause()
       stop()
     } else {
-      audioRef.current?.play().catch(() => setErrored(true))
       play(instanceId)
+      audioRef.current?.play().catch((err) => {
+        if (err?.name !== 'AbortError') setErrored(true)
+      })
     }
   }
 
@@ -272,7 +274,7 @@ function ItunesPlayer({
   return (
     <motion.div
       className={`rounded-2xl overflow-hidden relative flex items-center ${padding}`}
-      onClick={(e) => { e.stopPropagation(); handlePlay(e) }}
+      onClick={handlePlay}
       onMouseDown={(e) => e.stopPropagation()}
       style={{
         background: `linear-gradient(135deg, ${theme.glass.bg} 0%, ${theme.accent.warm}10 100%)`,
@@ -288,6 +290,9 @@ function ItunesPlayer({
         src={preview}
         preload="none"
         onTimeUpdate={onTimeUpdate}
+        onPause={() => {
+          if (useActiveSong.getState().activeId === instanceId) stop()
+        }}
         onEnded={onEnded}
         onError={() => setErrored(true)}
       />
@@ -326,7 +331,8 @@ function ItunesPlayer({
             <div className="mt-2 h-0.5 rounded-full overflow-hidden" style={{ background: `${theme.text.muted}25` }}>
               <motion.div
                 className="h-full rounded-full"
-                style={{ background: theme.accent.warm, width: `${progress * 100}%` }}
+                style={{ background: theme.accent.warm }}
+                animate={{ width: `${progress * 100}%` }}
                 transition={{ duration: 0.15 }}
               />
             </div>
