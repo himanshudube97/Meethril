@@ -26,12 +26,18 @@ export type StoredSong =
 
 const URL_RX = /^https?:\/\//i
 
+// Dropdown shows up to this many results — keeps the picker scannable without overwhelming.
+const ITUNES_RESULT_LIMIT = 8
+
 export function parseStoredSong(value: string | null | undefined): StoredSong {
   if (!value) return { kind: 'empty' }
   const trimmed = value.trim()
   if (!trimmed) return { kind: 'empty' }
 
-  // JSON discriminator path (iTunes pick)
+  // JSON discriminator path (iTunes pick).
+  // Note: if `_h` is anything other than 'itunes' (future providers, malformed data, or
+  // a literal user-typed string that happens to parse as JSON), we deliberately fall
+  // through to URL/text. Forward-compatible by design.
   if (trimmed.startsWith('{')) {
     try {
       const parsed = JSON.parse(trimmed) as ItunesStored
@@ -68,12 +74,13 @@ export function serializeItunesSong(track: ItunesTrack): string {
 
 // iTunes serves cover art at any square size by string replacement.
 // Default `artworkUrl100` ends in `.../100x100bb.jpg`; we typically render at 300 for Retina.
-export function highResArt(url: string, size = 300): string {
-  if (!url) return url
+export function highResArt(url: string | null | undefined, size = 300): string {
+  if (!url) return ''
   return url.replace(/\d+x\d+bb/, `${size}x${size}bb`)
 }
 
-// Public Apple Music page for a track id — used as the error/fallback link.
+// Apple's `/song/{trackId}` is a deep link that resolves to the canonical
+// /album/{albumId}?i={trackId} page. Works in browsers and on iOS without needing the album id.
 export function appleMusicLink(id: string): string {
   return `https://music.apple.com/song/${id}`
 }
@@ -84,7 +91,9 @@ export async function searchItunes(
 ): Promise<ItunesTrack[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(trimmed)}&entity=song&limit=8&country=US`
+  // NOTE: country=US returns a US-biased catalog. Regional users (IN, JP, etc.) may miss local releases.
+  // Acceptable for v1; revisit when adding locale-aware search.
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(trimmed)}&entity=song&limit=${ITUNES_RESULT_LIMIT}&country=US`
   const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`iTunes search failed: ${res.status}`)
   const json = await res.json()
