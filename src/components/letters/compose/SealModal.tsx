@@ -265,6 +265,7 @@ export function SealModal({
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder="What's the name of our favorite cafe?"
+                    maxLength={500}
                     className="w-full px-4 py-3 mb-3 rounded-xl outline-none"
                     style={{
                       border: `1px solid ${theme.text.primary}33`,

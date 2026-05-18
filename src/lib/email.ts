@@ -343,11 +343,10 @@ export async function sendSelfLetterEmail({
 }
 
 /**
- * Phase 4 friend-letter transient delivery. Schedules a Resend email at
- * unlockDate with the magic URL. Returns Resend's email id so the
- * webhook can correlate later.
+ * Schedules a Resend email at scheduledFor with the magic-link URL.
+ * Returns Resend's email id so the webhook can correlate later.
  */
-export async function sendFriendLetterTransientEmail(args: {
+export async function sendFriendLetterEmail(args: {
   to: string
   recipientName: string
   senderName: string

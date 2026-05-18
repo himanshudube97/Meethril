@@ -49,6 +49,17 @@ type Meta = {
   assets: AssetMeta[]
 }
 
+type CachedAsset = {
+  id: string
+  type: string
+  position: number
+  spread: number
+  rotation: number
+  ordinal: number
+  ciphertext: string
+  iv: string
+}
+
 type State =
   | { kind: 'loading_meta' }
   | { kind: 'not_yet'; scheduledFor: string }
@@ -56,7 +67,14 @@ type State =
   | { kind: 'not_found' }
   | { kind: 'error'; message: string }
   | { kind: 'sealed'; meta: Meta; attempts: number; attempting: boolean; error: string | null }
-  | { kind: 'unlocked'; data: LetterContent; meta: Meta; expiresAt: Date; letterKey: Uint8Array }
+  | {
+      kind: 'unlocked'
+      data: LetterContent
+      meta: Meta
+      expiresAt: Date
+      letterKey: Uint8Array
+      cachedAssets: CachedAsset[]
+    }
 
 const SESSION_KEY_PREFIX = 'hearth.letter.decrypted.'
 
@@ -65,6 +83,15 @@ export default function LetterPage() {
   const router = useRouter()
   const [state, setState] = useState<State>({ kind: 'loading_meta' })
   const ranRef = useRef(false)
+  const latestKeyRef = useRef<Uint8Array | null>(null)
+
+  // Best-effort zeroize the in-memory letterKey when the page unmounts.
+  // Matches the sender path's finally-block wipe in friend-letter-client.ts.
+  useEffect(() => {
+    return () => {
+      latestKeyRef.current?.fill(0)
+    }
+  }, [])
 
   useEffect(() => {
     if (ranRef.current) return
@@ -96,6 +123,7 @@ export default function LetterPage() {
 
     try {
       const letterKey = await deriveLetterKey(answer, meta.salt)
+      latestKeyRef.current = letterKey
 
       const ctRes = await fetch(`/api/letter/${params.token}/ciphertext`)
       if (ctRes.status === 410) return setState({ kind: 'expired' })
@@ -124,37 +152,28 @@ export default function LetterPage() {
 
       await fetch(`/api/letter/${params.token}/opened`, { method: 'POST' }).catch(() => {})
 
-      try {
-        const cachedAssets: Array<{
-          id: string
-          type: string
-          position: number
-          spread: number
-          rotation: number
-          ordinal: number
-          ciphertext: string
-          iv: string
-        }> = []
-        for (const a of meta.assets ?? []) {
-          try {
-            const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
-            if (!r.ok) continue
-            const j = (await r.json()) as { ciphertext: string; iv: string }
-            cachedAssets.push({
-              id: a.id,
-              type: a.type,
-              position: a.position,
-              spread: a.spread,
-              rotation: a.rotation,
-              ordinal: a.ordinal,
-              ciphertext: j.ciphertext,
-              iv: j.iv,
-            })
-          } catch {
-            /* skip — Save flow can still proceed without this asset */
-          }
+      const cachedAssets: CachedAsset[] = []
+      for (const a of meta.assets ?? []) {
+        try {
+          const r = await fetch(`/api/letter/${params.token}/asset/${a.id}`)
+          if (!r.ok) continue
+          const j = (await r.json()) as { ciphertext: string; iv: string }
+          cachedAssets.push({
+            id: a.id,
+            type: a.type,
+            position: a.position,
+            spread: a.spread,
+            rotation: a.rotation,
+            ordinal: a.ordinal,
+            ciphertext: j.ciphertext,
+            iv: j.iv,
+          })
+        } catch {
+          /* skip — Save flow can still proceed without this asset */
         }
+      }
 
+      try {
         sessionStorage.setItem(
           `${SESSION_KEY_PREFIX}${params.token}`,
           JSON.stringify({
@@ -167,11 +186,11 @@ export default function LetterPage() {
           })
         )
       } catch {
-        /* sessionStorage might be disabled; not fatal */
+        /* sessionStorage may be disabled or quota-exceeded; not fatal */
       }
 
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
-      setState({ kind: 'unlocked', data, meta, expiresAt, letterKey })
+      setState({ kind: 'unlocked', data, meta, expiresAt, letterKey, cachedAssets })
     } catch (e) {
       setState({
         kind: 'sealed',
@@ -231,7 +250,12 @@ export default function LetterPage() {
             Song they sent: <a href={state.data.song}>{state.data.song}</a>
           </p>
         )}
-        <LetterPhotos token={params.token} assets={state.meta.assets ?? []} K={state.letterKey} />
+        <LetterPhotos
+          token={params.token}
+          assets={state.meta.assets ?? []}
+          letterKey={state.letterKey}
+          cachedAssets={state.cachedAssets}
+        />
         <LetterDoodles doodles={state.data.doodles as never} />
         <KeepForeverCTA token={params.token} router={router} />
       </div>

@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
-import { sendFriendLetterTransientEmail } from '@/lib/email'
+import { sendFriendLetterEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +61,9 @@ export async function POST(request: NextRequest) {
     !body.question.trim()
   ) {
     return NextResponse.json({ error: 'missing crypto fields' }, { status: 400 })
+  }
+  if (body.question.trim().length > 500) {
+    return NextResponse.json({ error: 'question too long (max 500 chars)' }, { status: 400 })
   }
   if (!EMAIL_RE.test(body.recipientEmail ?? '')) {
     return NextResponse.json({ error: 'bad recipientEmail' }, { status: 400 })
@@ -196,7 +199,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { id } = await sendFriendLetterTransientEmail({
+    const { id } = await sendFriendLetterEmail({
       to: body.recipientEmail,
       recipientName: body.recipientName,
       senderName,

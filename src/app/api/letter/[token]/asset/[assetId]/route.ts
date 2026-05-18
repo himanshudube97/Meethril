@@ -1,9 +1,10 @@
 // src/app/api/letter/[token]/asset/[assetId]/route.ts
 //
-// Public GET. Returns one K-encrypted asset blob for a delivery. No auth
-// — the URL fragment K is the auth, exactly like /ciphertext. Lifecycle
-// matches the parent LetterDelivery: 24h after firstRead, or 60d unread.
-// The cleanup cron deletes the parent → asset cascade-deletes.
+// Public GET. Returns one letterKey-encrypted asset blob for a delivery.
+// No auth — possession of the publicToken plus the answer (which derives
+// letterKey client-side) is the implicit auth model. Lifecycle matches
+// the parent LetterDelivery: 24h after firstRead, or 60d unread. The
+// cleanup cron deletes the parent → asset cascade-deletes.
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
@@ -41,7 +42,7 @@ export async function GET(
   if (!asset) return NextResponse.json({ reason: 'not_found' }, { status: 404 })
 
   // Token must match the asset's delivery — prevents asset-id grinding
-  // across deliveries with a stolen URL fragment.
+  // across deliveries with a stolen publicToken.
   if (asset.delivery.publicToken !== token) {
     return NextResponse.json({ reason: 'not_found' }, { status: 404 })
   }
