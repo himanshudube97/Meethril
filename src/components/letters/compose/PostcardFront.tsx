@@ -13,7 +13,14 @@ import { findLargestFittingPrefix } from '@/lib/text-fit'
 // ~12 lines × ~36 chars per line. Sized to match the visible writing area on
 // the 660-px-tall postcard so the line cap and the lines you can SEE are the
 // same number — no more "I can see empty lines but Enter is blocked."
-export const FRONT_CHAR_LIMIT = 432
+// Loose upper bound on chars that can fit in FRONT_LINES at the postcard's
+// width with the Caveat font. Earlier value (432) was based on a 36-chars/line
+// estimate that didn't match the actual writing-area width, so the cap fired
+// after ~5 visual lines instead of letting the user fill all 12. The visual
+// offsetHeight trim in onUpdate is the real source of truth for "front is
+// full" — this limit is just a generous safety net so CharacterCount doesn't
+// preemptively block typing before the visual cap is reached.
+export const FRONT_CHAR_LIMIT = 1500
 const FRONT_LINES = 12
 
 function timeOfDay(d: Date): string {
