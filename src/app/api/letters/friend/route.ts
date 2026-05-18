@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic'
 interface Body {
   transientCiphertext: string
   transientIV: string
-  tlockedKey: string
+  salt: string
+  question: string
   recipientEmail: string
   recipientName: string
   // senderName from client is ignored — server derives it from the
@@ -52,7 +53,13 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 })
   }
-  if (!body.transientCiphertext || !body.transientIV || !body.tlockedKey) {
+  if (
+    !body.transientCiphertext ||
+    !body.transientIV ||
+    !body.salt ||
+    !body.question ||
+    !body.question.trim()
+  ) {
     return NextResponse.json({ error: 'missing crypto fields' }, { status: 400 })
   }
   if (!EMAIL_RE.test(body.recipientEmail ?? '')) {
@@ -156,7 +163,8 @@ export async function POST(request: NextRequest) {
         letterId,
         transientCiphertext: body.transientCiphertext,
         transientIV: body.transientIV,
-        tlockedKey: body.tlockedKey,
+        salt: body.salt,
+        question: body.question.trim(),
         publicToken,
       },
       select: { id: true, publicToken: true },
@@ -194,7 +202,6 @@ export async function POST(request: NextRequest) {
       senderName,
       scheduledFor,
       publicToken,
-      tlockedKey: body.tlockedKey,
     })
     await prisma.letterDelivery.update({
       where: { id: created.delivery.id },
