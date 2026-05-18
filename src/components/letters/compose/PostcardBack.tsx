@@ -236,12 +236,7 @@ export function PostcardBack({
                   </div>
                   <SongPicker
                     value={songInput}
-                    onChange={(next) => {
-                      handleSongChange(next ?? '')
-                      if (next && (/^https?:\/\//i.test(next) || next.startsWith('{'))) {
-                        setIsEditingSong(false)
-                      }
-                    }}
+                    onChange={(next) => handleSongChange(next ?? '')}
                     placeholder="Search a song or paste a link…"
                   />
                 </>
