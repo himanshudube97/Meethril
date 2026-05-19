@@ -3,31 +3,23 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
-import type { ReceivedNote, ReceivedReply } from '@/hooks/useStrangerNotes'
+import type { Theme } from '@/lib/themes'
+import type { InboxThread } from '@/hooks/useStrangerNotes'
 
 interface Props {
   unreadCount: number
-  canSendToday: boolean
+  outgoing: InboxThread[]
+  active: InboxThread[]
+  penpals: InboxThread[]
   onCompose: () => void
-  receivedNotes: ReceivedNote[]
-  receivedReplies: ReceivedReply[]
-  onPickNote: (id: string) => void
-  onPickReply: (id: string) => void
+  onPickThread: (id: string) => void
 }
 
-export default function Mailbox({
-  unreadCount,
-  canSendToday,
-  onCompose,
-  receivedNotes,
-  receivedReplies,
-  onPickNote,
-  onPickReply,
-}: Props) {
+export default function Mailbox({ unreadCount, outgoing, active, penpals, onCompose, onPickThread }: Props) {
   const { theme } = useThemeStore()
   const [open, setOpen] = useState(false)
 
-  const hasItems = receivedNotes.length > 0 || receivedReplies.length > 0
+  const hasItems = outgoing.length + active.length + penpals.length > 0
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -71,71 +63,78 @@ export default function Mailbox({
 
       {open && hasItems && (
         <div
-          className="w-full max-w-sm rounded-xl p-3 flex flex-col gap-2"
+          className="w-full max-w-sm rounded-xl p-3 flex flex-col gap-3"
           style={{
             background: theme.glass.bg,
             border: `1px solid ${theme.glass.border}`,
             backdropFilter: `blur(${theme.glass.blur})`,
           }}
         >
-          {receivedNotes.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <p className="text-xs uppercase tracking-wider opacity-60" style={{ color: theme.text.muted }}>
-                For you
-              </p>
-              {receivedNotes.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  className="text-left text-sm py-2 px-3 rounded-md hover:opacity-80 transition-opacity"
-                  style={{
-                    color: theme.text.secondary,
-                    background: n.readAt ? 'transparent' : `${theme.accent.warm}15`,
-                  }}
-                  onClick={() => onPickNote(n.id)}
-                >
-                  {n.content.slice(0, 60)}
-                  {n.content.length > 60 ? '…' : ''}
-                </button>
-              ))}
-            </div>
-          )}
-          {receivedReplies.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <p className="text-xs uppercase tracking-wider opacity-60" style={{ color: theme.text.muted }}>
-                A warmth back
-              </p>
-              {receivedReplies.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  className="text-left text-sm py-2 px-3 rounded-md hover:opacity-80 transition-opacity"
-                  style={{
-                    color: theme.text.secondary,
-                    background: r.readAt ? 'transparent' : `${theme.accent.primary}15`,
-                  }}
-                  onClick={() => onPickReply(r.id)}
-                >
-                  {r.content}
-                </button>
-              ))}
-            </div>
-          )}
+          <Shelf title="Lights you sent" items={outgoing} theme={theme} onPick={onPickThread} muted />
+          <Shelf title="Open exchanges" items={active} theme={theme} onPick={onPickThread} />
+          <Shelf title="Pen pals" items={penpals} theme={theme} onPick={onPickThread} highlight />
         </div>
       )}
 
       <button
         type="button"
         onClick={onCompose}
-        disabled={!canSendToday}
-        className="px-6 py-3 rounded-full text-sm font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{
-          background: theme.accent.primary,
-          color: theme.bg.primary,
-        }}
+        className="px-6 py-3 rounded-full text-sm font-medium transition-opacity"
+        style={{ background: theme.accent.primary, color: theme.bg.primary }}
       >
-        {canSendToday ? 'Send a small light' : 'Your light is on its way. Come back tomorrow.'}
+        Send a small light
       </button>
+    </div>
+  )
+}
+
+function Shelf({
+  title,
+  items,
+  theme,
+  onPick,
+  muted = false,
+  highlight = false,
+}: {
+  title: string
+  items: InboxThread[]
+  theme: Theme
+  onPick: (id: string) => void
+  muted?: boolean
+  highlight?: boolean
+}) {
+  if (items.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs uppercase tracking-wider opacity-60" style={{ color: theme.text.muted }}>
+        {title}
+      </p>
+      {items.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className="text-left text-sm py-2 px-3 rounded-md hover:opacity-80 transition-opacity"
+          style={{
+            color: theme.text.secondary,
+            background:
+              t.unreadCount > 0
+                ? `${theme.accent.warm}15`
+                : highlight
+                ? `${theme.accent.primary}10`
+                : 'transparent',
+            opacity: muted ? 0.7 : 1,
+          }}
+          onClick={() => onPick(t.id)}
+        >
+          <div className="font-medium">{t.partnerDisplayName}</div>
+          {t.preview && (
+            <div className="text-xs opacity-70 truncate">
+              {t.preview.isMine ? 'You: ' : ''}
+              {t.preview.encryptionTier === 'thread' ? '[encrypted]' : t.preview.body}
+            </div>
+          )}
+        </button>
+      ))}
     </div>
   )
 }

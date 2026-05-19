@@ -2,27 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-export interface ReceivedNote {
+export interface InboxThread {
   id: string
-  content: string
-  matchedAt: string | null
-  expiresAt: string | null
-  readAt: string | null
-  myReply: string | null
-}
-
-export interface ReceivedReply {
-  id: string
-  content: string
-  createdAt: string
-  expiresAt: string
-  readAt: string | null
+  status: 'unmatched' | 'active' | 'pen_pal' | 'closed_unwaved'
+  partnerDisplayName: string
+  myDisplayName: string
+  lastActivityAt: string
+  unreadCount: number
+  waveEligible: boolean
+  waveOfferedToMe: boolean
+  myWaveCast: boolean
+  pendingKeyExchange: boolean
+  myWrappedKey: string | null
+  preview: { isMine: boolean; encryptionTier: 'server' | 'thread'; body: string } | null
 }
 
 export interface InboxPayload {
-  receivedNotes: ReceivedNote[]
-  receivedReplies: ReceivedReply[]
-  canSendToday: boolean
+  outgoing: InboxThread[]
+  active: InboxThread[]
+  penpals: InboxThread[]
   counters: { sent: number; received: number }
 }
 
@@ -42,9 +40,7 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   headers.set(TZ_HEADER, userTz())
   const res = await fetch(input, { ...init, headers, credentials: 'include' })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`)
-  }
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`)
   return data as T
 }
 
@@ -66,60 +62,101 @@ export function useStrangerNotes() {
     }
   }, [])
 
+  // Focus-event refetch: tab visibility, window focus, manual pull.
   useEffect(() => {
     refresh()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', refresh)
+    }
   }, [refresh])
 
-  const send = useCallback(
-    async (content: string) => {
+  const sendNewNote = useCallback(
+    async (content: string, country?: string, stateName?: string) => {
       await jsonFetch('/api/stranger-notes', {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, country, state: stateName }),
       })
       await refresh()
     },
     [refresh]
   )
 
-  const reply = useCallback(
-    async (noteId: string, content: string) => {
-      await jsonFetch(`/api/stranger-notes/${encodeURIComponent(noteId)}/reply`, {
+  const sendReply = useCallback(
+    async (threadId: string, content: string, country?: string, stateName?: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, country, state: stateName, encryptionTier: 'server' }),
       })
       await refresh()
     },
     [refresh]
   )
 
-  const burnNote = useCallback(
-    async (noteId: string) => {
-      await jsonFetch(`/api/stranger-notes/${encodeURIComponent(noteId)}/burn`, {
+  const sendReplyEncrypted = useCallback(
+    async (threadId: string, ciphertext: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/messages`, {
         method: 'POST',
+        body: JSON.stringify({ encryptionTier: 'thread', ciphertext }),
       })
       await refresh()
     },
     [refresh]
   )
 
-  const burnReply = useCallback(
-    async (replyId: string) => {
-      await jsonFetch(`/api/stranger-notes/replies/${encodeURIComponent(replyId)}/burn`, {
-        method: 'POST',
-      })
+  const skip = useCallback(
+    async (threadId: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/skip`, { method: 'POST' })
       await refresh()
     },
     [refresh]
   )
 
-  const markRead = useCallback(
-    async (noteId: string) => {
-      await jsonFetch(`/api/stranger-notes/${encodeURIComponent(noteId)}/read`, {
-        method: 'POST',
-      }).catch(() => {})
+  const block = useCallback(
+    async (threadId: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/block`, { method: 'POST' })
+      await refresh()
     },
-    []
+    [refresh]
   )
 
-  return { data, loading, error, refresh, send, reply, burnNote, burnReply, markRead }
+  const waveOffered = useCallback(async (threadId: string) => {
+    await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/wave-offered`, { method: 'POST' })
+  }, [])
+
+  const wave = useCallback(
+    async (threadId: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/wave`, { method: 'POST' })
+      await refresh()
+    },
+    [refresh]
+  )
+
+  const endPenPal = useCallback(
+    async (threadId: string) => {
+      await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' })
+      await refresh()
+    },
+    [refresh]
+  )
+
+  return {
+    data,
+    loading,
+    error,
+    refresh,
+    sendNewNote,
+    sendReply,
+    sendReplyEncrypted,
+    skip,
+    block,
+    waveOffered,
+    wave,
+    endPenPal,
+  }
 }
