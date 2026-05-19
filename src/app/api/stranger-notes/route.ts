@@ -2,26 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import {
-  validateNoteContent,
-  encryptStrangerContent,
+  validateMessageContent,
+  encryptServerTier,
+  countTodaysNewNotes,
+  hasWrittenJournalEntry,
+  DAILY_NEW_NOTE_LIMIT,
+  safeIanaTz,
 } from '@/lib/stranger-notes'
-import { tryDeliverQueued } from '@/lib/stranger-matcher'
-
-function safeIanaTz(raw: string | null | undefined): string {
-  const candidate = raw && raw.length > 0 ? raw : 'UTC'
-  try {
-    new Intl.DateTimeFormat('en-CA', { timeZone: candidate })
-    return candidate
-  } catch {
-    return 'UTC'
-  }
-}
+import { pickRandomRecipient, deliverThreadToRecipient } from '@/lib/stranger-matcher'
+import { generateDisplayName } from '@/lib/stranger-names'
+import { moderateText } from '@/lib/moderation'
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: { content?: unknown }
+  let body: { content?: unknown; country?: unknown; state?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -31,72 +27,90 @@ export async function POST(req: NextRequest) {
   if (typeof body.content !== 'string') {
     return NextResponse.json({ error: 'content must be a string' }, { status: 400 })
   }
-
-  const validation = validateNoteContent(body.content)
+  const validation = validateMessageContent(body.content)
   if (!validation.ok) {
-    const map: Record<typeof validation.error, string> = {
+    const map = {
       empty: 'Write something first.',
       too_short: 'A little longer — at least 10 characters.',
       too_long: 'A little shorter — at most 200 characters.',
-    }
+    } as const
     return NextResponse.json({ error: map[validation.error] }, { status: 400 })
   }
+  const country = typeof body.country === 'string' && body.country.length > 0 ? body.country : null
+  const stateName = typeof body.state === 'string' && body.state.length > 0 ? body.state : null
 
-  // TODO BLOCKER before public launch: run validation.trimmed through a
-  // moderation API here. Reject (status 400) if flagged. Keep this comment
-  // until the moderation spec ships.
-
-  const ciphertext = encryptStrangerContent(validation.trimmed)
-  const tz = safeIanaTz(req.headers.get('X-User-TZ'))
-  const now = new Date()
-
-  // Atomic daily-rate-limit claim + note creation.
-  // The conditional UPDATE checks the user's local-day boundary in SQL so
-  // two concurrent sends cannot both pass: only the first request whose
-  // UPDATE matches "lastStrangerNoteSentAt is null OR is on an earlier
-  // calendar day in the user's tz" will succeed and increment the counter.
-  // The second request's UPDATE will affect 0 rows and we return 429.
-  // Wrapping the create + claim in a transaction also ensures that if note
-  // creation fails after the claim, the slot is rolled back and the user
-  // can retry. (Fixes the partial-failure and TOCTOU windows the prior
-  // read-then-write pattern allowed.)
-  const noteId = await prisma.$transaction(async (tx) => {
-    const claimedCount = await tx.$executeRaw`
-      UPDATE users
-      SET "lastStrangerNoteSentAt" = ${now},
-          "strangerNotesSent" = "strangerNotesSent" + 1
-      WHERE id = ${user.id}
-        AND ("lastStrangerNoteSentAt" IS NULL
-             OR date_trunc('day', "lastStrangerNoteSentAt" AT TIME ZONE ${tz})
-                < date_trunc('day', ${now}::timestamptz AT TIME ZONE ${tz}))
-    `
-    if (claimedCount === 0) return null
-
-    const note = await tx.strangerNote.create({
-      data: {
-        senderId: user.id,
-        content: ciphertext,
-        status: 'queued',
-      },
-      select: { id: true },
-    })
-    return note.id
-  })
-
-  if (noteId === null) {
+  // Cold-start gate
+  const hasEntry = await hasWrittenJournalEntry(user.id)
+  if (!hasEntry) {
     return NextResponse.json(
-      { error: 'Your light is on its way. Come back tomorrow.' },
+      { error: 'Write something for yourself first before reaching out to a stranger.' },
+      { status: 403 }
+    )
+  }
+
+  // Daily limit
+  const tz = safeIanaTz(req.headers.get('X-User-TZ'))
+  const todaysCount = await countTodaysNewNotes(user.id, tz)
+  if (todaysCount >= DAILY_NEW_NOTE_LIMIT) {
+    return NextResponse.json(
+      { error: 'Your lights are on their way. Come back tomorrow.' },
       { status: 429 }
     )
   }
 
-  // Try to deliver immediately. tryDeliverQueued runs its own transaction
-  // for the queued→delivered flip + recipient counter bump, so it stays
-  // outside the claim transaction here.
-  const delivered = await tryDeliverQueued(noteId, user.id)
+  // Moderation
+  const moderation = await moderateText(validation.trimmed)
+  if (moderation.rejected) {
+    return NextResponse.json(
+      { error: 'This note can\'t be sent. Try writing it with more warmth.' },
+      { status: 400 }
+    )
+  }
+  // selfHarm is not a rejection here; the client interstitial handles it pre-submit.
 
-  return NextResponse.json(
-    { id: noteId, status: delivered ? 'delivered' : 'queued' },
-    { status: 201 }
-  )
+  const ciphertext = encryptServerTier(validation.trimmed)
+
+  // Create thread + first message + bump sender counter atomically.
+  const senderDisplayName = generateDisplayName(`${user.id}:${Date.now()}:sender`)
+  const thread = await prisma.$transaction(async (tx) => {
+    const created = await tx.strangerThread.create({
+      data: {
+        senderId: user.id,
+        status: 'unmatched',
+        senderDisplayName,
+        messages: {
+          create: {
+            senderId: user.id,
+            content: ciphertext,
+            encryptionTier: 'server',
+            countryCode: country,
+            stateName,
+          },
+        },
+      },
+    })
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        strangerNotesSent: { increment: 1 },
+        lastStrangerNoteSentAt: new Date(),
+      },
+    })
+    return created
+  })
+
+  // Synchronous match attempt. If no eligible recipient, thread stays 'unmatched'
+  // and the cron retries.
+  const recipientId = await pickRandomRecipient(user.id)
+  if (recipientId) {
+    const recipientDisplayName = generateDisplayName(`${thread.id}:recipient`)
+    await deliverThreadToRecipient(thread.id, recipientId, recipientDisplayName)
+  }
+
+  const finalThread = await prisma.strangerThread.findUnique({
+    where: { id: thread.id },
+    select: { id: true, status: true },
+  })
+
+  return NextResponse.json({ id: thread.id, status: finalThread?.status ?? 'unmatched' }, { status: 201 })
 }
