@@ -32,6 +32,19 @@ model User {
   sentStrangerNotes       StrangerNote[] @relation("SentStrangerNotes")
   receivedStrangerNotes   StrangerNote[] @relation("ReceivedStrangerNotes")
 
+  // Stranger Notes v2 — E2EE keypair + suspension flag.
+  strangerPublicKey             String?
+  strangerWrappedPrivateKey     String?
+  strangerNotesSendingSuspended Boolean @default(false)
+
+  // Relations for the new tables
+  sentStrangerThreads      StrangerThread[]  @relation("SentStrangerThreads")
+  receivedStrangerThreads  StrangerThread[]  @relation("ReceivedStrangerThreads")
+  strangerMessagesSent     StrangerMessage[] @relation("StrangerMessagesSent")
+  strangerWaves            StrangerWave[]    @relation("StrangerWaves")
+  strangerBlocksInitiated  StrangerBlock[]   @relation("StrangerBlocksInitiated")
+  strangerBlocksReceived   StrangerBlock[]   @relation("StrangerBlocksReceived")
+
   // Lemon Squeezy subscription fields
   lemonSqueezyCustomerId String?   @unique
   subscriptionId         String?   @unique
@@ -373,4 +386,97 @@ model StrangerReply {
 
   @@index([createdAt])
   @@map("stranger_replies")
+}
+
+model StrangerThread {
+  id              String   @id @default(cuid())
+
+  senderId        String
+  sender          User     @relation("SentStrangerThreads", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId     String?
+  recipient       User?    @relation("ReceivedStrangerThreads", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  // unmatched | active | pen_pal | closed_unwaved
+  status          String   @default("unmatched")
+
+  senderDisplayName    String
+  recipientDisplayName String?
+
+  createdAt       DateTime  @default(now())
+  matchedAt       DateTime?
+  lastActivityAt  DateTime  @default(now())
+  closedAt        DateTime?
+
+  senderWaveOfferedAt    DateTime?
+  recipientWaveOfferedAt DateTime?
+
+  pendingKeyExchange     Boolean  @default(false)
+  wrappedKeyForSender    String?
+  wrappedKeyForRecipient String?
+
+  senderDismissedAt      DateTime?
+  recipientDismissedAt   DateTime?
+
+  senderLastViewedAt     DateTime?
+  recipientLastViewedAt  DateTime?
+
+  messages       StrangerMessage[]
+  waves          StrangerWave[]
+
+  @@index([senderId, status])
+  @@index([recipientId, status])
+  @@index([status, lastActivityAt])
+  @@map("stranger_threads")
+}
+
+model StrangerMessage {
+  id           String   @id @default(cuid())
+
+  threadId     String
+  thread       StrangerThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  senderId     String
+  sender       User     @relation("StrangerMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+
+  content        String   @db.Text
+  encryptionTier String   @default("server")
+
+  countryCode  String?
+  stateName    String?
+
+  createdAt    DateTime  @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("stranger_messages")
+}
+
+model StrangerWave {
+  id           String   @id @default(cuid())
+
+  threadId     String
+  thread       StrangerThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  userId       String
+  user         User     @relation("StrangerWaves", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now())
+
+  @@unique([threadId, userId])
+  @@map("stranger_waves")
+}
+
+model StrangerBlock {
+  id           String   @id @default(cuid())
+
+  blockerId    String
+  blocker      User     @relation("StrangerBlocksInitiated", fields: [blockerId], references: [id], onDelete: Cascade)
+
+  blockedId    String
+  blocked      User     @relation("StrangerBlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("stranger_blocks")
 }
