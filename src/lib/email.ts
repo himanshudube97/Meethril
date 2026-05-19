@@ -9,7 +9,7 @@ function getResend() {
 
 
 // Generate beautiful HTML email for letter delivery
-function generateLetterEmail({
+export function generateLetterEmail({
   recipientName,
   senderName,
   letterContent,
