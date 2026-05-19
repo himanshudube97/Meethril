@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useThemeStore } from '@/store/theme'
+import {
+  useStrangerThreadKey,
+  encryptThreadMessage,
+  decryptThreadMessage,
+} from '@/hooks/useStrangerThreadKey'
 
 interface ThreadMessage {
   id: string
@@ -19,6 +24,7 @@ interface ThreadDetail {
   partnerDisplayName: string
   myDisplayName: string
   partnerUserId: string | null
+  iAmThreadSender: boolean
   waveEligible: boolean
   waveOfferedToMe: boolean
   myWaveCast: boolean
@@ -48,6 +54,15 @@ export default function ThreadView({
 }: Props) {
   const { theme } = useThemeStore()
   const [thread, setThread] = useState<ThreadDetail | null>(null)
+  const { threadKey } = useStrangerThreadKey({
+    threadId: thread?.status === 'pen_pal' ? threadId : null,
+    status: thread?.status ?? null,
+    pendingKeyExchange: thread?.pendingKeyExchange ?? false,
+    iAmThreadSender: thread?.iAmThreadSender ?? false,
+    myWrappedKey: thread?.myWrappedKey ?? null,
+    partnerUserId: thread?.partnerUserId ?? null,
+  })
+  const [decryptedBodies, setDecryptedBodies] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
 
@@ -66,6 +81,27 @@ export default function ThreadView({
       cancelled = true
     }
   }, [threadId, onWavePromptShown])
+
+  useEffect(() => {
+    if (!thread || !threadKey) return
+    let cancelled = false
+    ;(async () => {
+      const out: Record<string, string> = {}
+      for (const m of thread.messages) {
+        if (m.encryptionTier === 'thread') {
+          try {
+            out[m.id] = await decryptThreadMessage(m.body, threadKey)
+          } catch {
+            out[m.id] = '[unreadable]'
+          }
+        }
+      }
+      if (!cancelled) setDecryptedBodies(out)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [thread, threadKey])
 
   if (!thread) return <div className="p-6 text-sm opacity-70">Loading…</div>
 
@@ -105,7 +141,9 @@ export default function ThreadView({
                 background: m.isMine ? `${theme.accent.primary}15` : `${theme.accent.warm}15`,
               }}
             >
-              {m.body || (m.encryptionTier === 'thread' ? '[encrypted]' : '')}
+              {m.encryptionTier === 'thread'
+                ? (decryptedBodies[m.id] ?? '[encrypted]')
+                : m.body}
               {m.countryCode && (
                 <span className="ml-2 text-xs opacity-60" style={{ color: theme.text.muted }}>
                   · {m.stateName ? `${m.stateName}, ` : ''}{m.countryCode}
@@ -139,7 +177,24 @@ export default function ThreadView({
             if (!draft.trim() || sending) return
             setSending(true)
             try {
-              await onReply(draft.trim())
+              if (thread.status === 'pen_pal' && threadKey) {
+                const ciphertext = await encryptThreadMessage(draft.trim(), threadKey)
+                const res = await fetch(
+                  `/api/stranger-notes/threads/${encodeURIComponent(threadId)}/messages`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ encryptionTier: 'thread', ciphertext }),
+                  }
+                )
+                if (!res.ok) throw new Error('Failed to send')
+                // Refresh thread so the new message appears.
+                const refreshed = await fetch(`/api/stranger-notes/threads/${threadId}`, { credentials: 'include' })
+                if (refreshed.ok) setThread(await refreshed.json())
+              } else {
+                await onReply(draft.trim())
+              }
               setDraft('')
             } finally {
               setSending(false)

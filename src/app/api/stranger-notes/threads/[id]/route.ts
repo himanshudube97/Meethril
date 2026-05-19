@@ -78,6 +78,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     partnerDisplayName,
     myDisplayName,
     partnerUserId,
+    iAmThreadSender: isSender,
     waveEligible,
     waveOfferedToMe,
     myWaveCast,
