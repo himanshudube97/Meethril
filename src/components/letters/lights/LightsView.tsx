@@ -49,10 +49,9 @@ export default function LightsView() {
 
       {mode === 'composing' && (
         <ComposePaper
-          canSend={true}
           onCancel={() => setMode('idle')}
-          onSend={async (content) => {
-            await sn.sendNewNote(content)
+          onSend={async (content, country, stateName) => {
+            await sn.sendNewNote(content, country, stateName)
             setMode('idle')
           }}
         />
