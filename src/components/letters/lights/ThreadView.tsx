@@ -105,6 +105,51 @@ export default function ThreadView({
 
   if (!thread) return <div className="p-6 text-sm opacity-70">Loading…</div>
 
+  // closed_unwaved: silent fold-away copy
+  if (thread.status === 'closed_unwaved') {
+    return (
+      <div
+        className="w-full max-w-md rounded-xl p-6 flex flex-col gap-3 text-center"
+        style={{
+          background: theme.glass.bg,
+          border: `1px solid ${theme.glass.border}`,
+          backdropFilter: `blur(${theme.glass.blur})`,
+        }}
+      >
+        <p className="text-sm" style={{ color: theme.text.primary }}>
+          This exchange has folded itself away.
+        </p>
+        <button onClick={onClose} className="text-xs opacity-60 hover:opacity-100 self-center">
+          close
+        </button>
+      </div>
+    )
+  }
+
+  // partner account deleted: cascade left partnerDisplayName as the fallback literal
+  const partnerGone =
+    (thread.status === 'active' || thread.status === 'pen_pal') &&
+    thread.partnerDisplayName === 'A wandering light'
+  if (partnerGone) {
+    return (
+      <div
+        className="w-full max-w-md rounded-xl p-6 flex flex-col gap-3 text-center"
+        style={{
+          background: theme.glass.bg,
+          border: `1px solid ${theme.glass.border}`,
+          backdropFilter: `blur(${theme.glass.blur})`,
+        }}
+      >
+        <p className="text-sm" style={{ color: theme.text.primary }}>
+          This stranger has left.
+        </p>
+        <button onClick={onClose} className="text-xs opacity-60 hover:opacity-100 self-center">
+          close
+        </button>
+      </div>
+    )
+  }
+
   // Find pre-wave / post-wave boundary: index of first 'thread' tier message
   const firstThreadIdx = thread.messages.findIndex((m) => m.encryptionTier === 'thread')
 
@@ -238,6 +283,22 @@ export default function ThreadView({
         <button onClick={onBlock} className="hover:opacity-100">
           Block
         </button>
+        {thread.status === 'pen_pal' && (
+          <button
+            onClick={async () => {
+              if (confirm('End this connection? The thread will be erased on both sides.')) {
+                await fetch(`/api/stranger-notes/threads/${threadId}`, {
+                  method: 'DELETE',
+                  credentials: 'include',
+                })
+                onClose()
+              }
+            }}
+            className="hover:opacity-100"
+          >
+            End connection
+          </button>
+        )}
       </div>
     </div>
   )
