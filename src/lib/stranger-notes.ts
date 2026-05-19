@@ -1,82 +1,75 @@
+import { prisma } from '@/lib/db'
 import { encrypt, decrypt } from '@/lib/encryption'
 
-// Min/max char length for outgoing note body (after trim).
-export const MIN_NOTE_CHARS = 10
-export const MAX_NOTE_CHARS = 200
+// Per-message body length cap. Same on cold opens and replies, both sides.
+export const MIN_MESSAGE_CHARS = 10
+export const MAX_MESSAGE_CHARS = 200
 
-// Max words for a reply.
-export const MAX_REPLY_WORDS = 20
+// New cold-open notes per user per local-calendar-day.
+export const DAILY_NEW_NOTE_LIMIT = 2
 
-// 24h lifetime once delivered (note) or once written (reply).
-export const NOTE_LIFETIME_MS = 24 * 60 * 60 * 1000
-export const REPLY_LIFETIME_MS = 24 * 60 * 60 * 1000
+// Lifetimes (cleanup cron enforces).
+export const UNMATCHED_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
+export const ACTIVE_SILENCE_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
+export const UNWAVED_VANISH_LIFETIME_MS = 24 * 60 * 60 * 1000
+export const WAVE_DECISION_WINDOW_MS = 24 * 60 * 60 * 1000
 
-export type NoteValidationError =
-  | 'empty'
-  | 'too_short'
-  | 'too_long'
+// Number of messages each side must send before wave is eligible.
+export const WAVE_ELIGIBLE_PER_SIDE = 3
 
-export type ReplyValidationError =
-  | 'empty'
-  | 'too_many_words'
+export type MessageValidationError = 'empty' | 'too_short' | 'too_long'
 
-export function validateNoteContent(raw: string): { ok: true; trimmed: string } | { ok: false; error: NoteValidationError } {
+export function validateMessageContent(
+  raw: string
+): { ok: true; trimmed: string } | { ok: false; error: MessageValidationError } {
   const trimmed = (raw ?? '').trim()
   if (trimmed.length === 0) return { ok: false, error: 'empty' }
-  if (trimmed.length < MIN_NOTE_CHARS) return { ok: false, error: 'too_short' }
-  if (trimmed.length > MAX_NOTE_CHARS) return { ok: false, error: 'too_long' }
+  if (trimmed.length < MIN_MESSAGE_CHARS) return { ok: false, error: 'too_short' }
+  if (trimmed.length > MAX_MESSAGE_CHARS) return { ok: false, error: 'too_long' }
   return { ok: true, trimmed }
 }
 
-export function countWords(s: string): number {
-  return s.trim().split(/\s+/).filter(Boolean).length
-}
-
-export function validateReplyContent(raw: string): { ok: true; trimmed: string } | { ok: false; error: ReplyValidationError } {
-  const trimmed = (raw ?? '').trim()
-  if (trimmed.length === 0) return { ok: false, error: 'empty' }
-  if (countWords(trimmed) > MAX_REPLY_WORDS) return { ok: false, error: 'too_many_words' }
-  return { ok: true, trimmed }
-}
-
-/**
- * Returns true if the user is allowed to send a note now.
- * Rule: at most one note per calendar day in the user's timezone.
- *
- * `lastSentAt` is the User.lastStrangerNoteSentAt field.
- * `userTz` should come from the X-User-TZ request header (IANA name); falls back to UTC.
- */
-export function canSendToday(lastSentAt: Date | null | undefined, userTz: string | null | undefined, now: Date = new Date()): boolean {
-  if (!lastSentAt) return true
-  const tz = userTz && userTz.length > 0 ? userTz : 'UTC'
-  try {
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
-    return fmt.format(lastSentAt) !== fmt.format(now)
-  } catch {
-    // Invalid TZ — fall back to UTC behavior
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' })
-    return fmt.format(lastSentAt) !== fmt.format(now)
-  }
-}
-
-export function encryptStrangerContent(plaintext: string): string {
+export function encryptServerTier(plaintext: string): string {
   return encrypt(plaintext)
 }
 
-export function decryptStrangerContent(ciphertext: string): string {
+export function decryptServerTier(ciphertext: string): string {
   return decrypt(ciphertext)
 }
 
-/**
- * Compute the absolute expiry instant for a delivered note (24h from matchedAt).
- */
-export function noteExpiresAt(matchedAt: Date): Date {
-  return new Date(matchedAt.getTime() + NOTE_LIFETIME_MS)
+export function safeIanaTz(raw: string | null | undefined): string {
+  const candidate = raw && raw.length > 0 ? raw : 'UTC'
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: candidate })
+    return candidate
+  } catch {
+    return 'UTC'
+  }
 }
 
 /**
- * Compute the absolute expiry instant for a reply (24h from createdAt).
+ * Returns the count of cold-open notes the user has sent today in their local timezone.
+ * Used to enforce DAILY_NEW_NOTE_LIMIT. Counts rows in stranger_threads with senderId=X
+ * and createdAt's local date == today's local date. This replaces v1's single-row
+ * lastStrangerNoteSentAt claim which only supported a 1/day limit.
  */
-export function replyExpiresAt(createdAt: Date): Date {
-  return new Date(createdAt.getTime() + REPLY_LIFETIME_MS)
+export async function countTodaysNewNotes(userId: string, tz: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+    SELECT COUNT(*) AS c FROM stranger_threads
+    WHERE "senderId" = ${userId}
+      AND date_trunc('day', "createdAt" AT TIME ZONE ${tz})
+          = date_trunc('day', now() AT TIME ZONE ${tz})
+  `
+  return Number(rows[0]?.c ?? 0)
+}
+
+/**
+ * Cold-start engagement gate: a user must have written at least one journal entry
+ * before they can send a stranger note.
+ */
+export async function hasWrittenJournalEntry(userId: string): Promise<boolean> {
+  const count = await prisma.journalEntry.count({
+    where: { userId },
+  })
+  return count > 0
 }
