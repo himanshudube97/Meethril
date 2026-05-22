@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
@@ -39,10 +39,6 @@ export default function DeskScene() {
       return () => window.removeEventListener('resize', calcScale)
     }
   }, [layoutMode])
-
-  const handleMobileClose = useCallback(() => {
-    window.history.back()
-  }, [])
 
   if (!mounted) return null
 
@@ -99,7 +95,7 @@ export default function DeskScene() {
       />
 
       {layoutMode === 'mobile' ? (
-        <MobileJournalEntry onClose={handleMobileClose} />
+        <MobileJournalEntry />
       ) : (
         <>
           {/* Whisper line — anchored just below the global navbar so it
