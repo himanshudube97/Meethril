@@ -9,6 +9,7 @@ import { htmlToPlainText } from '@/lib/text-utils'
 import { getRandomPrompt } from '@/lib/themes'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
+import SongPicker from '@/components/SongPicker'
 import PhotoBlock from './PhotoBlock'
 import CompactDoodleCanvas from './CompactDoodleCanvas'
 import EntrySelector from './EntrySelector'
@@ -447,7 +448,7 @@ function WritePage({
           style={{ color: colors.sectionLabel }}>
           Add a Song
         </div>
-        {songInput && /https?:\/\//.test(songInput) ? (
+        {songInput && (songInput.startsWith('{') || /https?:\/\//.test(songInput)) ? (
           <div className="relative">
             <SongEmbed url={songInput} compact audioOnly />
             <button onClick={() => onSongChange('')}
@@ -457,17 +458,10 @@ function WritePage({
             </button>
           </div>
         ) : (
-          <input
-            type="text"
+          <SongPicker
             value={songInput}
-            onChange={e => onSongChange(e.target.value)}
-            placeholder="Paste Spotify, YouTube, or SoundCloud..."
-            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-            style={{
-              border: `1px solid ${colors.pageBorder}`,
-              color: colors.bodyText,
-              background: 'rgba(255,255,255,0.03)',
-            }}
+            onChange={(next) => onSongChange(next ?? '')}
+            placeholder="Search a song or paste a link…"
           />
         )}
       </div>
