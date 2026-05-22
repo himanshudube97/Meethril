@@ -8,6 +8,7 @@ import { createNoise2D } from 'simplex-noise'
 import { useThemeStore } from '@/store/theme'
 import { useDeskSettings } from '@/store/deskSettings'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type { ISourceOptions } from '@tsparticles/engine'
 
 // Hard cap on the number of particles drawn on mobile. Phone CPUs + battery
@@ -814,7 +815,11 @@ function BackgroundComponent({ bounded = false }: BackgroundProps = {}) {
   const [mounted, setMounted] = useState(false)
   const [particlesReady, setParticlesReady] = useState(false)
   const { theme, themeName } = useThemeStore()
-  const animationsEnabled = useDeskSettings((s) => s.animationsEnabled)
+  const userAnimationsEnabled = useDeskSettings((s) => s.animationsEnabled)
+  const prefersReducedMotion = usePrefersReducedMotion()
+  // Honor the OS-level reduced-motion preference in addition to the
+  // in-app toggle. Either disables the heavy ambient effects.
+  const animationsEnabled = userAnimationsEnabled && !prefersReducedMotion
 
   useEffect(() => {
     setMounted(true)

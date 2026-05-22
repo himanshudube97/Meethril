@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EE } from '@/hooks/useE2EE'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { JournalEntry } from '@/store/journal'
 import MemoryEntryReader from './MemoryEntryReader'
 
@@ -30,6 +31,7 @@ const HOMES: Array<{ x: number; y: number }> = [
 export default function ButterflyMemoryView() {
   const { theme } = useThemeStore()
   const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
+  const prefersReducedMotion = usePrefersReducedMotion()
   const [entries, setEntries] = useState<JournalEntry[] | null>(null)
   const [selected, setSelected] = useState<JournalEntry | null>(null)
 
@@ -105,22 +107,26 @@ export default function ButterflyMemoryView() {
               padding: 12,
             }}
             initial={{ opacity: 0, scale: 0.6 }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: [0, -12, 0, 8, 0],
-              x: [0, 6, -4, 3, 0],
-            }}
-            transition={{
-              opacity: { delay: i * 0.18, duration: 0.6 },
-              scale: { delay: i * 0.18, duration: 0.6 },
-              y: { duration: 9 + i * 1.3, repeat: Infinity, ease: 'easeInOut' },
-              x: { duration: 11 + i * 1.1, repeat: Infinity, ease: 'easeInOut' },
-            }}
+            animate={prefersReducedMotion
+              ? { opacity: 1, scale: 1 }
+              : {
+                  opacity: 1,
+                  scale: 1,
+                  y: [0, -12, 0, 8, 0],
+                  x: [0, 6, -4, 3, 0],
+                }}
+            transition={prefersReducedMotion
+              ? { duration: 0.3 }
+              : {
+                  opacity: { delay: i * 0.18, duration: 0.6 },
+                  scale: { delay: i * 0.18, duration: 0.6 },
+                  y: { duration: 9 + i * 1.3, repeat: Infinity, ease: 'easeInOut' },
+                  x: { duration: 11 + i * 1.1, repeat: Infinity, ease: 'easeInOut' },
+                }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.92 }}
           >
-            <Butterfly primary={wing} warm={wingWarm} size={56} />
+            <Butterfly primary={wing} warm={wingWarm} size={56} flap={!prefersReducedMotion} />
           </motion.button>
         )
       })}
@@ -136,7 +142,7 @@ export default function ButterflyMemoryView() {
 
 // ----------------------------------------------------------------------------
 
-function Butterfly({ primary, warm, size }: { primary: string; warm: string; size: number }) {
+function Butterfly({ primary, warm, size, flap = true }: { primary: string; warm: string; size: number; flap?: boolean }) {
   return (
     <svg
       width={size}
@@ -156,8 +162,8 @@ function Butterfly({ primary, warm, size }: { primary: string; warm: string; siz
       {/* Left wing — upper and lower */}
       <motion.g
         style={{ transformOrigin: '32px 32px' }}
-        animate={{ rotateY: [0, 35, 0] }}
-        transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+        animate={flap ? { rotateY: [0, 35, 0] } : undefined}
+        transition={flap ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' } : undefined}
       >
         <path d="M32 18 C16 8, 4 22, 10 34 C16 40, 26 36, 32 30 Z" fill={primary} opacity="0.85" />
         <path d="M32 32 C18 32, 8 44, 14 52 C22 56, 28 50, 32 44 Z" fill={warm} opacity="0.85" />
@@ -166,8 +172,8 @@ function Butterfly({ primary, warm, size }: { primary: string; warm: string; siz
       {/* Right wing — upper and lower (mirror) */}
       <motion.g
         style={{ transformOrigin: '32px 32px' }}
-        animate={{ rotateY: [0, -35, 0] }}
-        transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+        animate={flap ? { rotateY: [0, -35, 0] } : undefined}
+        transition={flap ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' } : undefined}
       >
         <path d="M32 18 C48 8, 60 22, 54 34 C48 40, 38 36, 32 30 Z" fill={primary} opacity="0.85" />
         <path d="M32 32 C46 32, 56 44, 50 52 C42 56, 36 50, 32 44 Z" fill={warm} opacity="0.85" />

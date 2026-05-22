@@ -220,6 +220,8 @@ const PhotoSlot = memo(function PhotoSlot({
               <img
                 src={resolvedSrc}
                 alt="Journal photo"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             ) : (
