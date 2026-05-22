@@ -8,6 +8,7 @@ import { useE2EEStore } from '@/store/e2ee'
 import { useJournalStore, StrokeData } from '@/store/journal'
 import { buildSelfLetterPayload } from '@/lib/letters/self-letter-client'
 import { buildFriendLetterPayload } from '@/lib/letters/friend-letter-client'
+import { encryptString } from '@/lib/e2ee/crypto'
 import SongEmbed from '@/components/SongEmbed'
 import SongPicker from '@/components/SongPicker'
 import PhotoBlock from '@/components/desk/PhotoBlock'
@@ -17,8 +18,7 @@ import { JOURNAL } from '@/lib/journal-constants'
 const LETTER_BODY_MAX = 800
 
 type Recipient = 'self' | 'friend'
-type Step = 'pick' | 'compose'
-type ActiveTab = 'write' | 'media'
+type Step = 'pick' | 'write' | 'media' | 'seal'
 
 interface Photo {
   id?: string
@@ -30,16 +30,19 @@ interface Photo {
 }
 
 /**
- * Mobile letter compose — two-step flow:
+ * Mobile letter compose — a 4-step wizard so each surface gets its own
+ * room instead of stacking into one cramped form.
  *
- *  1. Pick recipient: Future me OR Someone close.
- *  2. Compose: tabbed Write / Media surface (mirrors the mobile journal).
+ *   pick   → Future me or Someone close
+ *   write  → song + the letter body
+ *   media  → photos + doodle
+ *   seal   → opens-on date + (for friends) name/email/question/answer
  *
- * Self letters carry text + song + photos + doodle, encrypted under the
- * master key. Friend letters carry text + song + photos and use a
- * security question to wrap the letter key; doodles aren't included on
- * mobile friend letters yet (the desktop has draft-storage scaffolding
- * for that which mobile doesn't share).
+ * Doodles are encrypted client-side under the master key and rejoin the
+ * letter via the existing payload builders — for self letters as a
+ * `{encryptedStrokes,e2eeIV,...}` row inside the encrypted JSON blob,
+ * for friend letters as a draft doodle the asset-bundler can re-wrap
+ * under the letter key.
  */
 export default function MobileLetterCompose() {
   const { theme } = useThemeStore()
@@ -49,9 +52,8 @@ export default function MobileLetterCompose() {
 
   const [step, setStep] = useState<Step>('pick')
   const [recipient, setRecipient] = useState<Recipient>('self')
-  const [tab, setTab] = useState<ActiveTab>('write')
 
-  // Compose fields
+  // Letter fields (preserved across step changes so Back doesn't lose work).
   const [body, setBody] = useState('')
   const [song, setSong] = useState('')
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -66,7 +68,7 @@ export default function MobileLetterCompose() {
     return d.toISOString().slice(0, 10)
   }, [])
 
-  // Friend-only fields
+  // Friend-only
   const [recipientName, setRecipientName] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
   const [question, setQuestion] = useState('')
@@ -89,21 +91,22 @@ export default function MobileLetterCompose() {
     setDoodleStrokes(strokes)
   }, [setDoodleStrokes])
 
-  const canSubmit = (() => {
+  const writeReady = body.trim().length > 0 && body.length <= LETTER_BODY_MAX
+  const sealReady = (() => {
     if (submitting) return false
-    if (body.trim().length === 0 || body.length > LETTER_BODY_MAX) return false
+    if (!writeReady) return false
     if (unlockDate < minUnlockDate) return false
     if (recipient === 'friend') {
       if (!recipientName.trim()) return false
-      if (!recipientEmail.trim() || !/^\S+@\S+\.\S+$/.test(recipientEmail.trim())) return false
+      if (!/^\S+@\S+\.\S+$/.test(recipientEmail.trim())) return false
       if (!question.trim()) return false
       if (!answer.trim()) return false
     }
     return true
   })()
 
-  async function onSubmit() {
-    if (!canSubmit) return
+  async function onSeal() {
+    if (!sealReady) return
     if (!isEnabled || !isUnlocked || !masterKey) {
       setError('Unlock encryption on desktop before writing letters here.')
       return
@@ -111,9 +114,7 @@ export default function MobileLetterCompose() {
     setError(null)
     setSubmitting(true)
     try {
-      const cleanSong = song && /https?:\/\//.test(song) ? song
-        : song.startsWith('{') ? song
-        : null
+      const cleanSong = song && (/https?:\/\//.test(song) || song.startsWith('{')) ? song : null
       const draftPhotos = photos
         .filter(p => p.encryptedRef || p.url)
         .map((p, i) => ({
@@ -125,6 +126,16 @@ export default function MobileLetterCompose() {
           rotation: p.rotation,
           ordinal: i,
         }))
+
+      // Encrypt doodle strokes once; both letter types want the same
+      // master-key ciphertext (friend-side asset-bundler then re-wraps it
+      // under the letter key).
+      let encryptedDoodle: { encryptedStrokes: string; e2eeIV: string } | null = null
+      if (currentDoodleStrokes.length > 0) {
+        const json = JSON.stringify(currentDoodleStrokes)
+        const enc = await encryptString(json, masterKey)
+        encryptedDoodle = { encryptedStrokes: enc.ciphertext, e2eeIV: enc.iv }
+      }
 
       if (recipient === 'self') {
         const payload = await buildSelfLetterPayload({
@@ -140,12 +151,14 @@ export default function MobileLetterCompose() {
                 spread: p.spread,
                 rotation: p.rotation,
               })),
-            // Self letters serialize doodles inline as part of the encrypted
-            // JSON blob, but the helper's DraftDoodle expects an
-            // already-encrypted strokes shape. For mobile we serialize as
-            // empty here and rely on the text/song/photos triple. Doodles
-            // can ride along once we wire mobile-side stroke encryption.
-            doodles: [],
+            doodles: encryptedDoodle
+              ? [{
+                  encryptedStrokes: encryptedDoodle.encryptedStrokes,
+                  e2eeIV: encryptedDoodle.e2eeIV,
+                  spread: 1,
+                  positionInEntry: 0,
+                }]
+              : [],
             letterLocation: null,
           },
           unlockDate: new Date(unlockDate + 'T00:00:00'),
@@ -174,7 +187,13 @@ export default function MobileLetterCompose() {
               rotation: p.rotation,
               ordinal: p.ordinal,
             })),
-            doodles: [],
+            doodles: encryptedDoodle
+              ? [{
+                  strokes: encryptedDoodle,
+                  spread: 1,
+                  positionInEntry: 0,
+                }]
+              : [],
           },
           unlockDate: new Date(unlockDate + 'T00:00:00'),
           recipientEmail: recipientEmail.trim(),
@@ -202,9 +221,117 @@ export default function MobileLetterCompose() {
     }
   }
 
-  // Header (shared between steps)
-  const Header = (
-    <div className="flex items-center justify-between mb-3 px-12 shrink-0">
+  // -----------------------------------------------------------------
+  // Step 0 — recipient picker
+  // -----------------------------------------------------------------
+  if (step === 'pick') {
+    return (
+      <div className="fixed inset-0 z-30 overflow-y-auto" style={{ color: theme.text.primary }}>
+        <div className="max-w-lg mx-auto px-4 pt-20 pb-12 flex flex-col gap-5">
+          <CompactHeader />
+          <p className="text-sm text-center italic"
+            style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+            Who is this letter for?
+          </p>
+          <div className="flex flex-col gap-3">
+            <RecipientCard
+              title="Future me"
+              subtitle="A letter to your future self. Sealed for at least a week."
+              onClick={() => { setRecipient('self'); setStep('write') }}
+            />
+            <RecipientCard
+              title="Someone close"
+              subtitle="Delivered to a friend. Locked with a question only they can answer."
+              onClick={() => { setRecipient('friend'); setStep('write') }}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // -----------------------------------------------------------------
+  // Steps 1–3 — shared shell
+  // -----------------------------------------------------------------
+  return (
+    <div className="fixed inset-0 z-30 flex flex-col" style={{ color: theme.text.primary }}>
+      <div className="pt-20 px-4 shrink-0">
+        <CompactHeader />
+        <div className="text-center text-xs italic mt-2 px-12"
+          style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+          Writing to {recipient === 'self' ? 'future you' : 'someone close'}
+          {' · '}
+          <button onClick={() => setStep('pick')} style={{ textDecoration: 'underline dotted' }}>
+            change
+          </button>
+        </div>
+        <StepIndicator step={step} />
+      </div>
+
+      <div className="flex-1 min-h-0 px-4 pb-3">
+        {step === 'write' && (
+          <WriteStep
+            song={song}
+            onSong={setSong}
+            body={body}
+            onBody={setBody}
+          />
+        )}
+        {step === 'media' && (
+          <MediaStep
+            photos={photos}
+            onPhotoAdd={handlePhotoAdd}
+            doodleStrokes={currentDoodleStrokes}
+            onStrokesChange={handleStrokesChange}
+          />
+        )}
+        {step === 'seal' && (
+          <SealStep
+            recipient={recipient}
+            unlockDate={unlockDate}
+            minUnlockDate={minUnlockDate}
+            onUnlockDate={setUnlockDate}
+            recipientName={recipientName}
+            onRecipientName={setRecipientName}
+            recipientEmail={recipientEmail}
+            onRecipientEmail={setRecipientEmail}
+            question={question}
+            onQuestion={setQuestion}
+            answer={answer}
+            onAnswer={setAnswer}
+            error={error}
+          />
+        )}
+      </div>
+
+      <FooterButtons
+        step={step}
+        onBack={() => setStep(
+          step === 'write' ? 'pick'
+          : step === 'media' ? 'write'
+          : 'media'
+        )}
+        onNext={() => {
+          if (step === 'write') setStep('media')
+          else if (step === 'media') setStep('seal')
+        }}
+        onSeal={onSeal}
+        writeReady={writeReady}
+        sealReady={sealReady}
+        submitting={submitting}
+      />
+    </div>
+  )
+}
+
+// =================================================================
+// Pieces
+// =================================================================
+
+function CompactHeader() {
+  const { theme } = useThemeStore()
+  return (
+    <div className="flex items-center justify-between px-12">
       <Link
         href="/letters"
         className="text-xs px-3 py-1.5 rounded-full transition"
@@ -226,170 +353,288 @@ export default function MobileLetterCompose() {
       <div className="w-12" aria-hidden />
     </div>
   )
+}
 
-  // Step 1: recipient picker
-  if (step === 'pick') {
-    return (
-      <div className="fixed inset-0 z-30 overflow-y-auto" style={{ color: theme.text.primary }}>
-        <div className="max-w-lg mx-auto px-4 pt-20 pb-12 flex flex-col gap-5">
-          {Header}
-          <p className="text-sm text-center italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-            Who is this letter for?
-          </p>
-          <div className="flex flex-col gap-3">
-            <RecipientCard
-              title="Future me"
-              subtitle="A letter to your future self. Sealed for at least a week."
-              onClick={() => { setRecipient('self'); setStep('compose') }}
-            />
-            <RecipientCard
-              title="Someone close"
-              subtitle="Delivered to a friend. Locked with a question only they can answer."
-              onClick={() => { setRecipient('friend'); setStep('compose') }}
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Step 2: compose surface
+function StepIndicator({ step }: { step: Step }) {
+  const { theme } = useThemeStore()
+  const items: { key: Step; label: string }[] = [
+    { key: 'write', label: 'Write' },
+    { key: 'media', label: 'Media' },
+    { key: 'seal', label: 'Seal' },
+  ]
   return (
-    <div className="fixed inset-0 z-30 flex flex-col" style={{ color: theme.text.primary }}>
-      <div className="pt-20 px-4 shrink-0">{Header}</div>
-
-      {/* Mode hint */}
-      <div className="text-center text-xs italic mb-3 px-12 shrink-0"
-        style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-        Writing to {recipient === 'self' ? 'future you' : 'someone close'}
-        {' · '}
-        <button
-          onClick={() => setStep('pick')}
-          style={{ textDecoration: 'underline dotted' }}
-        >
-          change
-        </button>
-      </div>
-
-      {/* Tab strip */}
-      <div className="flex justify-center px-4 pb-3 shrink-0">
-        <div
-          className="inline-flex rounded-full p-1 gap-1"
-          style={{
-            background: theme.glass.bg,
-            backdropFilter: `blur(${theme.glass.blur})`,
-            border: `1px solid ${theme.glass.border}`,
-          }}
-        >
-          <TabPill active={tab === 'write'} onClick={() => setTab('write')}>Write</TabPill>
-          <TabPill active={tab === 'media'} onClick={() => setTab('media')}>Photos &amp; doodle</TabPill>
-        </div>
-      </div>
-
-      <div className="flex-1 min-h-0 px-4 pb-4">
-        {tab === 'write' ? (
-          <WriteCard>
-            {recipient === 'friend' && (
-              <FriendFields
-                recipientName={recipientName}
-                onRecipientName={setRecipientName}
-                recipientEmail={recipientEmail}
-                onRecipientEmail={setRecipientEmail}
-                question={question}
-                onQuestion={setQuestion}
-                answer={answer}
-                onAnswer={setAnswer}
-              />
-            )}
-
-            <UnlockField value={unlockDate} min={minUnlockDate} onChange={setUnlockDate} />
-
-            <SongField value={song} onChange={setSong} />
-
-            <BodyField value={body} onChange={setBody} max={LETTER_BODY_MAX} />
-
-            {error && (
-              <div className="text-xs rounded-lg px-3 py-2 shrink-0"
-                style={{ background: 'rgba(192,57,43,0.12)', color: '#c0392b' }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={onSubmit}
-              disabled={!canSubmit}
-              className="w-full py-3 rounded-full text-sm transition shrink-0"
+    <div className="flex items-center justify-center gap-2 mt-3 mb-1">
+      {items.map((it, i) => {
+        const active = it.key === step
+        return (
+          <div key={it.key} className="flex items-center gap-2">
+            <span
+              className="text-[10px] tracking-[0.18em] uppercase"
               style={{
-                background: canSubmit ? theme.accent.primary : `${theme.accent.primary}40`,
-                color: '#fff',
-                cursor: canSubmit ? 'pointer' : 'not-allowed',
-                opacity: submitting ? 0.7 : 1,
-                fontFamily: 'Georgia, serif',
+                color: active ? theme.text.primary : theme.text.muted,
+                opacity: active ? 1 : 0.6,
               }}
             >
-              {submitting ? 'Sealing…' : 'Seal letter'}
-            </button>
-          </WriteCard>
-        ) : (
-          <MediaCard
-            photos={photos}
-            onPhotoAdd={handlePhotoAdd}
-            doodleStrokes={recipient === 'self' ? currentDoodleStrokes : []}
-            onStrokesChange={handleStrokesChange}
-            showDoodle={recipient === 'self'}
-          />
-        )}
-      </div>
+              {it.label}
+            </span>
+            {i < items.length - 1 && (
+              <span
+                className="w-4 h-px"
+                style={{ background: theme.glass.border }}
+                aria-hidden
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-// ----------------------------------------------------------------------------
-
-function RecipientCard({ title, subtitle, onClick }: { title: string; subtitle: string; onClick: () => void }) {
+function FooterButtons({
+  step,
+  onBack,
+  onNext,
+  onSeal,
+  writeReady,
+  sealReady,
+  submitting,
+}: {
+  step: Step
+  onBack: () => void
+  onNext: () => void
+  onSeal: () => void
+  writeReady: boolean
+  sealReady: boolean
+  submitting: boolean
+}) {
   const { theme } = useThemeStore()
+  if (step === 'pick') return null
+
+  const primary = step === 'write' ? { label: 'Next', enabled: writeReady, onClick: onNext }
+    : step === 'media' ? { label: 'Fold & seal', enabled: writeReady, onClick: onNext }
+    : { label: submitting ? 'Sealing…' : 'Seal letter', enabled: sealReady, onClick: onSeal }
+
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left rounded-2xl px-5 py-5 transition"
-      style={{
-        background: theme.glass.bg,
-        backdropFilter: `blur(${theme.glass.blur})`,
-        border: `1px solid ${theme.glass.border}`,
-      }}
-    >
-      <div className="text-base mb-1" style={{ color: theme.text.primary, fontFamily: 'var(--font-playfair), Georgia, serif' }}>
-        {title}
-      </div>
-      <div className="text-xs italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-        {subtitle}
-      </div>
-    </button>
+    <div className="px-4 py-4 shrink-0 flex items-center gap-3"
+      style={{ borderTop: `1px solid ${theme.glass.border}` }}>
+      <button
+        onClick={onBack}
+        className="text-sm px-4 py-2.5 rounded-full"
+        style={{
+          background: theme.glass.bg,
+          color: theme.text.muted,
+          border: `1px solid ${theme.glass.border}`,
+          fontFamily: 'Georgia, serif',
+        }}
+      >
+        Back
+      </button>
+      <button
+        onClick={primary.onClick}
+        disabled={!primary.enabled}
+        className="flex-1 py-2.5 rounded-full text-sm transition"
+        style={{
+          background: primary.enabled ? theme.accent.primary : `${theme.accent.primary}40`,
+          color: '#fff',
+          cursor: primary.enabled ? 'pointer' : 'not-allowed',
+          fontFamily: 'Georgia, serif',
+        }}
+      >
+        {primary.label}
+      </button>
+    </div>
   )
 }
 
-function TabPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  const { theme } = useThemeStore()
+// -----------------------------------------------------------------
+// Steps
+// -----------------------------------------------------------------
+
+function WriteStep({
+  song,
+  onSong,
+  body,
+  onBody,
+}: {
+  song: string
+  onSong: (v: string) => void
+  body: string
+  onBody: (v: string) => void
+}) {
   return (
-    <button
-      onClick={onClick}
-      className="text-xs px-4 py-1.5 rounded-full transition"
-      style={{
-        background: active ? `${theme.accent.primary}30` : 'transparent',
-        color: active ? theme.text.primary : theme.text.muted,
-        fontFamily: 'Georgia, serif',
-      }}
-    >
-      {children}
-    </button>
+    <Card scroll={false}>
+      <SongField value={song} onChange={onSong} />
+      <SectionLabel>The letter</SectionLabel>
+      <textarea
+        value={body}
+        onChange={e => onBody(e.target.value)}
+        placeholder="Dear future me…"
+        maxLength={LETTER_BODY_MAX}
+        className="flex-1 min-h-0 w-full resize-none outline-none rounded-lg p-3"
+        style={{
+          fontFamily: 'var(--font-caveat), Georgia, serif',
+          fontSize: `${JOURNAL.FONT_SIZE}px`,
+          lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
+          background: 'rgba(255,255,255,0.03)',
+          border: `1px solid var(--paper-border, rgba(0,0,0,0.1))`,
+          color: 'inherit',
+          overflowY: 'auto',
+          minHeight: 160,
+        }}
+      />
+      <CharCount value={body.length} max={LETTER_BODY_MAX} />
+    </Card>
   )
 }
 
-function WriteCard({ children }: { children: React.ReactNode }) {
+function MediaStep({
+  photos,
+  onPhotoAdd,
+  doodleStrokes,
+  onStrokesChange,
+}: {
+  photos: Photo[]
+  onPhotoAdd: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
+  doodleStrokes: StrokeData[]
+  onStrokesChange: (strokes: StrokeData[]) => void
+}) {
+  const { theme } = useThemeStore()
+  const dateCaption = new Date()
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    .toLowerCase()
+  return (
+    <Card scroll>
+      <SectionLabel>Photos</SectionLabel>
+      <PhotoBlock photos={photos} onPhotoAdd={onPhotoAdd} dateCaption={dateCaption} />
+      <SectionLabel>Draw</SectionLabel>
+      <div style={{ height: 220 }}>
+        <CompactDoodleCanvas
+          strokes={doodleStrokes}
+          onStrokesChange={onStrokesChange}
+          doodleColors={[theme.text.primary, theme.accent.primary, theme.accent.warm, theme.text.muted]}
+          canvasBackground={theme.bg.secondary}
+          canvasBorder={theme.glass.border}
+          textColor={theme.text.primary}
+          mutedColor={theme.text.muted}
+        />
+      </div>
+    </Card>
+  )
+}
+
+function SealStep({
+  recipient,
+  unlockDate,
+  minUnlockDate,
+  onUnlockDate,
+  recipientName,
+  onRecipientName,
+  recipientEmail,
+  onRecipientEmail,
+  question,
+  onQuestion,
+  answer,
+  onAnswer,
+  error,
+}: {
+  recipient: Recipient
+  unlockDate: string
+  minUnlockDate: string
+  onUnlockDate: (v: string) => void
+  recipientName: string
+  onRecipientName: (v: string) => void
+  recipientEmail: string
+  onRecipientEmail: (v: string) => void
+  question: string
+  onQuestion: (v: string) => void
+  answer: string
+  onAnswer: (v: string) => void
+  error: string | null
+}) {
+  const { theme } = useThemeStore()
+  const fieldStyle: React.CSSProperties = {
+    border: `1px solid ${theme.glass.border}`,
+    color: theme.text.primary,
+    background: 'rgba(255,255,255,0.03)',
+  }
+  return (
+    <Card scroll>
+      {recipient === 'friend' && (
+        <>
+          <SectionLabel>Who is it for?</SectionLabel>
+          <input
+            type="text"
+            value={recipientName}
+            onChange={e => onRecipientName(e.target.value)}
+            placeholder="Their name"
+            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none mb-2"
+            style={fieldStyle}
+          />
+          <input
+            type="email"
+            value={recipientEmail}
+            onChange={e => onRecipientEmail(e.target.value)}
+            placeholder="Their email"
+            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
+            style={fieldStyle}
+          />
+
+          <SectionLabel>A question only they can answer</SectionLabel>
+          <input
+            type="text"
+            value={question}
+            onChange={e => onQuestion(e.target.value)}
+            placeholder="e.g. The name of our school"
+            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none mb-2"
+            style={fieldStyle}
+          />
+          <input
+            type="text"
+            value={answer}
+            onChange={e => onAnswer(e.target.value)}
+            placeholder="The answer (we never store this)"
+            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
+            style={fieldStyle}
+          />
+          <div className="text-[10px] italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+            The letter unlocks for them only when they type this answer.
+          </div>
+        </>
+      )}
+
+      <SectionLabel>Opens on</SectionLabel>
+      <input
+        type="date"
+        value={unlockDate}
+        min={minUnlockDate}
+        onChange={e => onUnlockDate(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
+        style={fieldStyle}
+      />
+      <div className="text-[10px] italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+        Earliest: one week from today.
+      </div>
+
+      {error && (
+        <div className="text-xs rounded-lg px-3 py-2 mt-2"
+          style={{ background: 'rgba(192,57,43,0.12)', color: '#c0392b' }}>
+          {error}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// -----------------------------------------------------------------
+// Atoms
+// -----------------------------------------------------------------
+
+function Card({ children, scroll }: { children: React.ReactNode; scroll: boolean }) {
   const { theme } = useThemeStore()
   return (
     <div
-      className="h-full rounded-2xl p-4 flex flex-col gap-4 min-h-0 overflow-y-auto"
+      className={`h-full rounded-2xl p-4 flex flex-col gap-3 min-h-0 ${scroll ? 'overflow-y-auto' : ''}`}
       style={{
         background: theme.glass.bg,
         backdropFilter: `blur(${theme.glass.blur})`,
@@ -403,163 +648,22 @@ function WriteCard({ children }: { children: React.ReactNode }) {
   )
 }
 
-function MediaCard({
-  photos,
-  onPhotoAdd,
-  doodleStrokes,
-  onStrokesChange,
-  showDoodle,
-}: {
-  photos: Photo[]
-  onPhotoAdd: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
-  doodleStrokes: StrokeData[]
-  onStrokesChange: (strokes: StrokeData[]) => void
-  showDoodle: boolean
-}) {
-  const { theme } = useThemeStore()
-  const dateCaption = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()
-  return (
-    <div
-      className="h-full rounded-2xl p-5 flex flex-col gap-6 overflow-y-auto"
-      style={{
-        background: theme.glass.bg,
-        backdropFilter: `blur(${theme.glass.blur})`,
-        border: `1px solid ${theme.glass.border}`,
-        boxShadow: '0 8px 28px rgba(0,0,0,0.18)',
-      }}
-    >
-      <div>
-        <SectionLabel>Photos</SectionLabel>
-        <PhotoBlock photos={photos} onPhotoAdd={onPhotoAdd} dateCaption={dateCaption} />
-      </div>
-      {showDoodle && (
-        <div>
-          <SectionLabel>Draw</SectionLabel>
-          <div style={{ height: 220 }}>
-            <CompactDoodleCanvas
-              strokes={doodleStrokes}
-              onStrokesChange={onStrokesChange}
-              doodleColors={[theme.text.primary, theme.accent.primary, theme.accent.warm, theme.text.muted]}
-              canvasBackground={theme.bg.secondary}
-              canvasBorder={theme.glass.border}
-              textColor={theme.text.primary}
-              mutedColor={theme.text.muted}
-            />
-          </div>
-        </div>
-      )}
-      {!showDoodle && (
-        <div className="text-xs italic text-center mt-2"
-          style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-          Doodles on friend letters need a desk — write that part on desktop.
-        </div>
-      )}
-    </div>
-  )
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   const { theme } = useThemeStore()
   return (
-    <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
+    <div className="text-[10px] uppercase tracking-[0.18em] font-medium mt-1"
       style={{ color: theme.text.muted }}>
       {children}
     </div>
   )
 }
 
-function FriendFields({
-  recipientName,
-  onRecipientName,
-  recipientEmail,
-  onRecipientEmail,
-  question,
-  onQuestion,
-  answer,
-  onAnswer,
-}: {
-  recipientName: string
-  onRecipientName: (v: string) => void
-  recipientEmail: string
-  onRecipientEmail: (v: string) => void
-  question: string
-  onQuestion: (v: string) => void
-  answer: string
-  onAnswer: (v: string) => void
-}) {
-  const { theme } = useThemeStore()
-  const fieldStyle: React.CSSProperties = {
-    border: `1px solid ${theme.glass.border}`,
-    color: theme.text.primary,
-    background: 'rgba(255,255,255,0.03)',
-  }
-  return (
-    <>
-      <div className="shrink-0">
-        <SectionLabel>Who is it for?</SectionLabel>
-        <input
-          type="text"
-          value={recipientName}
-          onChange={e => onRecipientName(e.target.value)}
-          placeholder="Their name"
-          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none mb-2"
-          style={fieldStyle}
-        />
-        <input
-          type="email"
-          value={recipientEmail}
-          onChange={e => onRecipientEmail(e.target.value)}
-          placeholder="Their email"
-          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-          style={fieldStyle}
-        />
-      </div>
-      <div className="shrink-0">
-        <SectionLabel>A question only they can answer</SectionLabel>
-        <input
-          type="text"
-          value={question}
-          onChange={e => onQuestion(e.target.value)}
-          placeholder="e.g. The name of our school"
-          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none mb-2"
-          style={fieldStyle}
-        />
-        <input
-          type="text"
-          value={answer}
-          onChange={e => onAnswer(e.target.value)}
-          placeholder="The answer (we never store this)"
-          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-          style={fieldStyle}
-        />
-        <div className="text-[10px] mt-1.5 italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-          The letter unlocks for them only when they type this answer.
-        </div>
-      </div>
-    </>
-  )
-}
-
-function UnlockField({ value, min, onChange }: { value: string; min: string; onChange: (v: string) => void }) {
+function CharCount({ value, max }: { value: number; max: number }) {
   const { theme } = useThemeStore()
   return (
-    <div className="shrink-0">
-      <SectionLabel>Opens on</SectionLabel>
-      <input
-        type="date"
-        value={value}
-        min={min}
-        onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-        style={{
-          border: `1px solid ${theme.glass.border}`,
-          color: theme.text.primary,
-          background: 'rgba(255,255,255,0.03)',
-        }}
-      />
-      <div className="text-[10px] mt-1.5 italic" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
-        Earliest: one week from today.
-      </div>
+    <div className="text-right text-[10px] shrink-0"
+      style={{ color: value > max * 0.9 ? theme.accent.warm : theme.text.muted }}>
+      {value} / {max}
     </div>
   )
 }
@@ -591,34 +695,26 @@ function SongField({ value, onChange }: { value: string; onChange: (v: string) =
   )
 }
 
-function BodyField({ value, onChange, max }: { value: string; onChange: (v: string) => void; max: number }) {
+function RecipientCard({ title, subtitle, onClick }: { title: string; subtitle: string; onClick: () => void }) {
   const { theme } = useThemeStore()
   return (
-    <>
-      <div className="shrink-0">
-        <SectionLabel>The letter</SectionLabel>
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-2xl px-5 py-5 transition"
+      style={{
+        background: theme.glass.bg,
+        backdropFilter: `blur(${theme.glass.blur})`,
+        border: `1px solid ${theme.glass.border}`,
+      }}
+    >
+      <div className="text-base mb-1"
+        style={{ color: theme.text.primary, fontFamily: 'var(--font-playfair), Georgia, serif' }}>
+        {title}
       </div>
-      <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Dear future me…"
-        maxLength={max}
-        className="flex-1 min-h-0 w-full resize-none outline-none rounded-lg p-3"
-        style={{
-          color: theme.text.primary,
-          fontFamily: 'var(--font-caveat), Georgia, serif',
-          fontSize: `${JOURNAL.FONT_SIZE}px`,
-          lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${theme.glass.border}`,
-          overflowY: 'auto',
-          minHeight: 180,
-        }}
-      />
-      <div className="text-right text-[10px] shrink-0"
-        style={{ color: value.length > max * 0.9 ? theme.accent.warm : theme.text.muted }}>
-        {value.length} / {max}
+      <div className="text-xs italic"
+        style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+        {subtitle}
       </div>
-    </>
+    </button>
   )
 }
