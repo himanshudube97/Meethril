@@ -9,6 +9,7 @@ import type { Theme } from '@/lib/themes'
 import type { JournalEntry } from '@/store/journal'
 import { ConstellationRenderer, type MemoryStar } from './ConstellationRenderer'
 import { HearthScene } from './firelight/scenes/HearthScene'
+import { RainWindowScene } from './rain/scenes/RainWindowScene'
 
 export interface FirelightRendererProps {
   loading: boolean
@@ -23,6 +24,8 @@ export function FirelightRenderer(props: FirelightRendererProps) {
   switch (props.theme.ambience) {
     case 'firelight':
       return <HearthScene {...props} />
+    case 'rainy':
+      return <RainWindowScene {...props} />
     default:
       return <ConstellationRenderer {...props} />
   }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useThemeStore } from '@/store/theme'
+import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 
 const COUNTRIES: { code: string; name: string }[] = [
   { code: 'IN', name: 'India' },
@@ -28,18 +28,98 @@ const COUNTRIES: { code: string; name: string }[] = [
 
 const STORAGE_KEY = 'hearth.stranger.lastCountry'
 
-interface Props {
-  onCancel: () => void
-  onSend: (content: string, country?: string, stateName?: string) => Promise<void>
+// ISO 3166-1 alpha-2 → regional indicator emoji flag (U+1F1E6 + (letter - 'A')).
+function flagOf(code: string): string {
+  const upper = code.toUpperCase()
+  if (upper.length !== 2) return ''
+  const base = 0x1f1e6 - 'A'.charCodeAt(0)
+  return String.fromCodePoint(base + upper.charCodeAt(0), base + upper.charCodeAt(1))
 }
 
-export default function ComposePaper({ onCancel, onSend }: Props) {
-  const { theme } = useThemeStore()
+// Irregular torn edge — clip-path polygon with hand-tuned points.
+// Anchored to a 100×100 viewport (percentage). Tuned for a parchment feel.
+const TORN_EDGE_CLIP =
+  'polygon(' +
+  [
+    '0% 4%',
+    '2% 1%',
+    '6% 3%',
+    '10% 0%',
+    '15% 2%',
+    '20% 1%',
+    '26% 3%',
+    '32% 0%',
+    '38% 2%',
+    '44% 1%',
+    '50% 3%',
+    '57% 0%',
+    '63% 2%',
+    '70% 1%',
+    '76% 3%',
+    '82% 1%',
+    '88% 0%',
+    '94% 2%',
+    '98% 0%',
+    '100% 4%',
+    '99% 10%',
+    '100% 18%',
+    '98% 26%',
+    '100% 34%',
+    '99% 42%',
+    '100% 50%',
+    '98% 58%',
+    '100% 66%',
+    '99% 74%',
+    '100% 82%',
+    '98% 90%',
+    '100% 96%',
+    '96% 100%',
+    '90% 98%',
+    '84% 100%',
+    '78% 99%',
+    '72% 100%',
+    '66% 97%',
+    '60% 100%',
+    '54% 99%',
+    '48% 100%',
+    '42% 98%',
+    '36% 100%',
+    '30% 99%',
+    '24% 100%',
+    '18% 98%',
+    '12% 100%',
+    '6% 99%',
+    '2% 100%',
+    '0% 95%',
+    '2% 88%',
+    '0% 80%',
+    '1% 72%',
+    '0% 64%',
+    '2% 56%',
+    '0% 48%',
+    '1% 40%',
+    '0% 32%',
+    '2% 24%',
+    '0% 16%',
+    '1% 8%',
+  ].join(', ') +
+  ')'
+
+interface Props {
+  /** Send the message to the server. Resolves on network success. */
+  onSend: (content: string, country?: string, stateName?: string) => Promise<void>
+  /** Called when the ceremony has played through and the component should unmount. */
+  onDismiss: () => void
+}
+
+type Phase = 'idle' | 'folding' | 'igniting' | 'drifting' | 'caption' | 'done'
+
+export default function ComposePaper({ onSend, onDismiss }: Props) {
   const [text, setText] = useState('')
   const [country, setCountry] = useState<string>('')
-  const [stateName, setStateName] = useState<string>('')
-  const [sending, setSending] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
+  const dismissedRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -56,108 +136,395 @@ export default function ComposePaper({ onCancel, onSend }: Props) {
     }
   }, [country])
 
-  const canSend = text.trim().length >= 10 && text.trim().length <= 200 && !sending
+  // Lifecycle: dismiss once the caption has had its moment.
+  useEffect(() => {
+    if (phase !== 'caption' || dismissedRef.current) return
+    dismissedRef.current = true
+    const t = setTimeout(() => {
+      setPhase('done')
+      onDismiss()
+    }, 1800)
+    return () => clearTimeout(t)
+  }, [phase, onDismiss])
+
+  const trimmed = text.trim()
+  const canSend = trimmed.length >= 10 && trimmed.length <= 200 && phase === 'idle'
+
+  async function handleSend() {
+    if (!canSend) return
+    setError(null)
+    setPhase('folding')
+
+    // Fire send in parallel with the fold; ignore the timing of network success
+    // for the visuals — the ceremony plays regardless. Only revert on error.
+    try {
+      await Promise.all([
+        onSend(trimmed, country || undefined),
+        new Promise((r) => setTimeout(r, 750)),
+      ])
+    } catch (e) {
+      setPhase('idle')
+      setError(e instanceof Error ? e.message : 'Could not send')
+      return
+    }
+
+    setPhase('igniting')
+    await new Promise((r) => setTimeout(r, 420))
+    setPhase('drifting')
+    await new Promise((r) => setTimeout(r, 1700))
+    setPhase('caption')
+  }
+
+  // Animation control: the paper is mounted during idle, folding, igniting;
+  // the ember is mounted during igniting and drifting.
+  const showPaper = phase === 'idle' || phase === 'folding' || phase === 'igniting'
+  const showEmber = phase === 'igniting' || phase === 'drifting'
+  const showCaption = phase === 'caption'
 
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (!canSend) return
-        setSending(true)
-        setError(null)
-        try {
-          await onSend(text.trim(), country || undefined, stateName || undefined)
-          setText('')
-        } catch (e) {
-          setError(e instanceof Error ? e.message : 'Could not send')
-        } finally {
-          setSending(false)
-        }
-      }}
-      className="w-full max-w-md rounded-xl p-4 flex flex-col gap-3"
-      style={{
-        background: theme.glass.bg,
-        border: `1px solid ${theme.glass.border}`,
-        backdropFilter: `blur(${theme.glass.blur})`,
-      }}
+    <div
+      className="relative mx-auto w-full max-w-md"
+      style={{ minHeight: 360, perspective: 1200 }}
     >
-      <p className="text-sm opacity-80" style={{ color: theme.text.primary }}>
-        Write a small light to a stranger. A gratitude, a hope, a kindness.
-      </p>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        maxLength={200}
-        rows={4}
-        placeholder="Something warm…"
-        className="w-full p-2 rounded-md text-sm resize-none"
-        style={{
-          background: theme.glass.bg,
-          border: `1px solid ${theme.glass.border}`,
-          color: theme.text.primary,
-        }}
-        autoFocus
-      />
-      <div className="flex gap-2 items-center">
-        <select
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          className="text-xs p-1 rounded-md"
-          style={{
-            background: theme.glass.bg,
-            border: `1px solid ${theme.glass.border}`,
-            color: theme.text.secondary,
-          }}
-        >
-          <option value="">No postmark</option>
-          {COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {country && (
-          <input
-            type="text"
-            value={stateName}
-            onChange={(e) => setStateName(e.target.value)}
-            maxLength={40}
-            placeholder="State (optional)"
-            className="flex-1 text-xs p-1 rounded-md"
-            style={{
-              background: theme.glass.bg,
-              border: `1px solid ${theme.glass.border}`,
-              color: theme.text.primary,
+      <AnimatePresence>
+        {showPaper && (
+          <motion.form
+            key="paper"
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSend()
             }}
-          />
+            initial={{ opacity: 0, y: 14, rotate: -2 }}
+            animate={
+              phase === 'folding'
+                ? {
+                    opacity: 1,
+                    scaleX: 0.42,
+                    scaleY: 0.7,
+                    rotate: -8,
+                    transition: { duration: 0.7, ease: [0.55, 0.05, 0.35, 1] },
+                  }
+                : phase === 'igniting'
+                ? {
+                    opacity: 0,
+                    scale: 0.18,
+                    rotate: -15,
+                    filter: 'brightness(1.8) saturate(1.4)',
+                    transition: { duration: 0.42, ease: [0.55, 0.05, 0.35, 1] },
+                  }
+                : { opacity: 1, y: 0, rotate: -2, scale: 1 }
+            }
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="relative flex flex-col gap-3"
+            style={{
+              padding: '28px 30px 22px',
+              background: `radial-gradient(
+                ellipse at center,
+                var(--paper-1) 0%,
+                var(--paper-1) 55%,
+                color-mix(in oklab, var(--paper-1) 60%, #3a2008) 100%
+              )`,
+              clipPath: TORN_EDGE_CLIP,
+              filter:
+                'drop-shadow(0 10px 24px rgba(60, 30, 10, 0.25)) drop-shadow(0 1px 2px rgba(60, 30, 10, 0.15))',
+              transformOrigin: 'center',
+            }}
+          >
+            {/* Ruled lines, layered over the paper */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(transparent, transparent 1.7rem, color-mix(in oklab, var(--text-primary) 35%, transparent) 1.7rem, color-mix(in oklab, var(--text-primary) 35%, transparent) calc(1.7rem + 1px))',
+                opacity: 0.35,
+              }}
+            />
+
+            {/* Burnt highlights at corners (small darker patches) */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  'radial-gradient(circle at 2% 4%, rgba(60,30,10,0.25), transparent 8%), ' +
+                  'radial-gradient(circle at 97% 6%, rgba(60,30,10,0.2), transparent 7%), ' +
+                  'radial-gradient(circle at 3% 96%, rgba(60,30,10,0.2), transparent 8%), ' +
+                  'radial-gradient(circle at 95% 94%, rgba(60,30,10,0.25), transparent 8%)',
+              }}
+            />
+
+            {/* Top-right corner: flag picker */}
+            <div className="absolute right-4 top-4 z-10">
+              <FlagPicker value={country} onChange={setCountry} disabled={phase !== 'idle'} />
+            </div>
+
+            {/* Header line */}
+            <p
+              className="relative font-serif text-[13px] italic"
+              style={{
+                color: 'color-mix(in oklab, var(--text-primary) 70%, transparent)',
+                marginRight: 64,
+              }}
+            >
+              a letter to a stranger
+            </p>
+
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={200}
+              rows={6}
+              placeholder="write something true. a gratitude. a hope. a small kindness."
+              disabled={phase !== 'idle'}
+              className="relative w-full resize-none bg-transparent text-[15px] leading-[1.7rem] focus:outline-none disabled:opacity-90"
+              style={{
+                color: 'var(--text-primary)',
+                fontFamily: '"Caveat", "Patrick Hand", cursive',
+                caretColor: 'var(--accent-warm)',
+              }}
+              autoFocus
+            />
+
+            {error && (
+              <p className="relative text-xs italic" style={{ color: '#a13a3a' }}>
+                {error}
+              </p>
+            )}
+
+            <div className="relative flex items-center justify-between pt-1">
+              <span
+                className="font-serif text-[11px] italic"
+                style={{ color: 'color-mix(in oklab, var(--text-primary) 55%, transparent)' }}
+              >
+                {text.length}/200
+              </span>
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="rounded-full px-5 py-1.5 font-serif text-[13px] italic transition-all disabled:opacity-40"
+                style={{
+                  background: 'var(--accent-primary)',
+                  color: 'var(--paper-1)',
+                  letterSpacing: '0.04em',
+                  boxShadow: '0 4px 12px color-mix(in oklab, var(--accent-primary) 50%, transparent)',
+                }}
+              >
+                release into the night
+              </button>
+            </div>
+          </motion.form>
         )}
-      </div>
-      {error && (
-        <p className="text-xs text-red-500">{error}</p>
-      )}
-      <div className="flex justify-between items-center">
-        <span className="text-xs opacity-60" style={{ color: theme.text.muted }}>
-          {text.length}/200
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-xs px-3 py-1 opacity-60 hover:opacity-100"
-            style={{ color: theme.text.muted }}
+
+        {showEmber && (
+          <motion.div
+            key="ember"
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            initial={{ opacity: 0, scale: 0.18 }}
+            animate={
+              phase === 'igniting'
+                ? {
+                    opacity: [0, 1, 1],
+                    scale: [0.18, 0.7, 0.55],
+                    transition: { duration: 0.42, ease: [0.4, 0, 0.5, 1] },
+                  }
+                : {
+                    // drifting
+                    opacity: [1, 1, 0.6, 0],
+                    scale: [0.55, 0.5, 0.34, 0.18],
+                    x: [0, 18, -14, 24, 8],
+                    y: [0, -60, -160, -260, -380],
+                    rotate: [0, -8, 6, -4, 0],
+                    transition: { duration: 1.7, ease: 'linear', times: [0, 0.25, 0.55, 0.8, 1] },
+                  }
+            }
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="px-4 py-1.5 rounded-full text-xs font-medium disabled:opacity-50"
-            style={{ background: theme.accent.primary, color: theme.bg.primary }}
+            <Ember />
+          </motion.div>
+        )}
+
+        {showCaption && (
+          <motion.div
+            key="caption"
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
           >
-            {sending ? 'Sending…' : 'Send'}
-          </button>
-        </div>
-      </div>
-    </form>
+            <p
+              className="font-serif text-[15px] italic"
+              style={{ color: 'color-mix(in oklab, var(--text-primary) 75%, transparent)' }}
+            >
+              your light is on its way…
+            </p>
+            <p
+              className="mt-2 font-serif text-[11px]"
+              style={{
+                color: 'color-mix(in oklab, var(--text-primary) 45%, transparent)',
+                letterSpacing: '0.18em',
+              }}
+            >
+              someone, somewhere, will find it
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ───────────────────────────── Ember / glow ─────────────────────────────
+
+function Ember() {
+  return (
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: '50%',
+        background:
+          'radial-gradient(circle at center, #fff4d2 0%, var(--accent-warm) 30%, color-mix(in oklab, var(--accent-warm) 50%, #6e2c0a) 80%, transparent 100%)',
+        boxShadow:
+          '0 0 24px 10px color-mix(in oklab, var(--accent-warm) 70%, transparent), 0 0 60px 20px color-mix(in oklab, var(--accent-warm) 30%, transparent)',
+        filter: 'blur(0.3px)',
+      }}
+    />
+  )
+}
+
+// ───────────────────────────── Flag picker popover ────────────────────────────
+
+interface FlagPickerProps {
+  value: string
+  onChange: (code: string) => void
+  disabled?: boolean
+}
+
+function FlagPicker({ value, onChange, disabled }: FlagPickerProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onDown)
+    }
+  }, [open])
+
+  const selectedLabel = value
+    ? COUNTRIES.find((c) => c.code === value)?.name ?? value
+    : 'no postmark'
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen((v) => !v)}
+        disabled={disabled}
+        aria-label={`Postmark: ${selectedLabel}`}
+        title={selectedLabel}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none transition-transform hover:scale-110 disabled:opacity-50"
+        style={{
+          background: value ? 'transparent' : 'color-mix(in oklab, var(--paper-1) 70%, transparent)',
+          border: `1px dashed color-mix(in oklab, var(--text-primary) 50%, transparent)`,
+        }}
+      >
+        {value ? (
+          flagOf(value)
+        ) : (
+          <span style={{ fontSize: 12, color: 'color-mix(in oklab, var(--text-primary) 60%, transparent)' }}>
+            +
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+            transition={{ duration: 0.14 }}
+            className="absolute right-0 top-10 z-30 rounded-lg p-2 shadow-lg"
+            style={{
+              background: 'var(--paper-1)',
+              border: '1px solid color-mix(in oklab, var(--text-primary) 30%, transparent)',
+              width: 232,
+            }}
+            role="dialog"
+            aria-label="Choose a postmark"
+          >
+            <p
+              className="mb-2 px-1 font-serif text-[10px] uppercase tracking-[0.2em]"
+              style={{ color: 'color-mix(in oklab, var(--text-primary) 60%, transparent)' }}
+            >
+              postmark
+            </p>
+            <div className="grid grid-cols-5 gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('')
+                  setOpen(false)
+                }}
+                title="no postmark"
+                aria-label="no postmark"
+                className="flex h-9 w-9 items-center justify-center rounded-md transition-colors"
+                style={{
+                  background:
+                    value === ''
+                      ? 'color-mix(in oklab, var(--text-primary) 12%, transparent)'
+                      : 'transparent',
+                  border:
+                    value === ''
+                      ? '1px solid color-mix(in oklab, var(--text-primary) 40%, transparent)'
+                      : '1px solid transparent',
+                  color: 'color-mix(in oklab, var(--text-primary) 60%, transparent)',
+                  fontSize: 14,
+                }}
+              >
+                —
+              </button>
+              {COUNTRIES.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => {
+                    onChange(c.code)
+                    setOpen(false)
+                  }}
+                  title={c.name}
+                  aria-label={c.name}
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-[20px] leading-none transition-colors"
+                  style={{
+                    background:
+                      value === c.code
+                        ? 'color-mix(in oklab, var(--text-primary) 12%, transparent)'
+                        : 'transparent',
+                    border:
+                      value === c.code
+                        ? '1px solid color-mix(in oklab, var(--text-primary) 40%, transparent)'
+                        : '1px solid transparent',
+                  }}
+                >
+                  {flagOf(c.code)}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
