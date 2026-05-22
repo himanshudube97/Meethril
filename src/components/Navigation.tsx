@@ -73,82 +73,81 @@ export default function Navigation() {
         <AnimatePresence>
           {drawerOpen && (
             <>
-              {/* Backdrop — tap to close */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+              {/* Invisible click-catcher to close the panel on outside tap.
+                  No dark backdrop — the panel is small and we want to keep
+                  the page visible underneath. */}
+              <div
                 onClick={() => setDrawerOpen(false)}
                 className="fixed inset-0 z-40"
-                style={{ background: 'rgba(0,0,0,0.35)' }}
               />
 
-              {/* Drawer */}
+              {/* Compact dropdown panel just below the hamburger button. */}
               <motion.div
-                initial={{ x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
-                transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                className="fixed top-0 left-0 z-50 h-full w-72 max-w-[80vw] flex flex-col p-6 pt-20 gap-1.5"
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="fixed top-17 left-4 z-50 w-56 rounded-2xl p-2 flex flex-col gap-0.5"
                 style={{
                   background: theme.glass.bg,
                   backdropFilter: `blur(${theme.glass.blur})`,
-                  borderRight: `1px solid ${theme.glass.border}`,
+                  WebkitBackdropFilter: `blur(${theme.glass.blur})`,
+                  border: `1px solid ${theme.glass.border}`,
+                  boxShadow: '0 16px 40px rgba(0,0,0,0.28)',
+                  transformOrigin: 'top left',
                 }}
               >
-                <Link
-                  href="/"
-                  className="text-[10px] tracking-[0.3em] mb-4 opacity-60"
-                  style={{ color: theme.text.muted }}
-                >
-                  ← HEARTH
-                </Link>
-
                 {tabs.map(tab => {
                   const isActive = pathname === tab.href
                   return (
                     <Link key={tab.href} href={tab.href}>
                       <div
-                        className="px-4 py-3 rounded-xl flex items-center gap-3 transition"
+                        className="px-3 py-2 rounded-xl flex items-center gap-3 transition"
                         style={{
                           background: isActive ? `${theme.accent.primary}30` : 'transparent',
                           color: isActive ? theme.text.primary : theme.text.muted,
-                          border: isActive
-                            ? `1px solid ${theme.accent.primary}40`
-                            : '1px solid transparent',
                         }}
                       >
-                        <span className="text-lg w-6 text-center">{tab.icon}</span>
-                        <span className="text-base">{tab.label}</span>
+                        <span className="text-base w-5 text-center">{tab.icon}</span>
+                        <span className="text-sm" style={{ fontFamily: 'Georgia, serif' }}>
+                          {tab.label}
+                        </span>
                       </div>
                     </Link>
                   )
                 })}
 
                 {user && (
-                  <Link href="/me" className="mt-auto">
+                  <>
                     <div
-                      className="px-4 py-3 rounded-xl flex items-center gap-3"
-                      style={{
-                        background: pathname === '/me'
-                          ? `${theme.accent.primary}30`
-                          : `${theme.accent.warm}20`,
-                        color: pathname === '/me' ? theme.accent.primary : theme.text.muted,
-                        border: pathname === '/me'
-                          ? `1px solid ${theme.accent.primary}`
-                          : '1px solid transparent',
-                      }}
-                    >
-                      <span
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium"
-                        style={{ border: `1px solid ${theme.glass.border}` }}
+                      className="my-1 mx-2 h-px"
+                      style={{ background: theme.glass.border }}
+                    />
+                    <Link href="/me">
+                      <div
+                        className="px-3 py-2 rounded-xl flex items-center gap-3"
+                        style={{
+                          background: pathname === '/me'
+                            ? `${theme.accent.primary}30`
+                            : 'transparent',
+                          color: pathname === '/me' ? theme.accent.primary : theme.text.muted,
+                        }}
                       >
-                        {avatarLetter}
-                      </span>
-                      <span className="text-sm">{nickname || user.email}</span>
-                    </div>
-                  </Link>
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-medium"
+                          style={{
+                            background: `${theme.accent.warm}20`,
+                            border: `1px solid ${theme.glass.border}`,
+                          }}
+                        >
+                          {avatarLetter}
+                        </span>
+                        <span className="text-sm truncate" style={{ fontFamily: 'Georgia, serif' }}>
+                          {nickname || user.email}
+                        </span>
+                      </div>
+                    </Link>
+                  </>
                 )}
               </motion.div>
             </>

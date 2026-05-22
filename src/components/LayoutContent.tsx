@@ -13,6 +13,27 @@ import FullscreenPrompt from '@/components/FullscreenPrompt'
 import { useThemeStore } from '@/store/theme'
 import { useApplyCursorStyles } from '@/hooks/useApplyCursorStyles'
 
+/**
+ * Solid-to-transparent strip across the top of authed pages. Sits behind
+ * the floating hamburger + gear buttons so scrolled page content fades
+ * out cleanly instead of bleeding through under the translucent buttons.
+ */
+function TopChromeBackdrop() {
+  const { theme } = useThemeStore()
+  return (
+    <div
+      aria-hidden
+      className="fixed top-0 inset-x-0 z-30 pointer-events-none"
+      style={{
+        height: 80,
+        background: `linear-gradient(180deg, ${theme.bg.primary} 0%, ${theme.bg.primary}cc 55%, transparent 100%)`,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    />
+  )
+}
+
 export default function LayoutContent({
   children,
 }: {
@@ -81,6 +102,7 @@ export default function LayoutContent({
         <Background />
         <AmbientSoundLayer />
         {children}
+        <TopChromeBackdrop />
         <Navigation />
         <FullscreenButton />
         <DeskSettingsPanel />
@@ -116,6 +138,7 @@ export default function LayoutContent({
           inside <main> / <PageTransition> — those wrappers have transforms
           during the page-transition animation, which would otherwise become
           the containing block for their `position: fixed`. */}
+      <TopChromeBackdrop />
       <FullscreenButton />
       <DeskSettingsPanel />
       <InstallPrompt />
