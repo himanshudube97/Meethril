@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useThemeStore } from '@/store/theme'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
+import ScrapbookDesktopOnly from './ScrapbookDesktopOnly'
 import {
   ScrapbookItem,
   TextItemData,
@@ -152,6 +154,7 @@ interface Props {
 
 export default function ScrapbookCanvas({ boardId, initialItems }: Props) {
   const { theme } = useThemeStore()
+  const layoutMode = useLayoutMode()
   const [items, setItems] = useState<ScrapbookItem[]>(initialItems)
   const { status: saveStatus, trigger: triggerSave, flush: flushSave } = useAutosaveScrapbook({ boardId })
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -370,6 +373,11 @@ export default function ScrapbookCanvas({ boardId, initialItems }: Props) {
 
   const tapeLeft = withAlpha(theme.accent.warm, 0.78)
   const tapeRight = withAlpha(theme.accent.secondary, 0.78)
+
+  // Scrapbook canvas is desktop-only — free-form drag + multi-select don't
+  // translate to small screens. Gate AFTER all hooks above to keep the hook
+  // order stable across renders.
+  if (layoutMode === 'mobile') return <ScrapbookDesktopOnly />
 
   return (
     <div className="w-full flex flex-col items-center">

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
+import ScrapbookDesktopOnly from '../ScrapbookDesktopOnly'
 import ScrapbookTokens from './ScrapbookTokens'
 // Reuse the Letters scene backdrop so /scrapbook and /letters share the
 // exact same horizon, sun glow, hills, village glints, and particle
@@ -29,6 +31,12 @@ import { encryptString } from '@/lib/e2ee/crypto'
 export default function ScrapbookListingView() {
   const router = useRouter()
   const today = useMemo(() => new Date(), [])
+  const layoutMode = useLayoutMode()
+
+  // Scrapbook is a desktop craft surface; on phones we show a soft
+  // "open on desktop" page instead of trying to cram the canvas onto
+  // a narrow screen. Listing route hits this just like the canvas does.
+  if (layoutMode === 'mobile') return <ScrapbookDesktopOnly />
 
   const [books, setBooks] = useState<ScrapbookSummary[] | null>(null)
   const [year, setYear] = useState(today.getFullYear())
