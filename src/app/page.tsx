@@ -1,30 +1,23 @@
 'use client'
 
-import { useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import HeroSection from '@/components/landing/HeroSection'
-import DiarySection from '@/components/landing/DiarySection'
 import FooterCTA from '@/components/landing/FooterCTA'
 import StickyHeader from '@/components/landing/StickyHeader'
 
+/**
+ * Landing page — kept minimal so it loads cleanly on mobile and on
+ * lower-end devices.
+ *
+ * Previously this rendered HeroSection → DiarySection (a 715-line 3D
+ * book) → FooterCTA inside a scroll-snap container with body overflow
+ * locked and ambient blobs animating below the fold. All of that is
+ * gone: two sections, normal page scroll, no 3D, no orbs, no snap.
+ * The Hero and Footer keep just the gentle fades that feel like
+ * Hearth without taxing the device.
+ */
 export default function LandingPage() {
   const { theme } = useThemeStore()
-
-  useEffect(() => {
-    // Hand the page-level scroll over to <main> so we can use scroll-snap
-    // with predictable behavior. Restore on unmount.
-    const html = document.documentElement
-    const body = document.body
-    const prevHtmlOverflow = html.style.overflow
-    const prevBodyOverflow = body.style.overflow
-    html.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-    return () => {
-      html.style.overflow = prevHtmlOverflow
-      body.style.overflow = prevBodyOverflow
-    }
-  }, [])
 
   return (
     <main
@@ -32,50 +25,10 @@ export default function LandingPage() {
       style={{
         background: theme.bg.gradient,
         color: theme.text.primary,
-        height: '100vh',
-        overflowY: 'auto',
-        scrollSnapType: 'y mandatory',
-        scrollBehavior: 'smooth',
       }}
     >
-      {/* Ambient Background - only shows below the fold */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ top: '100vh' }}>
-        {/* Subtle glow for lower sections */}
-        <motion.div
-          className="absolute top-1/4 -left-40 w-80 h-80 rounded-full blur-3xl"
-          style={{ background: theme.accent.primary }}
-          animate={{
-            opacity: [0.05, 0.1, 0.05],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-        <motion.div
-          className="absolute top-3/4 -right-40 w-80 h-80 rounded-full blur-3xl"
-          style={{ background: theme.accent.secondary }}
-          animate={{
-            opacity: [0.05, 0.08, 0.05],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 2,
-          }}
-        />
-      </div>
-
-      {/* Sticky Header - appears on scroll */}
       <StickyHeader />
-
-      {/* Page Sections */}
       <HeroSection />
-      <DiarySection />
       <FooterCTA />
     </main>
   )
