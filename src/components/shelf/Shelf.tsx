@@ -3,6 +3,8 @@
 
 import BookSpine from './BookSpine'
 import EmptyMonthSpine from './EmptyMonthSpine'
+import MobileShelfGrid from './MobileShelfGrid'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
 
 export interface ShelfMonth {
   monthIndex: number   // 0..11
@@ -33,6 +35,19 @@ export default function Shelf({
   onMonthClick,
   pulledMonthIndex,
 }: ShelfProps) {
+  const layoutMode = useLayoutMode()
+  // Mobile: 3×4 grid of book-cover cards — fits on one screen, no
+  // scroll, no rotated spines. Desktop keeps the wooden shelf.
+  if (layoutMode === 'mobile') {
+    return (
+      <MobileShelfGrid
+        year={year}
+        months={months}
+        onMonthClick={onMonthClick}
+        pulledMonthIndex={pulledMonthIndex}
+      />
+    )
+  }
   return (
     <div className="relative">
       {/* Desktop: horizontal row. Mobile: vertical stack with rotated spines. */}
