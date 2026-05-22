@@ -38,14 +38,18 @@ interface Entry {
   createdAt: string
 }
 
+type ActivePage = 'write' | 'media'
+
 /**
- * Mobile journal entry — a single scrollable page (no pagination, no swipe).
+ * Mobile journal entry — two tabbed surfaces inside a fixed-height shell:
  *
- * Cross-device contract: text is capped at `JOURNAL.MAX_CHARS` (same as
- * desktop), saved as `<p>` paragraphs split on '\n'. Desktop's BookSpread
- * reads the same HTML and paginates it across its left/right pages via
- * overflow detection. So what the user writes here will fit cleanly on
- * desktop's two-page spread, and vice versa.
+ *   1. WRITE   — song input + the writing textarea. The textarea has its
+ *                own internal scroll so the page chrome never moves.
+ *   2. MEDIA   — photos + doodle canvas.
+ *
+ * MAX_CHARS=1200 shared with desktop; HTML output is `<p>` paragraphs split
+ * on '\n' so desktop's BookSpread overflow-paginates it onto the two-page
+ * spread cleanly.
  */
 export default function MobileJournalEntry() {
   const { theme } = useThemeStore()
@@ -67,27 +71,21 @@ export default function MobileJournalEntry() {
   const [songInput, setSongInput] = useState(currentSong || '')
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([])
   const [prompt, setPrompt] = useState('')
+  const [activePage, setActivePage] = useState<ActivePage>('write')
 
   const autosave = useAutosaveEntry(null)
   const { trigger: autosaveTrigger, flush: autosaveFlush, reset: autosaveReset } = autosave
   const autosaveStatus = useDeskStore((s) => s.autosaveStatus)
 
-  // Auto-load gating + hydration gating. Refs because they don't need to
-  // trigger re-renders.
   const hasAutoLoadedRef = useRef(false)
   const lastHydratedIdRef = useRef<string | null>(null)
-  // Skip the first autosave trigger right after we hydrate from server data —
-  // it would just PUT the same content back to the server.
   const skipNextAutosaveRef = useRef(false)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => { setPrompt(getRandomPrompt()) }, [])
 
   // Fetch entries
   const fetchEntries = useCallback(async () => {
     try {
-      // One diary = one calendar month. Scope to the current month so the
-      // mobile entry view can't navigate into last month.
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       const res = await fetch(`/api/entries?month=${currentMonth}&limit=50`, {
@@ -118,8 +116,6 @@ export default function MobileJournalEntry() {
     : null
   const isPastEntry = currentEntry ? isEntryLocked(currentEntry.createdAt) : false
 
-  // On first arrival of today's entries, auto-load the latest one — so
-  // continuing an entry that was started on desktop "just works."
   useEffect(() => {
     if (hasAutoLoadedRef.current) return
     if (todayEntries.length === 0) return
@@ -131,7 +127,6 @@ export default function MobileJournalEntry() {
   }, [todayEntries])
 
   // Hydrate the editor when the user (or auto-load) selects a today's entry.
-  // Past entries skip hydration — they render in the read-only branch below.
   useEffect(() => {
     if (!currentEntry) return
     if (lastHydratedIdRef.current === currentEntry.id) return
@@ -156,8 +151,7 @@ export default function MobileJournalEntry() {
     autosaveReset(currentEntry.id)
   }, [currentEntry, isPastEntry, autosaveReset, setCurrentSong, setDoodleStrokes])
 
-  // Trigger autosave whenever a draft field changes. Covers both new entries
-  // (POST on first content) and today's entries (PUT on every change).
+  // Trigger autosave whenever a draft field changes.
   useEffect(() => {
     if (loading) return
     if (isPastEntry) return
@@ -170,10 +164,6 @@ export default function MobileJournalEntry() {
       || pendingPhotos.length > 0
       || currentDoodleStrokes.length > 0
     if (!hasContent && !currentEntryId) return
-    // Encode as <p>...</p> paragraphs so desktop's HTML pipeline can pick it
-    // apart correctly. Newlines become paragraph breaks; the server stores
-    // the HTML and desktop's overflow detection paginates it onto the two
-    // book pages as needed.
     const html = '<p>' + text.replace(/\n/g, '</p><p>') + '</p>'
     autosaveTrigger({
       text: html,
@@ -192,8 +182,6 @@ export default function MobileJournalEntry() {
     })
   }, [text, songInput, pendingPhotos, currentDoodleStrokes, currentEntryId, isPastEntry, loading, autosaveTrigger])
 
-  // When the autosave hook creates a fresh entry (POST → 200), pull the new
-  // id into local state and refetch so the EntrySelector reflects it.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { entryId?: string; isFirstSaveOfSession?: boolean }
@@ -207,17 +195,6 @@ export default function MobileJournalEntry() {
     return () => window.removeEventListener('hearth:entry-saved', handler)
   }, [fetchEntries])
 
-  // Auto-resize textarea so it grows with content — the outer page scrolls
-  // instead of the textarea showing an internal scrollbar.
-  useEffect(() => {
-    const ta = textareaRef.current
-    if (!ta) return
-    ta.style.height = 'auto'
-    ta.style.height = `${Math.max(ta.scrollHeight, JOURNAL.LINE_HEIGHT * 6)}px`
-  }, [text])
-
-  // Share-capture surface for the current entry — renders a JournalShareCard
-  // off-screen, captures it, and opens the OS share sheet / download.
   const { CameraButton: ShareCameraButton, Capture: ShareCapture } = useShareableCapture({
     cardContent: currentEntry ? <JournalShareCard entry={currentEntry as unknown as JournalEntry} /> : null,
     surface: 'diary',
@@ -256,9 +233,11 @@ export default function MobileJournalEntry() {
       autosaveReset(null)
       lastHydratedIdRef.current = null
       setCurrentEntryId(null)
+      setActivePage('write')
       return
     }
     setCurrentEntryId(entryId)
+    setActivePage('write')
   }, [autosaveFlush, autosaveReset, resetCurrentEntry, setCurrentSong, setDoodleStrokes])
 
   if (loading) {
@@ -269,7 +248,7 @@ export default function MobileJournalEntry() {
     )
   }
 
-  // Read-only view for past entries (older than today's calendar day).
+  // Read-only view for past entries — keeps the existing scrollable layout.
   if (currentEntry && isPastEntry) {
     const plainText = htmlToPlainText(currentEntry.text)
     const entryPhotos = currentEntry.photos || []
@@ -284,7 +263,12 @@ export default function MobileJournalEntry() {
             <button
               onClick={() => handleEntrySelect(null)}
               className="text-xs px-3 py-1.5 rounded-full"
-              style={{ background: colors.buttonBg, color: colors.bodyText, border: `1px solid ${colors.buttonBorder}`, fontFamily: 'Georgia, serif' }}
+              style={{
+                background: colors.buttonBg,
+                color: colors.bodyText,
+                border: `1px solid ${colors.buttonBorder}`,
+                fontFamily: 'Georgia, serif',
+              }}
             >
               ← Today
             </button>
@@ -317,160 +301,97 @@ export default function MobileJournalEntry() {
     )
   }
 
-  // Editable view — single scrollable page (new entry OR today's entry).
+  // Editable view — fixed-height shell with two tabbed pages.
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto" style={{ background: theme.bg.primary }}>
-      <div className="max-w-lg mx-auto flex flex-col gap-4 px-4 pt-20 pb-12">
-        {/* Header — left/right padding leaves room for the floating hamburger
-            (top-4 left-4) and gear (top-6 right-6) so the centered date never
-            slides under them. */}
-        <div className="flex items-center justify-center px-12">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-xs italic" style={{ color: colors.date, fontFamily: 'Georgia, serif' }}>
-              {currentEntry?.createdAt
-                ? new Date(currentEntry.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                : new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-            <AutosaveIndicator status={autosaveStatus} color={colors.prompt} />
-          </div>
+    <div className="fixed inset-0 z-40 flex flex-col" style={{ background: theme.bg.primary }}>
+      {/* Header (sits below the floating hamburger + gear thanks to pt-20) */}
+      <div className="flex flex-col items-center pt-20 pb-2 px-12 shrink-0">
+        <span className="text-xs italic" style={{ color: colors.date, fontFamily: 'Georgia, serif' }}>
+          {currentEntry?.createdAt
+            ? new Date(currentEntry.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            : new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+        </span>
+        <AutosaveIndicator status={autosaveStatus} color={colors.prompt} />
+      </div>
+
+      {todayEntries.length > 0 && (
+        <div className="flex justify-center px-4 pb-2 shrink-0">
+          <EntrySelector
+            entries={todayEntries}
+            currentEntryId={currentEntryId}
+            onEntrySelect={handleEntrySelect}
+          />
         </div>
+      )}
 
-        {todayEntries.length > 0 && (
-          <div className="flex justify-center">
-            <EntrySelector
-              entries={todayEntries}
-              currentEntryId={currentEntryId}
-              onEntrySelect={handleEntrySelect}
-            />
-          </div>
-        )}
-
-        {/* Single page card with all entry inputs */}
+      {/* Tab strip */}
+      <div className="flex justify-center px-4 pb-3 shrink-0">
         <div
-          className="rounded-2xl p-5 flex flex-col gap-5"
+          className="inline-flex rounded-full p-1 gap-1"
           style={{
-            background: colors.pageBg,
-            backdropFilter: `blur(${colors.pageBlur})`,
-            WebkitBackdropFilter: `blur(${colors.pageBlur})`,
-            border: `1px solid ${colors.pageBorder}`,
-            boxShadow: '0 8px 28px rgba(0,0,0,0.2)',
+            background: theme.glass.bg,
+            backdropFilter: `blur(${theme.glass.blur})`,
+            border: `1px solid ${theme.glass.border}`,
           }}
         >
-          {/* Song input */}
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
-              style={{ color: colors.sectionLabel }}>
-              Add a Song
-            </div>
-            {songInput && /https?:\/\//.test(songInput) ? (
-              <div className="relative">
-                <SongEmbed url={songInput} compact audioOnly />
-                <button onClick={() => handleSongChange('')}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs"
-                  style={{ background: colors.buttonBg, color: colors.prompt }}>
-                  ×
-                </button>
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={songInput}
-                onChange={e => handleSongChange(e.target.value)}
-                placeholder="Paste Spotify, YouTube, or SoundCloud..."
-                className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
-                style={{
-                  border: `1px solid ${colors.pageBorder}`,
-                  color: colors.bodyText,
-                  background: 'rgba(255,255,255,0.03)',
-                }}
-              />
-            )}
-          </div>
-
-          {/* Writing area — auto-grows; page scrolls. MAX_CHARS shared with
-              desktop so cross-device the entry fits naturally on the 2-page
-              spread. */}
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] mb-1 font-medium"
-              style={{ color: colors.sectionLabel }}>
-              Write your thoughts
-            </div>
-            <div className="text-xs italic mb-2" style={{ color: colors.prompt, fontFamily: 'Georgia, serif' }}>
-              {prompt}
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="What's on your mind today..."
-              maxLength={JOURNAL.MAX_CHARS}
-              rows={6}
-              className="w-full resize-none outline-none rounded-lg p-3"
-              style={{
-                color: colors.bodyText,
-                fontFamily: 'var(--font-caveat), Georgia, serif',
-                fontSize: `${JOURNAL.FONT_SIZE}px`,
-                lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
-                caretColor: colors.saveButton,
-                background: 'rgba(255,255,255,0.03)',
-                border: `1px solid ${colors.pageBorder}`,
-                backgroundImage: `repeating-linear-gradient(transparent, transparent ${JOURNAL.LINE_HEIGHT - 1}px, ${colors.ruledLine} ${JOURNAL.LINE_HEIGHT - 1}px, ${colors.ruledLine} ${JOURNAL.LINE_HEIGHT}px)`,
-                backgroundPosition: '0 12px',
-                overflow: 'hidden',
-              }}
-            />
-            <div className="text-right text-[10px] mt-2"
-              style={{ color: text.length > JOURNAL.MAX_CHARS * 0.9 ? colors.saveButton : colors.prompt }}>
-              {text.length} / {JOURNAL.MAX_CHARS}
-            </div>
-          </div>
-
-          {/* Photos */}
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
-              style={{ color: colors.sectionLabel }}>
-              Photos
-            </div>
-            <PhotoBlock
-              photos={pendingPhotos}
-              onPhotoAdd={handlePhotoAdd}
-              dateCaption={new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()}
-            />
-          </div>
-
-          {/* Doodle */}
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
-              style={{ color: colors.sectionLabel }}>
-              Draw
-            </div>
-            <div style={{ height: 200 }}>
-              <CompactDoodleCanvas
-                strokes={currentDoodleStrokes}
-                onStrokesChange={handleStrokesChange}
-                doodleColors={[colors.bodyText, colors.saveButton, colors.ribbon, colors.prompt]}
-                canvasBackground={colors.doodleBg}
-                canvasBorder={colors.doodleBorder}
-                textColor={colors.bodyText}
-                mutedColor={colors.prompt}
-              />
-            </div>
-          </div>
-
-          {/* Share button (only after an entry exists) */}
-          {currentEntry && (
-            <div className="flex justify-end pt-2">
-              {ShareCameraButton}
-            </div>
-          )}
+          <TabPill active={activePage === 'write'} onClick={() => setActivePage('write')}>Write</TabPill>
+          <TabPill active={activePage === 'media'} onClick={() => setActivePage('media')}>Photos & doodle</TabPill>
         </div>
       </div>
+
+      {/* Active page card — fills remaining height, no outer scroll. */}
+      <div className="flex-1 min-h-0 px-4 pb-6">
+        {activePage === 'write' ? (
+          <WritePage
+            colors={colors}
+            prompt={prompt}
+            text={text}
+            onTextChange={setText}
+            songInput={songInput}
+            onSongChange={handleSongChange}
+          />
+        ) : (
+          <MediaPage
+            colors={colors}
+            photos={pendingPhotos}
+            onPhotoAdd={handlePhotoAdd}
+            doodleStrokes={currentDoodleStrokes}
+            onStrokesChange={handleStrokesChange}
+          />
+        )}
+      </div>
+
       {ShareCapture}
     </div>
   )
 }
 
 // ----------------------------------------------------------------------------
+
+function TabPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  const { theme } = useThemeStore()
+  return (
+    <button
+      onClick={onClick}
+      className="text-xs px-4 py-1.5 rounded-full transition"
+      style={{
+        background: active ? `${theme.accent.primary}30` : 'transparent',
+        color: active ? theme.text.primary : theme.text.muted,
+        fontFamily: 'Georgia, serif',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
 
 function AutosaveIndicator({ status, color }: { status: AutosaveStatus; color: string }) {
   const label = status === 'saving' ? 'Saving…'
@@ -484,12 +405,167 @@ function AutosaveIndicator({ status, color }: { status: AutosaveStatus; color: s
         color: status === 'error' ? '#c0392b' : color,
         opacity: label ? 0.7 : 0,
         minHeight: 12,
-        textAlign: 'center',
         transition: 'opacity 200ms',
       }}
       aria-live="polite"
     >
       {label}
     </span>
+  )
+}
+
+// ----------------------------------------------------------------------------
+
+function WritePage({
+  colors,
+  prompt,
+  text,
+  onTextChange,
+  songInput,
+  onSongChange,
+}: {
+  colors: ReturnType<typeof getGlassDiaryColors>
+  prompt: string
+  text: string
+  onTextChange: (v: string) => void
+  songInput: string
+  onSongChange: (v: string) => void
+}) {
+  return (
+    <div
+      className="h-full rounded-2xl p-4 flex flex-col gap-4 min-h-0"
+      style={{
+        background: colors.pageBg,
+        backdropFilter: `blur(${colors.pageBlur})`,
+        WebkitBackdropFilter: `blur(${colors.pageBlur})`,
+        border: `1px solid ${colors.pageBorder}`,
+        boxShadow: '0 8px 28px rgba(0,0,0,0.2)',
+      }}
+    >
+      <div className="shrink-0">
+        <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
+          style={{ color: colors.sectionLabel }}>
+          Add a Song
+        </div>
+        {songInput && /https?:\/\//.test(songInput) ? (
+          <div className="relative">
+            <SongEmbed url={songInput} compact audioOnly />
+            <button onClick={() => onSongChange('')}
+              className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs"
+              style={{ background: colors.buttonBg, color: colors.prompt }}>
+              ×
+            </button>
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={songInput}
+            onChange={e => onSongChange(e.target.value)}
+            placeholder="Paste Spotify, YouTube, or SoundCloud..."
+            className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
+            style={{
+              border: `1px solid ${colors.pageBorder}`,
+              color: colors.bodyText,
+              background: 'rgba(255,255,255,0.03)',
+            }}
+          />
+        )}
+      </div>
+
+      <div className="shrink-0">
+        <div className="text-[10px] uppercase tracking-[0.18em] mb-1 font-medium"
+          style={{ color: colors.sectionLabel }}>
+          Write your thoughts
+        </div>
+        <div className="text-xs italic" style={{ color: colors.prompt, fontFamily: 'Georgia, serif' }}>
+          {prompt}
+        </div>
+      </div>
+
+      {/* The textarea fills the remaining card height and scrolls inside
+          itself — the outer page chrome never moves while typing. */}
+      <textarea
+        value={text}
+        onChange={e => onTextChange(e.target.value)}
+        placeholder="What's on your mind today..."
+        maxLength={JOURNAL.MAX_CHARS}
+        className="flex-1 min-h-0 w-full resize-none outline-none rounded-lg p-3"
+        style={{
+          color: colors.bodyText,
+          fontFamily: 'var(--font-caveat), Georgia, serif',
+          fontSize: `${JOURNAL.FONT_SIZE}px`,
+          lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
+          caretColor: colors.saveButton,
+          background: 'rgba(255,255,255,0.03)',
+          border: `1px solid ${colors.pageBorder}`,
+          backgroundImage: `repeating-linear-gradient(transparent, transparent ${JOURNAL.LINE_HEIGHT - 1}px, ${colors.ruledLine} ${JOURNAL.LINE_HEIGHT - 1}px, ${colors.ruledLine} ${JOURNAL.LINE_HEIGHT}px)`,
+          backgroundPosition: '0 12px',
+          overflowY: 'auto',
+        }}
+      />
+
+      <div className="text-right text-[10px] shrink-0"
+        style={{ color: text.length > JOURNAL.MAX_CHARS * 0.9 ? colors.saveButton : colors.prompt }}>
+        {text.length} / {JOURNAL.MAX_CHARS}
+      </div>
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------------------
+
+function MediaPage({
+  colors,
+  photos,
+  onPhotoAdd,
+  doodleStrokes,
+  onStrokesChange,
+}: {
+  colors: ReturnType<typeof getGlassDiaryColors>
+  photos: Photo[]
+  onPhotoAdd: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
+  doodleStrokes: StrokeData[]
+  onStrokesChange: (strokes: StrokeData[]) => void
+}) {
+  const dateCaption = new Date()
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    .toLowerCase()
+  return (
+    <div
+      className="h-full rounded-2xl p-5 flex flex-col gap-6 overflow-y-auto"
+      style={{
+        background: colors.pageBg,
+        backdropFilter: `blur(${colors.pageBlur})`,
+        WebkitBackdropFilter: `blur(${colors.pageBlur})`,
+        border: `1px solid ${colors.pageBorder}`,
+        boxShadow: '0 8px 28px rgba(0,0,0,0.2)',
+      }}
+    >
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
+          style={{ color: colors.sectionLabel }}>
+          Photos
+        </div>
+        <PhotoBlock photos={photos} onPhotoAdd={onPhotoAdd} dateCaption={dateCaption} />
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.18em] mb-2 font-medium"
+          style={{ color: colors.sectionLabel }}>
+          Draw
+        </div>
+        <div style={{ height: 220 }}>
+          <CompactDoodleCanvas
+            strokes={doodleStrokes}
+            onStrokesChange={onStrokesChange}
+            doodleColors={[colors.bodyText, colors.saveButton, colors.ribbon, colors.prompt]}
+            canvasBackground={colors.doodleBg}
+            canvasBorder={colors.doodleBorder}
+            textColor={colors.bodyText}
+            mutedColor={colors.prompt}
+          />
+        </div>
+      </div>
+    </div>
   )
 }
