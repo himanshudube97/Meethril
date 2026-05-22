@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useThemeStore } from '@/store/theme'
-import RevealModal from './inbox/RevealModal'
+import MobileLetterReader from './MobileLetterReader'
 import LightsView from './lights/LightsView'
 import type { InboxLetter, SentStamp, LettersTab } from './letterTypes'
 
@@ -177,7 +177,7 @@ function InboxList() {
         })}
       </ul>
       {revealLetter && (
-        <RevealModal
+        <MobileLetterReader
           letter={revealLetter}
           onClose={() => setRevealLetter(null)}
           onMarkRead={(id) => {
