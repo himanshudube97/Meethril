@@ -7,7 +7,13 @@ import { loadSlim } from '@tsparticles/slim'
 import { createNoise2D } from 'simplex-noise'
 import { useThemeStore } from '@/store/theme'
 import { useDeskSettings } from '@/store/deskSettings'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
 import type { ISourceOptions } from '@tsparticles/engine'
+
+// Hard cap on the number of particles drawn on mobile. Phone CPUs + battery
+// can't carry the same swarm the desktop renders, and most particle effects
+// read fine with a small handful of motes anyway.
+const MOBILE_PARTICLE_CAP = 8
 
 // ========== PARTICLE CONFIGURATIONS ==========
 
@@ -817,22 +823,43 @@ function BackgroundComponent({ bounded = false }: BackgroundProps = {}) {
 
   const particlesLoaded = useCallback(async () => {}, [])
 
+  const layoutMode = useLayoutMode()
+
   const particleConfig = useMemo(() => {
     const mode = theme.mode
-    if (theme.particles === 'fireflies') return getFirefliesConfig()
-    if (theme.particles === 'sakura') return getSakuraConfig(mode)
-    if (theme.particles === 'mist') return getMistConfig()
-    if (theme.particles === 'dust') return getDustConfig(mode)
-    if (theme.particles === 'foam') return getFoamConfig(mode)
-    if (theme.particles === 'sunbeam') return getSunbeamConfig(mode)
-    if (theme.particles === 'embers') return getEmbersConfig()
-    if (theme.particles === 'goldFlecks') return getGoldFlecksConfig()
-    if (theme.particles === 'rain') return getRainConfig()
-    if (theme.particles === 'leaves') {
-      return getLeavesConfig(theme.accent.primary, 18)
+    const base = (() => {
+      if (theme.particles === 'fireflies') return getFirefliesConfig()
+      if (theme.particles === 'sakura') return getSakuraConfig(mode)
+      if (theme.particles === 'mist') return getMistConfig()
+      if (theme.particles === 'dust') return getDustConfig(mode)
+      if (theme.particles === 'foam') return getFoamConfig(mode)
+      if (theme.particles === 'sunbeam') return getSunbeamConfig(mode)
+      if (theme.particles === 'embers') return getEmbersConfig()
+      if (theme.particles === 'goldFlecks') return getGoldFlecksConfig()
+      if (theme.particles === 'rain') return getRainConfig()
+      if (theme.particles === 'leaves') {
+        return getLeavesConfig(theme.accent.primary, 18)
+      }
+      return getFirefliesConfig()
+    })()
+
+    if (layoutMode !== 'mobile') return base
+    // Mobile: cap the particle count. The atmosphere stays — just fewer
+    // motes drifting around — so battery and FPS don't suffer on a phone.
+    const currentCount = typeof base.particles?.number?.value === 'number'
+      ? base.particles.number.value
+      : MOBILE_PARTICLE_CAP
+    return {
+      ...base,
+      particles: {
+        ...base.particles,
+        number: {
+          ...base.particles?.number,
+          value: Math.min(MOBILE_PARTICLE_CAP, currentCount),
+        },
+      },
     }
-    return getFirefliesConfig()
-  }, [theme.particles, theme.mode, theme.accent.primary])
+  }, [theme.particles, theme.mode, theme.accent.primary, layoutMode])
 
   if (!mounted) return null
 

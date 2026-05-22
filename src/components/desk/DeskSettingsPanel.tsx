@@ -7,6 +7,7 @@ import { useCursorStore } from '@/store/cursor'
 import { useDeskSettings } from '@/store/deskSettings'
 import { useSoundStore } from '@/store/sound'
 import { themes, ThemeName } from '@/lib/themes'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
 import { cursors, cursorIcons, CursorName } from '@/lib/cursors'
 
 const themeIcons: Record<ThemeName, string> = {
@@ -38,8 +39,17 @@ export default function DeskSettingsPanel() {
   // Themes hidden from the picker (still registered, just not offered).
   // Hearth and Linen are temporarily hidden until their views are polished.
   const HIDDEN_THEMES: ThemeName[] = ['hearth', 'linen']
+  // Mobile keeps just two themes: sunset + rose. The other ambiences depend
+  // on particles, scenes, and chrome that don't translate well to small
+  // screens. A user who set a desktop-only theme still sees it apply; they
+  // just can't pick others while on mobile.
+  const MOBILE_THEMES: ThemeName[] = ['sunset', 'rose']
+  const layoutMode = useLayoutMode()
   const themeList = (Object.entries(themes) as [ThemeName, typeof theme][])
-    .filter(([name]) => !HIDDEN_THEMES.includes(name))
+    .filter(([name]) => {
+      if (layoutMode === 'mobile') return MOBILE_THEMES.includes(name)
+      return !HIDDEN_THEMES.includes(name)
+    })
   const cursorList = Object.entries(cursors) as [CursorName, (typeof cursors)[CursorName]][]
 
   return (
