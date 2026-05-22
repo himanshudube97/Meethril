@@ -2,6 +2,7 @@
 
 import { useThemeStore } from '@/store/theme'
 import HeroSection from '@/components/landing/HeroSection'
+import FeaturesSection from '@/components/landing/FeaturesSection'
 import FooterCTA from '@/components/landing/FooterCTA'
 import StickyHeader from '@/components/landing/StickyHeader'
 
@@ -29,6 +30,7 @@ export default function LandingPage() {
     >
       <StickyHeader />
       <HeroSection />
+      <FeaturesSection />
       <FooterCTA />
     </main>
   )
