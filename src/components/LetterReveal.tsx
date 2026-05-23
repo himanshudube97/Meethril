@@ -7,6 +7,7 @@ import { useThemeStore } from '@/store/theme'
 import { useProfileStore } from '@/store/profile'
 import { useE2EE } from '@/hooks/useE2EE'
 import type { JournalEntry } from '@/store/journal'
+import { sanitizeLetterClient } from '@/lib/sanitize-letter-client'
 
 interface ArrivedLetter {
   id: string
@@ -246,7 +247,7 @@ export default function LetterReveal() {
                 lineHeight: 2,
                 color: theme.text.primary,
               }}
-              dangerouslySetInnerHTML={{ __html: currentLetter.text }}
+              dangerouslySetInnerHTML={{ __html: sanitizeLetterClient(currentLetter.text) }}
             />
 
             {/* Letter footer */}

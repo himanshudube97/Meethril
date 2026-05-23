@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useThemeStore } from '@/store/theme'
 import { useJournalStore } from '@/store/journal'
 
@@ -26,6 +26,20 @@ export default function Editor({ prompt, value, onChange, flexible, customStyles
   const currentText = value !== undefined ? value : storeText
   const setCurrentText = onChange || setStoreText
   const { theme } = useThemeStore()
+
+  // TipTap's `onUpdate` callback is captured at editor-construction time and
+  // is never re-bound. If `setCurrentText` (or `onCharCountChange`) changes
+  // identity on a parent re-render, the editor would keep calling the OLD
+  // version and silently lose live edits. Mirror the latest callbacks into
+  // refs and read from them inside the stable onUpdate closure.
+  const setCurrentTextRef = useRef(setCurrentText)
+  const onCharCountChangeRef = useRef(onCharCountChange)
+  useEffect(() => {
+    setCurrentTextRef.current = setCurrentText
+  }, [setCurrentText])
+  useEffect(() => {
+    onCharCountChangeRef.current = onCharCountChange
+  }, [onCharCountChange])
 
   const extensions = useMemo(
     () => [
@@ -53,10 +67,10 @@ export default function Editor({ prompt, value, onChange, flexible, customStyles
       },
     },
     onUpdate: ({ editor }) => {
-      setCurrentText(editor.getHTML())
-      if (onCharCountChange) {
-        onCharCountChange(editor.storage.characterCount?.characters() ?? 0)
-      }
+      setCurrentTextRef.current(editor.getHTML())
+      onCharCountChangeRef.current?.(
+        editor.storage.characterCount?.characters() ?? 0,
+      )
     },
   })
 

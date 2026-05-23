@@ -12,6 +12,7 @@ import DoodlePreview from '@/components/DoodlePreview'
 import SongEmbed, { isMusicUrl } from '@/components/SongEmbed'
 import { useE2EE } from '@/hooks/useE2EE'
 import type { JournalEntry } from '@/store/journal'
+import { sanitizeLetterClient } from '@/lib/sanitize-letter-client'
 
 interface ArrivedLetter {
   id: string
@@ -303,6 +304,22 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
   const letterCaptureRef = useRef<HTMLDivElement>(null)
   const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
 
+  // The envelope-phase animation schedules three setTimeouts per open/close.
+  // Earlier these were bare and uncancelled — opening then quickly closing
+  // (or unmounting) left the timers ticking and called setEnvelopePhase on
+  // a dead instance. Track them so we can drain on unmount and on each new
+  // sequence.
+  const phaseTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const clearPhaseTimeouts = useCallback(() => {
+    for (const t of phaseTimeoutsRef.current) clearTimeout(t)
+    phaseTimeoutsRef.current = []
+  }, [])
+  useEffect(() => {
+    return () => {
+      clearPhaseTimeouts()
+    }
+  }, [clearPhaseTimeouts])
+
   // Check for arrived letters
   const checkForLetters = useCallback(async () => {
     try {
@@ -394,10 +411,14 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
     }))
     setParticles(newParticles)
 
-    // Animate through phases
-    setTimeout(() => setEnvelopePhase('opening'), 500)
-    setTimeout(() => setEnvelopePhase('open'), 1500)
-    setTimeout(() => setEnvelopePhase('reading'), 2500)
+    // Animate through phases. Cancel any in-flight phase timers first so a
+    // rapid open/close/open doesn't queue stale state updates.
+    clearPhaseTimeouts()
+    phaseTimeoutsRef.current.push(
+      setTimeout(() => setEnvelopePhase('opening'), 500),
+      setTimeout(() => setEnvelopePhase('open'), 1500),
+      setTimeout(() => setEnvelopePhase('reading'), 2500),
+    )
   }
 
   const handleCloseLetter = async () => {
@@ -419,14 +440,18 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
     if (currentLetterIndex < arrivedLetters.length - 1) {
       setCurrentLetterIndex(currentLetterIndex + 1)
       setEnvelopePhase('closed')
-      setTimeout(() => setEnvelopePhase('opening'), 500)
-      setTimeout(() => setEnvelopePhase('open'), 1500)
-      setTimeout(() => setEnvelopePhase('reading'), 2500)
+      clearPhaseTimeouts()
+      phaseTimeoutsRef.current.push(
+        setTimeout(() => setEnvelopePhase('opening'), 500),
+        setTimeout(() => setEnvelopePhase('open'), 1500),
+        setTimeout(() => setEnvelopePhase('reading'), 2500),
+      )
     } else {
       setShowModal(false)
       setEnvelopePhase('closed')
       setParticles([])
       setArrivedLetters([])
+      clearPhaseTimeouts()
     }
   }
 
@@ -1034,7 +1059,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
                             lineHeight: 1.9,
                             color: '#2a2520',
                           }}
-                          dangerouslySetInnerHTML={{ __html: currentLetter?.text || '' }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeLetterClient(currentLetter?.text) }}
                         />
 
                         <div style={{ marginTop: '40px', textAlign: 'right' }}>

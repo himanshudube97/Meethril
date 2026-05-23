@@ -10,6 +10,7 @@ import DoodlePreview from './DoodlePreview'
 import DoodleCanvas from './DoodleCanvas'
 import CollagePhoto from './CollagePhoto'
 import SongEmbed, { isMusicUrl } from './SongEmbed'
+import { sanitizeLetterClient } from '@/lib/sanitize-letter-client'
 
 interface EntryDetailModalProps {
   entryId: string | null
@@ -284,7 +285,7 @@ export default function EntryDetailModal({ entryId, onClose, onUpdated }: EntryD
                             lineHeight: 2,
                             color: theme.text.primary,
                           }}
-                          dangerouslySetInnerHTML={{ __html: entry.text }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeLetterClient(entry.text) }}
                         />
 
                         {/* Doodles inline */}
