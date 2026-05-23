@@ -1,10 +1,10 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
 import { useThemeStore } from '@/store/theme'
 import { useCursorStore } from '@/store/cursor'
 import { useDeskSettings } from '@/store/deskSettings'
+import { useDeskPanel } from '@/store/deskPanel'
 import { useSoundStore } from '@/store/sound'
 import { themes, ThemeName } from '@/lib/themes'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
@@ -23,7 +23,7 @@ const themeIcons: Record<ThemeName, string> = {
 }
 
 export default function DeskSettingsPanel() {
-  const [open, setOpen] = useState(false)
+  const { open, setOpen } = useDeskPanel()
   const { theme, themeName, setTheme } = useThemeStore()
   const { cursorName, setCursor } = useCursorStore()
   const { animationsEnabled, setAnimationsEnabled } = useDeskSettings()
@@ -52,6 +52,13 @@ export default function DeskSettingsPanel() {
     })
   const cursorList = Object.entries(cursors) as [CursorName, (typeof cursors)[CursorName]][]
 
+  // Mobile has no settings UI at all — the theme is locked to sunset and
+  // user-tweakable preferences (cursor, animations, ambient sound) are
+  // desktop-only knobs anyway.
+  if (layoutMode === 'mobile') {
+    return null
+  }
+
   return (
     <>
       {/* Gear button — top-right of viewport, above the desk scene. */}
@@ -59,7 +66,7 @@ export default function DeskSettingsPanel() {
         whileHover={{ scale: 1.05, rotate: 30 }}
         whileTap={{ scale: 0.95 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
         className="fixed top-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center text-xl"
         style={{
           background: theme.glass.bg,

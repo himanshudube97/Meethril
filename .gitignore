@@ -66,3 +66,9 @@ task*-*.png
 diary-*.png
 hero-viewport.png
 diary-viewport.png
+
+# local docker overrides (port mappings, container names)
+docker-compose.override.yml
+
+# claude code worktrees
+.claude/worktrees/

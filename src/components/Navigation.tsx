@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useAuthStore } from '@/store/auth'
 import { useProfileStore } from '@/store/profile'
@@ -23,7 +23,6 @@ export default function Navigation() {
   const { user } = useAuthStore()
   const { profile, fetchProfile } = useProfileStore()
   const layoutMode = useLayoutMode()
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Fetch profile on mount to get nickname
   useEffect(() => {
@@ -31,12 +30,6 @@ export default function Navigation() {
       fetchProfile()
     }
   }, [user, fetchProfile])
-
-  // Close the mobile drawer whenever the route changes — otherwise it stays
-  // open after a tab tap and covers the page the user just navigated to.
-  useEffect(() => {
-    setDrawerOpen(false)
-  }, [pathname])
 
   // Don't show navigation on login page or landing page
   if (pathname === '/login' || pathname === '/') {
@@ -47,113 +40,68 @@ export default function Navigation() {
   const nickname = profile.nickname
   const avatarLetter = nickname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'
 
-  // Mobile: hamburger in the top-right slot where FullscreenButton sits on
-  // desktop (FullscreenButton hides on mobile). The 5-tab pill is too wide
-  // for narrow screens, so we collapse to a slide-from-right drawer.
+  // Mobile: always-visible horizontal pill centered at top. Icon-only tabs
+  // plus a divider + gear that triggers the shared DeskSettingsPanel store.
+  // The panel component itself hides its own floating gear on mobile.
   if (layoutMode === 'mobile') {
     return (
-      <>
-        <motion.button
-          onClick={() => setDrawerOpen(o => !o)}
-          whileTap={{ scale: 0.95 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed top-4 left-4 z-50 w-12 h-12 rounded-full flex items-center justify-center"
-          style={{
-            background: theme.glass.bg,
-            backdropFilter: `blur(${theme.glass.blur})`,
-            border: `1px solid ${theme.glass.border}`,
-            color: theme.text.primary,
-          }}
-          aria-label={drawerOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={drawerOpen}
-        >
-          <HamburgerIcon open={drawerOpen} />
-        </motion.button>
-
-        <AnimatePresence>
-          {drawerOpen && (
-            <>
-              {/* Invisible click-catcher to close the panel on outside tap.
-                  No dark backdrop — the panel is small and we want to keep
-                  the page visible underneath. */}
-              <div
-                onClick={() => setDrawerOpen(false)}
-                className="fixed inset-0 z-40"
-              />
-
-              {/* Compact dropdown panel just below the hamburger button. */}
+      <nav
+        className="fixed top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 p-1 rounded-full"
+        style={{
+          background: theme.glass.bg,
+          backdropFilter: `blur(${theme.glass.blur})`,
+          WebkitBackdropFilter: `blur(${theme.glass.blur})`,
+          border: `1px solid ${theme.glass.border}`,
+        }}
+        aria-label="Primary navigation"
+      >
+        {tabs.map(tab => {
+          const isActive = pathname === tab.href
+          return (
+            <Link key={tab.href} href={tab.href} aria-label={tab.label}>
               <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="fixed top-17 left-4 z-50 w-56 rounded-2xl p-2 flex flex-col gap-0.5"
+                whileTap={{ scale: 0.92 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-base"
                 style={{
-                  background: theme.glass.bg,
-                  backdropFilter: `blur(${theme.glass.blur})`,
-                  WebkitBackdropFilter: `blur(${theme.glass.blur})`,
-                  border: `1px solid ${theme.glass.border}`,
-                  boxShadow: '0 16px 40px rgba(0,0,0,0.28)',
-                  transformOrigin: 'top left',
+                  background: isActive ? `${theme.accent.primary}30` : 'transparent',
+                  color: isActive ? theme.text.primary : theme.text.muted,
                 }}
               >
-                {tabs.map(tab => {
-                  const isActive = pathname === tab.href
-                  return (
-                    <Link key={tab.href} href={tab.href}>
-                      <div
-                        className="px-3 py-2 rounded-xl flex items-center gap-3 transition"
-                        style={{
-                          background: isActive ? `${theme.accent.primary}30` : 'transparent',
-                          color: isActive ? theme.text.primary : theme.text.muted,
-                        }}
-                      >
-                        <span className="text-base w-5 text-center">{tab.icon}</span>
-                        <span className="text-sm" style={{ fontFamily: 'Georgia, serif' }}>
-                          {tab.label}
-                        </span>
-                      </div>
-                    </Link>
-                  )
-                })}
-
-                {user && (
-                  <>
-                    <div
-                      className="my-1 mx-2 h-px"
-                      style={{ background: theme.glass.border }}
-                    />
-                    <Link href="/me">
-                      <div
-                        className="px-3 py-2 rounded-xl flex items-center gap-3"
-                        style={{
-                          background: pathname === '/me'
-                            ? `${theme.accent.primary}30`
-                            : 'transparent',
-                          color: pathname === '/me' ? theme.accent.primary : theme.text.muted,
-                        }}
-                      >
-                        <span
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-medium"
-                          style={{
-                            background: `${theme.accent.warm}20`,
-                            border: `1px solid ${theme.glass.border}`,
-                          }}
-                        >
-                          {avatarLetter}
-                        </span>
-                        <span className="text-sm truncate" style={{ fontFamily: 'Georgia, serif' }}>
-                          {nickname || user.email}
-                        </span>
-                      </div>
-                    </Link>
-                  </>
-                )}
+                {tab.icon}
               </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      </>
+            </Link>
+          )
+        })}
+
+        <div
+          className="w-px h-5 mx-0.5"
+          style={{ background: theme.glass.border }}
+          aria-hidden
+        />
+
+        {user && (
+          <Link href="/me" aria-label={nickname || user.email || 'Profile'}>
+            <motion.div
+              whileTap={{ scale: 0.92 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium"
+              style={{
+                background: pathname === '/me'
+                  ? `${theme.accent.primary}30`
+                  : `${theme.accent.warm}20`,
+                color: pathname === '/me' ? theme.accent.primary : theme.text.muted,
+                border: pathname === '/me'
+                  ? `1px solid ${theme.accent.primary}`
+                  : `1px solid ${theme.glass.border}`,
+              }}
+              title={nickname || user.email}
+            >
+              {avatarLetter}
+            </motion.div>
+          </Link>
+        )}
+      </nav>
     )
   }
 
@@ -237,34 +185,5 @@ export default function Navigation() {
       </div>
     </nav>
     </>
-  )
-}
-
-function HamburgerIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {open ? (
-        <>
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </>
-      ) : (
-        <>
-          <line x1="3" y1="7" x2="21" y2="7" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="17" x2="21" y2="17" />
-        </>
-      )}
-    </svg>
   )
 }

@@ -39,48 +39,46 @@ export default function MemoryEntryReader({ entry, onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-50 overflow-y-auto"
-      style={{ background: 'rgba(0,0,0,0.55)' }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-x-0 top-20 bottom-4 z-30 px-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ y: 30, opacity: 0 }}
+        initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 20, opacity: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="max-w-lg mx-auto my-12 px-4"
+        exit={{ y: 10, opacity: 0 }}
+        transition={{ duration: 0.28, ease: 'easeOut' }}
+        className="h-full max-w-lg mx-auto rounded-3xl flex flex-col overflow-hidden"
+        style={{
+          background: colors.pageBg,
+          border: `1px solid ${colors.pageBorder}`,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
+        }}
       >
         <div
-          className="rounded-3xl p-6"
-          style={{
-            background: colors.pageBg,
-            backdropFilter: `blur(${colors.pageBlur})`,
-            WebkitBackdropFilter: `blur(${colors.pageBlur})`,
-            border: `1px solid ${colors.pageBorder}`,
-            boxShadow: '0 16px 40px rgba(0,0,0,0.35)',
-          }}
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: `1px solid ${colors.pageBorder}` }}
         >
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={onClose}
-              className="text-xs px-3 py-1.5 rounded-full"
-              style={{
-                background: colors.buttonBg,
-                color: colors.bodyText,
-                border: `1px solid ${colors.buttonBorder}`,
-                fontFamily: 'Georgia, serif',
-              }}
-            >
-              Close
-            </button>
-            <span className="text-xs italic" style={{ color: colors.date, fontFamily: 'Georgia, serif' }}>
-              {captionDate.toLocaleDateString('en-US', {
-                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-              })}
-            </span>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-xs px-3 py-1.5 rounded-full"
+            style={{
+              background: colors.buttonBg,
+              color: colors.bodyText,
+              border: `1px solid ${colors.buttonBorder}`,
+              fontFamily: 'Georgia, serif',
+            }}
+          >
+            Close
+          </button>
+          <span className="text-xs italic" style={{ color: colors.date, fontFamily: 'Georgia, serif' }}>
+            {captionDate.toLocaleDateString('en-US', {
+              weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+            })}
+          </span>
+        </div>
 
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {entry.song && (
             <div className="mb-4">
               <SongEmbed url={entry.song} compact audioOnly />
