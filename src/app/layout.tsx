@@ -33,8 +33,9 @@ const patrickHand = Patrick_Hand({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Allow pinch-to-zoom for accessibility (WCAG 1.4.4). Earlier the viewport
+  // pinned maximumScale: 1 + userScalable: false, which blocks low-vision
+  // users from zooming and is a hard a11y violation.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f5f5f5" },
     { media: "(prefers-color-scheme: dark)", color: "#0f0f1a" },
