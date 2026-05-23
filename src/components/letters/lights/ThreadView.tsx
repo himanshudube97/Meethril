@@ -66,6 +66,8 @@ export default function ThreadView({
   onWave,
 }: Props) {
   const [thread, setThread] = useState<ThreadDetail | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
   const { threadKey } = useStrangerThreadKey({
     threadId: thread?.status === 'pen_pal' ? threadId : null,
     status: thread?.status ?? null,
@@ -81,11 +83,31 @@ export default function ThreadView({
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const res = await fetch(`/api/stranger-notes/threads/${threadId}`, { credentials: 'include' })
-      const data = await res.json()
-      if (!cancelled) setThread(data)
-      if (data.waveEligible && !data.waveOfferedToMe) {
-        onWavePromptShown().catch(() => {})
+      try {
+        const res = await fetch(`/api/stranger-notes/threads/${threadId}`, {
+          credentials: 'include',
+        })
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        if (cancelled) return
+        // The server returns `{ error }` shapes with non-ok statuses we already
+        // filtered above, but a 200 with `{ error }` (e.g. middleware quirk)
+        // would otherwise become a bogus `thread` object.
+        if (!data || typeof data !== 'object' || data.error) {
+          throw new Error(data?.error ?? 'thread unavailable')
+        }
+        setThread(data)
+        if (data.waveEligible && !data.waveOfferedToMe) {
+          onWavePromptShown().catch(() => {})
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(
+            e instanceof Error ? e.message : "we couldn't open this thread",
+          )
+        }
       }
     }
     load()
@@ -115,6 +137,24 @@ export default function ThreadView({
     }
   }, [thread, threadKey])
 
+  if (loadError) {
+    return (
+      <div
+        className="p-6 font-serif text-sm flex flex-col items-center gap-3"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <p className="italic">we couldn&apos;t open this thread.</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="underline text-xs"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          go back
+        </button>
+      </div>
+    )
+  }
   if (!thread) {
     return (
       <div className="p-6 font-serif text-sm italic" style={{ color: 'var(--text-muted)' }}>
@@ -247,6 +287,7 @@ export default function ThreadView({
             e.preventDefault()
             if (!draft.trim() || sending) return
             setSending(true)
+            setSendError(null)
             try {
               if (thread.status === 'pen_pal' && threadKey) {
                 const ciphertext = await encryptThreadMessage(draft.trim(), threadKey)
@@ -273,6 +314,13 @@ export default function ThreadView({
                 if (refreshed.ok) setThread(await refreshed.json())
               }
               setDraft('')
+            } catch (err) {
+              setSendError(
+                err instanceof Error
+                  ? "couldn't send — your message is still here, tap send to try again."
+                  : "couldn't send. tap send to try again.",
+              )
+              // Keep `draft` populated so the user doesn't lose the text.
             } finally {
               setSending(false)
             }
@@ -280,6 +328,14 @@ export default function ThreadView({
           className="flex flex-col gap-2"
         >
           <ReplyPaper draft={draft} setDraft={setDraft} disabled={sending} />
+          {sendError && (
+            <p
+              className="font-serif text-[11px] italic"
+              style={{ color: 'color-mix(in oklab, red 70%, var(--text-primary) 30%)' }}
+            >
+              {sendError}
+            </p>
+          )}
           <div className="flex items-center justify-between">
             <span
               className="font-serif text-[11px] italic"

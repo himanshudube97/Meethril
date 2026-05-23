@@ -23,6 +23,8 @@ interface Props {
 export default function InboxView({ onUnreadCountChange }: Props) {
   const router = useRouter()
   const [letters, setLetters] = useState<InboxLetter[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [monthIdx, setMonthIdx] = useState(today.getMonth())
@@ -73,15 +75,27 @@ export default function InboxView({ onUnreadCountChange }: Props) {
   // string and atob exploded on `{`.
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setLoadError(false)
     fetch('/api/letters/inbox')
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((d) => {
         if (cancelled) return
         const raw = (d.letters || []) as InboxLetter[]
         setLetters(raw)
       })
-      .catch(() => {})
-    return () => { cancelled = true }
+      .catch(() => {
+        if (!cancelled) setLoadError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [isE2EEReady])
 
   const grouped = useMemo(() => groupInboxByMonth(letters), [letters])
@@ -180,7 +194,13 @@ export default function InboxView({ onUnreadCountChange }: Props) {
           letterSpacing: 1.2,
         }}
       >
-        — {MONTH_NAMES[monthIdx]} · {year} · {captionFor(currentLetters)} —
+        — {MONTH_NAMES[monthIdx]} · {year} ·{' '}
+        {loading
+          ? 'opening the box…'
+          : loadError
+            ? "couldn't reach the mailbox — tap the postbox to retry"
+            : captionFor(currentLetters)}{' '}
+        —
       </div>
 
       <RevealModal

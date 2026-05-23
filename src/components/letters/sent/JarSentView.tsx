@@ -26,6 +26,10 @@ interface JarSentViewProps {
   /** First valid (year, month) — defaults to (2026, 0) i.e. Jan 2026 (Hearth launch). */
   launchYear?: number
   launchMonth?: number
+  /** True while the initial /api/letters/sent fetch is in flight. */
+  loading?: boolean
+  /** True when the fetch failed; suppresses the "no letters" empty state. */
+  loadError?: boolean
 }
 
 function todayYM() {
@@ -37,6 +41,8 @@ export default function JarSentView({
   stamps,
   launchYear = 2026,
   launchMonth = 0,
+  loading = false,
+  loadError = false,
 }: JarSentViewProps) {
   const [open, setOpen] = useState<SentStamp | null>(null)
   const [opened, setOpened] = useState(false)
@@ -213,6 +219,8 @@ export default function JarSentView({
             delivered={delivered}
             total={total}
             totalEver={stamps.length}
+            loading={loading}
+            loadError={loadError}
             opened={opened}
             onToggle={() => setOpened(o => !o)}
           />
@@ -388,11 +396,13 @@ interface JarProps {
   delivered: number
   total: number
   totalEver: number
+  loading?: boolean
+  loadError?: boolean
   opened: boolean
   onToggle: () => void
 }
 
-function Jar({ sealed, delivered, total, totalEver, opened, onToggle }: JarProps) {
+function Jar({ sealed, delivered, total, totalEver, loading, loadError, opened, onToggle }: JarProps) {
   const CAP = 14
   const sealedShown = Math.min(sealed, Math.max(0, CAP - delivered))
   const deliveredShown = Math.min(delivered, CAP)
@@ -586,7 +596,11 @@ function Jar({ sealed, delivered, total, totalEver, opened, onToggle }: JarProps
         </g>
       </svg>
 
-      {totalEver === 0 ? (
+      {loading ? (
+        <div className="empty-state">unsealing the jar…</div>
+      ) : loadError ? (
+        <div className="empty-state">we couldn&rsquo;t reach the jar — try again later</div>
+      ) : totalEver === 0 ? (
         <div className="empty-state">
           you haven&rsquo;t sealed any letters yet — your jar is waiting
         </div>
