@@ -308,13 +308,16 @@ export async function PUT(
       style: parseStyle(updatedEntry?.style),
     })
   } catch (error) {
-    // Surface the underlying message + stack head so production 500s aren't
-    // a black box. Only the catch text leaks — never the request body.
+    // Keep the stack server-side for debugging, but never ship it (or the
+    // Prisma error detail) to the client. Earlier the response body
+    // included `details: message` and the first 4 stack frames, which
+    // exposed internal file paths and Prisma query shapes to any caller
+    // who could trigger a 500.
     const message = error instanceof Error ? error.message : String(error)
     const stack = error instanceof Error ? error.stack?.split('\n').slice(0, 4).join('\n') : undefined
     console.error('Error updating entry:', { message, stack })
     return NextResponse.json(
-      { error: 'Failed to update entry', details: message, stack },
+      { error: 'Failed to update entry' },
       { status: 500 }
     )
   }

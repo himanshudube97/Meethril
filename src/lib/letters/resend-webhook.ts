@@ -6,6 +6,11 @@ export interface ResendEventEnvelope {
   data: Record<string, unknown>
 }
 
+// Svix recommends rejecting timestamps outside ±5 minutes to prevent replay
+// attacks. Without this check, an attacker who captured a single valid webhook
+// could replay it indefinitely.
+const MAX_AGE_SECONDS = 300
+
 export function verifyResendSignature(args: {
   rawBody: string
   svixId: string
@@ -13,6 +18,12 @@ export function verifyResendSignature(args: {
   svixSignature: string
   secret: string
 }): boolean {
+  // Reject stale or future-dated payloads.
+  const ts = parseInt(args.svixTimestamp, 10)
+  if (!Number.isFinite(ts)) return false
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  if (Math.abs(nowSeconds - ts) > MAX_AGE_SECONDS) return false
+
   // secret comes in like "whsec_xxx"; the Svix verification uses the part
   // after the underscore base64-decoded.
   const secretBase64 = args.secret.startsWith('whsec_') ? args.secret.slice('whsec_'.length) : args.secret

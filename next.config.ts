@@ -42,6 +42,29 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["jose", "@prisma/client", ".prisma/client"],
   turbopack: {},
+  async headers() {
+    // Baseline security headers. CSP is intentionally omitted from this
+    // first pass — locking it down requires walking the app for inline
+    // scripts + the Next runtime, which is a separate task. Everything
+    // here is safe to apply globally.
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+        ],
+      },
+    ]
+  },
 };
 
 export default withPWA(nextConfig);
