@@ -8,12 +8,11 @@ import {
   UNWAVED_VANISH_LIFETIME_MS,
   WAVE_DECISION_WINDOW_MS,
 } from '@/lib/stranger-notes'
+import { checkCronAuth } from '@/lib/cron-auth'
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = checkCronAuth(req)
+  if (unauthorized) return unauthorized
 
   const now = new Date()
   const summary = { matched: 0, closedUnwaved: 0, deleted: 0 }
@@ -58,15 +57,17 @@ export async function POST(req: NextRequest) {
   const activeSilenceDeadline = new Date(now.getTime() - ACTIVE_SILENCE_LIFETIME_MS)
   const unwavedVanishDeadline = new Date(now.getTime() - UNWAVED_VANISH_LIFETIME_MS)
 
-  const d1 = await prisma.strangerThread.deleteMany({
-    where: { status: 'unmatched', createdAt: { lt: unmatchedDeadline } },
-  })
-  const d2 = await prisma.strangerThread.deleteMany({
-    where: { status: 'active', lastActivityAt: { lt: activeSilenceDeadline } },
-  })
-  const d3 = await prisma.strangerThread.deleteMany({
-    where: { status: 'closed_unwaved', closedAt: { lt: unwavedVanishDeadline } },
-  })
+  const [d1, d2, d3] = await prisma.$transaction([
+    prisma.strangerThread.deleteMany({
+      where: { status: 'unmatched', createdAt: { lt: unmatchedDeadline } },
+    }),
+    prisma.strangerThread.deleteMany({
+      where: { status: 'active', lastActivityAt: { lt: activeSilenceDeadline } },
+    }),
+    prisma.strangerThread.deleteMany({
+      where: { status: 'closed_unwaved', closedAt: { lt: unwavedVanishDeadline } },
+    }),
+  ])
   summary.deleted = d1.count + d2.count + d3.count
 
   return NextResponse.json({ ok: true, summary })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getPhotoAdapter } from '@/lib/storage/photo-adapter'
+import { checkCronAuth } from '@/lib/cron-auth'
 
 const BATCH_SIZE = 50
 
@@ -9,11 +10,8 @@ const BATCH_SIZE = 50
 // delete() already swallows missing-handle errors. Marks each row sweptAt
 // after a successful delete so subsequent runs skip it.
 export async function POST(request: NextRequest) {
-  const auth = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = checkCronAuth(request)
+  if (unauthorized) return unauthorized
 
   const orphans = await prisma.orphanedBlob.findMany({
     where: { sweptAt: null },
@@ -25,26 +23,29 @@ export async function POST(request: NextRequest) {
   }
 
   const adapter = await getPhotoAdapter()
-  let swept = 0
+  const sweptIds: string[] = []
   const errors: string[] = []
 
   for (const orphan of orphans) {
     try {
       await adapter.delete(orphan.handle, orphan.userId)
-      await prisma.orphanedBlob.update({
-        where: { id: orphan.id },
-        data: { sweptAt: new Date() },
-      })
-      swept++
+      sweptIds.push(orphan.id)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown'
       errors.push(`${orphan.handle}: ${msg}`)
     }
   }
 
+  if (sweptIds.length > 0) {
+    await prisma.orphanedBlob.updateMany({
+      where: { id: { in: sweptIds } },
+      data: { sweptAt: new Date() },
+    })
+  }
+
   return NextResponse.json({
-    swept,
-    remaining: orphans.length - swept,
+    swept: sweptIds.length,
+    remaining: orphans.length - sweptIds.length,
     errors,
   })
 }

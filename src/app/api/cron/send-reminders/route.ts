@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { isCurrentWindowTarget, targetMinutesPastSeven } from '@/lib/reminder-schedule'
 import { pickReminderLine, REMINDER_TITLE } from '@/lib/reminder-messages'
 import { decryptJson } from '@/lib/encryption'
+import { checkCronAuth } from '@/lib/cron-auth'
 
 let configured = false
 function configureVapid() {
@@ -55,10 +56,8 @@ function startOfLocalDayUTC(now: Date, tz: string): Date {
 }
 
 export async function GET(request: NextRequest | Request) {
-  const auth = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = checkCronAuth(request as NextRequest)
+  if (unauthorized) return unauthorized
 
   try {
     configureVapid()
@@ -79,6 +78,26 @@ export async function GET(request: NextRequest | Request) {
     where: { pausedAt: null },
   })
 
+  // Step 2b: batch-fetch user profiles and most-recent entry per user.
+  // The earlier version issued 3 sequential Prisma queries per subscriber,
+  // which timed out at scale on Vercel's 10s budget. Now we do 2 calls total
+  // and look up per-user in memory inside the loop.
+  const userIds = Array.from(new Set(subs.map((s) => s.userId)))
+  const [users, latestEntries] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, profile: true },
+    }),
+    prisma.journalEntry.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['userId'],
+    }),
+  ])
+  const userById = new Map(users.map((u) => [u.id, u]))
+  const latestEntryByUser = new Map(latestEntries.map((e) => [e.userId, e.createdAt]))
+
   let fired = 0
   let skippedAlreadyJournaled = 0
   let skippedNotInWindow = 0
@@ -95,10 +114,7 @@ export async function GET(request: NextRequest | Request) {
       continue
     }
 
-    const userRow = await prisma.user.findUnique({
-      where: { id: sub.userId },
-      select: { profile: true },
-    })
+    const userRow = userById.get(sub.userId)
     const profile = userRow?.profile
       ? (decryptJson<Record<string, unknown>>(userRow.profile as string) ?? {})
       : {}
@@ -114,12 +130,10 @@ export async function GET(request: NextRequest | Request) {
       continue
     }
 
+    const latestEntry = latestEntryByUser.get(sub.userId) ?? null
+
     // Skip if user already journaled today
-    const todayEntry = await prisma.journalEntry.findFirst({
-      where: { userId: sub.userId, createdAt: { gte: startOfToday } },
-      select: { id: true },
-    })
-    if (todayEntry) {
+    if (latestEntry && latestEntry >= startOfToday) {
       skippedAlreadyJournaled++
       // Reset ignored counter (they're engaged)
       await prisma.pushSubscription.update({
@@ -129,13 +143,10 @@ export async function GET(request: NextRequest | Request) {
       continue
     }
 
-    // Update ignored counter for the *previous* fire
+    // Update ignored counter for the *previous* fire — did they write since?
     let nextIgnored = sub.consecutiveIgnored
     if (sub.lastFiredAt) {
-      const wroteSinceLastFire = await prisma.journalEntry.findFirst({
-        where: { userId: sub.userId, createdAt: { gte: sub.lastFiredAt } },
-        select: { id: true },
-      })
+      const wroteSinceLastFire = latestEntry !== null && latestEntry >= sub.lastFiredAt
       nextIgnored = wroteSinceLastFire ? 0 : sub.consecutiveIgnored + 1
     }
 

@@ -2,22 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { sendSelfLetterReminderEmail } from '@/lib/email'
+import { checkCronAuth } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get('authorization')
-  const secret = process.env.CRON_SECRET
-  // Fail-closed in production: a missing CRON_SECRET would otherwise leave
-  // this endpoint publicly callable, which could be used to spam Resend
-  // reminders. Dev keeps fail-open so local cron testing works without
-  // any extra env setup.
-  if (!secret && process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'cron not configured' }, { status: 500 })
-  }
-  if (secret && auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
+  const unauthorized = checkCronAuth(request)
+  if (unauthorized) return unauthorized
 
   const now = new Date()
   const due = await prisma.letter.findMany({
@@ -37,15 +28,28 @@ export async function GET(request: NextRequest) {
   const errors: string[] = []
   let processed = 0
   for (const l of due) {
+    // Claim the row before sending so concurrent cron firings can't double-send.
+    // updateMany returns count=0 if another worker already flipped deliveredAt.
+    const claim = await prisma.letter.updateMany({
+      where: { id: l.id, deliveredAt: null },
+      data: { deliveredAt: new Date(), isDelivered: true },
+    })
+    if (claim.count === 0) continue
+
     try {
       await sendSelfLetterReminderEmail({
         to: l.user.email,
         recipientName: l.user.name ?? null,
         writtenOn: l.createdAt,
       })
-      await prisma.letter.update({ where: { id: l.id }, data: { deliveredAt: new Date(), isDelivered: true } })
       processed++
     } catch (e) {
+      // Roll the claim back so a later cron run can retry. Without this, a
+      // transient Resend failure would silently swallow the letter forever.
+      await prisma.letter.updateMany({
+        where: { id: l.id, isDelivered: true },
+        data: { deliveredAt: null, isDelivered: false },
+      })
       errors.push(`${l.id}: ${e instanceof Error ? e.message : 'unknown'}`)
     }
   }

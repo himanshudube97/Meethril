@@ -55,6 +55,30 @@ export async function GET(_req: NextRequest) {
     countsByThread.set(row.threadId, t)
   }
 
+  // Batch unread counts in a single query instead of one COUNT per thread.
+  // Pull every message sent by the other party across all the user's threads,
+  // then tally per-thread in memory using each thread's own lastViewedAt.
+  const lastViewedByThread = new Map<string, Date | null>()
+  for (const r of rows) {
+    lastViewedByThread.set(
+      r.id,
+      r.senderId === user.id ? r.senderLastViewedAt : r.recipientLastViewedAt,
+    )
+  }
+  const incomingMessages = await prisma.strangerMessage.findMany({
+    where: {
+      threadId: { in: rows.map((r) => r.id) },
+      senderId: { not: user.id },
+    },
+    select: { threadId: true, createdAt: true },
+  })
+  const unreadByThread = new Map<string, number>()
+  for (const m of incomingMessages) {
+    const lvAt = lastViewedByThread.get(m.threadId) ?? null
+    if (lvAt && m.createdAt <= lvAt) continue
+    unreadByThread.set(m.threadId, (unreadByThread.get(m.threadId) ?? 0) + 1)
+  }
+
   const outgoing: InboxThread[] = []
   const active: InboxThread[] = []
   const penpals: InboxThread[] = []
@@ -65,14 +89,7 @@ export async function GET(_req: NextRequest) {
       ? (t.recipientDisplayName ?? 'A wandering light')
       : t.senderDisplayName
     const myDisplayName = isSender ? t.senderDisplayName : (t.recipientDisplayName ?? '—')
-    const lastViewedAt = isSender ? t.senderLastViewedAt : t.recipientLastViewedAt
-    const unreadCount = await prisma.strangerMessage.count({
-      where: {
-        threadId: t.id,
-        senderId: { not: user.id },
-        createdAt: lastViewedAt ? { gt: lastViewedAt } : undefined,
-      },
-    })
+    const unreadCount = unreadByThread.get(t.id) ?? 0
 
     const c = countsByThread.get(t.id) ?? { sender: 0, recipient: 0 }
     const waveEligible =
