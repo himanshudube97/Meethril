@@ -15,12 +15,14 @@ import ReminderControls from '@/components/reminders/ReminderControls'
 function useDebouncedSave(delay = 500) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState(false)
   const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
 
   const save = useCallback(async (key: ProfileKey, value: string) => {
     // Clear existing timer
     if (timer) clearTimeout(timer)
     setSaved(false)
+    setSaveError(false)
 
     // Set new timer
     const newTimer = setTimeout(async () => {
@@ -35,9 +37,14 @@ function useDebouncedSave(delay = 500) {
           setSaved(true)
           // Hide "saved" after 2 seconds
           setTimeout(() => setSaved(false), 2000)
+        } else {
+          setSaveError(true)
         }
       } catch {
-        // Silently fail
+        // Surface the failure instead of silently leaving the user thinking
+        // the change persisted. Previously the catch swallowed both the
+        // network and the non-2xx paths.
+        setSaveError(true)
       } finally {
         setSaving(false)
       }
@@ -46,7 +53,7 @@ function useDebouncedSave(delay = 500) {
     setTimer(newTimer)
   }, [timer, delay])
 
-  return { saving, saved, save }
+  return { saving, saved, saveError, save }
 }
 
 // Personal info input with local state
@@ -67,7 +74,7 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
 }) {
   const { theme } = useThemeStore()
   const [value, setValue] = useState(initialValue)
-  const { saving, saved, save } = useDebouncedSave()
+  const { saving, saved, saveError, save } = useDebouncedSave()
 
   // Sync initial value when it changes (after fetch)
   useEffect(() => {
@@ -90,6 +97,11 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
         {label}
         {saving && <span className="ml-2 opacity-60">saving...</span>}
         {saved && !saving && <span className="ml-2" style={{ color: theme.accent.primary }}>saved</span>}
+        {saveError && !saving && (
+          <span className="ml-2" style={{ color: '#b94c4c' }}>
+            couldn’t save — try again
+          </span>
+        )}
       </label>
       <input
         type={type}
@@ -114,7 +126,7 @@ const DateOfBirthInput = memo(function DateOfBirthInput({
 }) {
   const { theme } = useThemeStore()
   const [value, setValue] = useState(initialValue)
-  const { saving, saved, save } = useDebouncedSave()
+  const { saving, saved, saveError, save } = useDebouncedSave()
 
   // Sync initial value when it changes (after fetch)
   useEffect(() => {
@@ -135,6 +147,11 @@ const DateOfBirthInput = memo(function DateOfBirthInput({
         when were you born?
         {saving && <span className="ml-2 opacity-60">saving...</span>}
         {saved && !saving && <span className="ml-2" style={{ color: theme.accent.primary }}>saved</span>}
+        {saveError && !saving && (
+          <span className="ml-2" style={{ color: '#b94c4c' }}>
+            couldn’t save — try again
+          </span>
+        )}
       </label>
       <DatePicker
         value={value}

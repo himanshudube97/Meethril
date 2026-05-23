@@ -33,16 +33,23 @@ export default function ButterflyMemoryView() {
   const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
   const prefersReducedMotion = usePrefersReducedMotion()
   const [entries, setEntries] = useState<JournalEntry[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const [selected, setSelected] = useState<JournalEntry | null>(null)
 
   const fetchEntries = useCallback(async () => {
+    setLoadError(false)
     try {
       const res = await fetch('/api/entries?limit=50')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const raw = (data.entries || []) as JournalEntry[]
       const decrypted = await decryptEntriesFromServer(raw)
       setEntries(decrypted)
     } catch {
+      // Earlier the catch silently set entries to [] which then rendered as
+      // "Memories appear here once you've written a few entries" — a false
+      // empty state for users who had entries but the fetch failed.
+      setLoadError(true)
       setEntries([])
     }
   }, [decryptEntriesFromServer])
@@ -70,10 +77,24 @@ export default function ButterflyMemoryView() {
   if (visible.length === 0) {
     return (
       <div
-        className="fixed inset-0 flex items-center justify-center px-8 text-center"
+        className="fixed inset-0 flex flex-col items-center justify-center px-8 text-center gap-3"
         style={{ color: theme.text.muted, fontFamily: 'Georgia, serif', fontStyle: 'italic' }}
       >
-        Memories appear here once you&apos;ve written a few entries.
+        <p>
+          {loadError
+            ? "we couldn't reach your memories — give it another try in a moment"
+            : 'Memories appear here once you’ve written a few entries.'}
+        </p>
+        {loadError && (
+          <button
+            type="button"
+            onClick={fetchEntries}
+            className="underline text-xs"
+            style={{ color: theme.text.muted }}
+          >
+            try again
+          </button>
+        )}
       </div>
     )
   }
