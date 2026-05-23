@@ -50,6 +50,11 @@ export async function DELETE(request: NextRequest | Request) {
   const endpoint = body?.endpoint
   if (!endpoint) return NextResponse.json({ error: 'Missing endpoint' }, { status: 400 })
 
-  await prisma.pushSubscription.delete({ where: { endpoint } }).catch(() => {})
+  // Scope by userId — previously this deleted by endpoint alone, which let
+  // any authenticated user silence anyone else's push reminders if they
+  // could guess or obtain the raw endpoint URL.
+  await prisma.pushSubscription.deleteMany({
+    where: { endpoint, userId: user.id },
+  })
   return NextResponse.json({ ok: true })
 }

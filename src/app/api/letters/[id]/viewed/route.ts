@@ -22,9 +22,11 @@ export async function POST(
       return NextResponse.json({ error: 'Letter not found' }, { status: 404 })
     }
 
-    // Mark as viewed on the Letter table (letters no longer live on JournalEntry).
-    await prisma.letter.update({
-      where: { id },
+    // Mark as viewed. Scope by userId in the where clause so the predicate
+    // is enforced at the DB layer, not just at the prior findLetterForRead
+    // check — closes a structural TOCTOU between the two queries.
+    await prisma.letter.updateMany({
+      where: { id, userId: user.id },
       data: { isViewed: true },
     })
 

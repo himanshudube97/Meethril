@@ -54,7 +54,18 @@ export async function unwrapStrangerPrivateKey(
   wrappedPrivateKey: string,
   masterKey: CryptoKey
 ): Promise<Uint8Array> {
-  const { ciphertext, iv } = JSON.parse(wrappedPrivateKey) as { ciphertext: string; iv: string }
+  let ciphertext: string
+  let iv: string
+  try {
+    const parsed = JSON.parse(wrappedPrivateKey) as { ciphertext: string; iv: string }
+    ciphertext = parsed.ciphertext
+    iv = parsed.iv
+  } catch {
+    // A corrupt or truncated wrappedPrivateKey would throw a raw SyntaxError
+    // here and bubble out as an unhandled promise rejection, leaving the
+    // thread permanently unopenable. Surface a domain error the UI can show.
+    throw new Error('corrupt thread key — key exchange may need to be retried')
+  }
   const privB64 = await decryptString(ciphertext, iv, masterKey)
   return base64ToBytes(privB64)
 }
@@ -141,6 +152,14 @@ export async function encryptThreadMessage(plaintext: string, threadKey: CryptoK
 }
 
 export async function decryptThreadMessage(cipherEnvelope: string, threadKey: CryptoKey): Promise<string> {
-  const { ciphertext, iv } = JSON.parse(cipherEnvelope) as { ciphertext: string; iv: string }
+  let ciphertext: string
+  let iv: string
+  try {
+    const parsed = JSON.parse(cipherEnvelope) as { ciphertext: string; iv: string }
+    ciphertext = parsed.ciphertext
+    iv = parsed.iv
+  } catch {
+    throw new Error('thread message looks corrupted')
+  }
   return decryptString(ciphertext, iv, threadKey)
 }

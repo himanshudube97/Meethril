@@ -18,6 +18,17 @@ interface ArrivedLetter {
   e2eeIVs?: unknown
 }
 
+function parseViewedIds(raw: string | null): Set<string> | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return new Set(parsed.map(String))
+    return null
+  } catch {
+    return null
+  }
+}
+
 // Twinkling star component for the reveal background
 function TwinklingStar({ delay, size, x, y }: { delay: number; size: number; x: number; y: number }) {
   return (
@@ -72,10 +83,14 @@ export default function LetterReveal() {
   // Check for arrived letters on mount
   const checkForLetters = useCallback(async () => {
     try {
-      // Get already viewed letters from session storage
+      // Get already viewed letters from session storage. Guard the parse so
+      // a corrupted/foreign value can't permanently brick the arrived-letter
+      // modal — without try/catch a syntax error would skip the rest of this
+      // effect and the user would never see a delivered letter.
       const viewedIds = sessionStorage.getItem('viewedLetterIds')
-      if (viewedIds) {
-        setViewedLetterIds(new Set(JSON.parse(viewedIds)))
+      const parsedViewedIds = parseViewedIds(viewedIds)
+      if (parsedViewedIds) {
+        setViewedLetterIds(parsedViewedIds)
       }
 
       const res = await fetch('/api/letters/arrived')
@@ -86,7 +101,7 @@ export default function LetterReveal() {
           (data.letters || []) as unknown as JournalEntry[]
         )) as unknown as ArrivedLetter[]
         // Filter out already viewed letters
-        const viewedSet = viewedIds ? new Set(JSON.parse(viewedIds)) : new Set()
+        const viewedSet: Set<string> = parsedViewedIds ?? new Set()
         const unviewedLetters = decryptedLetters.filter(
           (letter) => !viewedSet.has(letter.id)
         )

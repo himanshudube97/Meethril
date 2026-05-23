@@ -28,6 +28,20 @@ interface LetterArrivedBannerProps {
   nickname?: string
 }
 
+function parseViewedIds(raw: string | null): Set<string> {
+  if (!raw) return new Set<string>()
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return new Set<string>(parsed.map(String))
+    return new Set<string>()
+  } catch {
+    // Corrupted/foreign value — start from empty rather than throwing and
+    // skipping the rest of the effect (which would prevent the arrived-letter
+    // modal from ever opening).
+    return new Set<string>()
+  }
+}
+
 // Theme-specific stamps
 const themeStamps: Record<ThemeName, { icon: string; color: string }> = {
   rivendell: { icon: '🌲', color: '#5E8B5A' },
@@ -290,8 +304,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
   // Check for arrived letters
   const checkForLetters = useCallback(async () => {
     try {
-      const viewedIds = sessionStorage.getItem('viewedLetterIds')
-      const viewedSet = viewedIds ? new Set(JSON.parse(viewedIds)) : new Set()
+      const viewedSet = parseViewedIds(sessionStorage.getItem('viewedLetterIds'))
 
       const res = await fetch('/api/letters/arrived')
       if (res.ok) {
@@ -388,8 +401,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
     const currentLetter = arrivedLetters[currentLetterIndex]
     if (currentLetter) {
       // Mark as viewed in sessionStorage
-      const viewedIds = sessionStorage.getItem('viewedLetterIds')
-      const viewedSet = viewedIds ? new Set(JSON.parse(viewedIds)) : new Set()
+      const viewedSet = parseViewedIds(sessionStorage.getItem('viewedLetterIds'))
       viewedSet.add(currentLetter.id)
       sessionStorage.setItem('viewedLetterIds', JSON.stringify([...viewedSet]))
 

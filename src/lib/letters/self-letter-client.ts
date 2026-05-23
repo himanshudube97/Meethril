@@ -46,5 +46,13 @@ export async function decryptSelfLetterContent(args: {
   masterKey: CryptoKey
 }): Promise<SelfLetterDraft> {
   const json = await decryptString(args.contentCiphertext, args.contentIVs.content, args.masterKey)
-  return JSON.parse(json)
+  try {
+    return JSON.parse(json) as SelfLetterDraft
+  } catch {
+    // Decryption succeeded but the plaintext is not the expected JSON wrapper
+    // — most likely a letter sealed under an earlier payload format. Surface
+    // a domain error so the reveal modal can show "couldn't read this letter"
+    // instead of crashing the surrounding view.
+    throw new Error('self letter payload looks malformed')
+  }
 }

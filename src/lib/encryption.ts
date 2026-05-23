@@ -104,15 +104,20 @@ export function decryptJson<T>(encryptedData: string | null | undefined): T | nu
     const decrypted = decrypt(encryptedData)
     return JSON.parse(decrypted) as T
   } catch {
-    // If decryption fails, try parsing as plain JSON (old unencrypted data)
+    // If decryption fails, try parsing as plain JSON (old unencrypted data
+    // from before server-side encryption was introduced).
     try {
       if (typeof encryptedData === 'string') {
         return JSON.parse(encryptedData) as T
       }
-      return encryptedData as T
     } catch {
-      return encryptedData as T
+      // fall through
     }
+    // The earlier implementation returned `encryptedData as T` on this path —
+    // a type lie that masked a parse failure as valid data and could feed
+    // raw ciphertext into callers expecting a structured object. Return null
+    // so callers handle the failure explicitly.
+    return null
   }
 }
 

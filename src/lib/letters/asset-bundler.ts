@@ -57,7 +57,20 @@ async function fetchAndDecryptPhoto(
   masterKey: CryptoKey,
 ): Promise<ArrayBuffer> {
   const refJson = await decryptString(encryptedRef, encryptedRefIV, masterKey)
-  const { handle, iv } = JSON.parse(refJson) as { handle: string; iv: string }
+  let handle: string
+  let iv: string
+  try {
+    const parsed = JSON.parse(refJson) as { handle: string; iv: string }
+    handle = parsed.handle
+    iv = parsed.iv
+  } catch {
+    // A non-JSON refJson means decryption succeeded but produced garbage
+    // (e.g. master key was rotated, or the photo was uploaded before
+    // E2EE was enabled). Without this guard the whole seal flow crashes
+    // and the letter becomes unsealable; with it the caller can show
+    // a recoverable "re-upload this photo" error.
+    throw new Error('photo reference is corrupted — try re-uploading the photo')
+  }
   const res = await fetch(`/api/photos/${encodeURIComponent(handle)}`)
   if (!res.ok) throw new Error(`photo fetch ${res.status}: ${handle}`)
   const ct = await res.arrayBuffer()

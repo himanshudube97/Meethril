@@ -15,10 +15,12 @@ export async function POST(
   const letter = await findLetterForRead({ id, userId: user.id, requireSealed: true })
   if (!letter) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-  // Record the peek on the Letter table. Letters no longer live on JournalEntry.
+  // Record the peek. Scope by userId at the DB layer so the predicate is
+  // enforced beyond the prior findLetterForRead check — closes the same
+  // structural TOCTOU pattern as /viewed.
   if (!letter.letterPeekedAt) {
-    await prisma.letter.update({
-      where: { id },
+    await prisma.letter.updateMany({
+      where: { id, userId: user.id },
       data: { letterPeekedAt: new Date() },
     })
   }
