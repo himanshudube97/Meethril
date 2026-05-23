@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { JournalEntry } from '@/store/journal'
 import { useE2EE } from './useE2EE'
 import { getClientTz } from '@/lib/entry-lock-client'
@@ -70,16 +70,32 @@ export function useEntries(options: UseEntriesOptions = {}) {
     return `/api/entries?${params.toString()}`
   }, [options.month, options.year, options.search, options.today, options.limit, options.includeDoodles])
 
+  // Monotonic counter + cursor ref. The counter discards stale responses so
+  // a fast month-switch or search-keystroke never overwrites the live data
+  // with results from a superseded request. Keeping the cursor in a ref means
+  // fetchEntries identity no longer churns on every setPagination call (which
+  // was thrashing the IntersectionObserver in the timeline route).
+  const fetchCounterRef = useRef(0)
+  const cursorRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const fetchEntries = useCallback(async (reset = true) => {
+    const myCount = ++fetchCounterRef.current
     try {
       if (reset) {
         setLoading(true)
         setEntries([])
+        cursorRef.current = null
       } else {
         setLoadingMore(true)
       }
 
-      const cursor = reset ? undefined : pagination.nextCursor ?? undefined
+      const cursor = reset ? undefined : cursorRef.current ?? undefined
       const res = await fetch(buildUrl(cursor), {
         headers: { 'X-User-TZ': getClientTz() },
       })
@@ -93,16 +109,23 @@ export function useEntries(options: UseEntriesOptions = {}) {
       // Decrypt E2EE entries client-side
       const decryptedEntries = await decryptEntriesFromServer(data.entries)
 
+      // Drop stale responses: another fetch has been queued behind us.
+      if (myCount !== fetchCounterRef.current || !mountedRef.current) return
+
       setEntries(prev => reset ? decryptedEntries : [...prev, ...decryptedEntries])
       setPagination(data.pagination)
+      cursorRef.current = data.pagination.nextCursor
       setError(null)
     } catch (err) {
+      if (myCount !== fetchCounterRef.current || !mountedRef.current) return
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (myCount === fetchCounterRef.current && mountedRef.current) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
-  }, [buildUrl, pagination.nextCursor, decryptEntriesFromServer])
+  }, [buildUrl, decryptEntriesFromServer])
 
   const loadMore = useCallback(() => {
     if (!loadingMore && pagination.hasMore) {
@@ -181,6 +204,10 @@ export function useEntry(id: string | null) {
       return
     }
 
+    // Guard against id-change races: if `id` (or E2EE readiness) flips while
+    // an old fetch is in flight, the old result must not overwrite the new.
+    let cancelled = false
+
     const fetchEntry = async () => {
       try {
         setLoading(true)
@@ -193,16 +220,21 @@ export function useEntry(id: string | null) {
         const data = await res.json()
         // Decrypt E2EE entry client-side
         const decryptedEntry = await decryptEntryFromServer(data)
+        if (cancelled) return
         setEntry(decryptedEntry)
         setError(null)
       } catch (err) {
+        if (cancelled) return
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchEntry()
+    return () => {
+      cancelled = true
+    }
   }, [id, isE2EEReady, decryptEntryFromServer])
 
   return { entry, loading, error }

@@ -111,9 +111,14 @@ export function useAutosaveLetterDraft(
   const draftIdRef = useRef<string | null>(initialDraftId)
   const payloadRef = useRef<LetterDraftAutosavePayload | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inFlightRef = useRef(false)
   const dirtyRef = useRef(false)
   const lastSavedSigRef = useRef<string | null>(null)
+  // Guard setState / dispatchEvent against fire-after-unmount. The first POST
+  // creates the draft row; if the component unmounts before it resolves the
+  // returned id would be set on a dead instance, orphaning the draft.
+  const mountedRef = useRef(true)
 
   const { encryptEntryData, isE2EEReady, isE2EEEnabled, isE2EEInitialized } = useE2EE()
   const encryptEntryDataRef = useRef(encryptEntryData)
@@ -203,7 +208,7 @@ export function useAutosaveLetterDraft(
       if (res.ok) {
         if (!id) {
           const data = await res.json()
-          if (data?.id) {
+          if (data?.id && mountedRef.current) {
             draftIdRef.current = data.id
             setDraftId(data.id)
             if (typeof window !== 'undefined') {
@@ -217,6 +222,7 @@ export function useAutosaveLetterDraft(
         }
         lastSavedSigRef.current = sig
         inFlightRef.current = false
+        if (!mountedRef.current) return
         if (dirtyRef.current) {
           performSaveRef.current?.(0)
         } else {
@@ -227,15 +233,19 @@ export function useAutosaveLetterDraft(
 
       if (res.status === 403 || res.status === 404) {
         inFlightRef.current = false
-        setStatus('error')
+        if (mountedRef.current) setStatus('error')
         return
       }
 
       throw new Error(`HTTP ${res.status}`)
     } catch {
       inFlightRef.current = false
+      if (!mountedRef.current) return
       if (retryCount < 1) {
-        setTimeout(() => performSaveRef.current?.(1), RETRY_DELAY_MS)
+        retryTimeoutRef.current = setTimeout(
+          () => performSaveRef.current?.(1),
+          RETRY_DELAY_MS,
+        )
       } else {
         setStatus('error')
       }
@@ -273,7 +283,9 @@ export function useAutosaveLetterDraft(
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
     }
   }, [])
 

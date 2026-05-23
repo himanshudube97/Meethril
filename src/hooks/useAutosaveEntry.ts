@@ -63,8 +63,14 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
   const entryIdRef = useRef<string | null>(initialEntryId)
   const draftRef = useRef<AutosaveDraft | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inFlightRef = useRef(false)
   const dirtyRef = useRef(false)
+  // Guard every setState / dispatchEvent against post-unmount fire-after.
+  // The most damaging path was the first-save POST that resolved after the
+  // component unmounted: setEntryId(data.id) silently created an orphaned
+  // entry in the DB because no future PUT would ever reference that id.
+  const mountedRef = useRef(true)
   // Signature of the last successfully-saved draft. If a trigger fires with
   // an identical draft (e.g. a store subscription re-emitted the same value,
   // or a stray effect ran on mount), short-circuit instead of burning a PUT
@@ -190,7 +196,7 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       if (res.ok) {
         if (!id) {
           const data = await res.json()
-          if (data?.id) {
+          if (data?.id && mountedRef.current) {
             entryIdRef.current = data.id
             setEntryId(data.id)
             if (typeof window !== 'undefined') {
@@ -211,6 +217,7 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
           style: draft.style,
         })
         inFlightRef.current = false
+        if (!mountedRef.current) return
         if (dirtyRef.current) {
           // Another change came in while we were saving — kick off another round.
           performSaveRef.current?.(0)
@@ -223,15 +230,22 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       // Lock-violation: don't retry, surface error.
       if (res.status === 403) {
         inFlightRef.current = false
-        setStatus('error')
+        if (mountedRef.current) setStatus('error')
         return
       }
 
       throw new Error(`HTTP ${res.status}`)
     } catch {
       inFlightRef.current = false
+      if (!mountedRef.current) return
       if (retryCount < 1) {
-        setTimeout(() => performSaveRef.current?.(1), RETRY_DELAY_MS)
+        // Store the retry handle in retryTimeoutRef so unmount cleanup can
+        // cancel it. Earlier the bare setTimeout escaped cleanup and would
+        // fire a save against an unmounted component.
+        retryTimeoutRef.current = setTimeout(
+          () => performSaveRef.current?.(1),
+          RETRY_DELAY_MS,
+        )
       } else {
         setStatus('error')
       }
@@ -267,10 +281,13 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
     setStatus('idle')
   }, [])
 
-  // Cancel pending save on unmount.
+  // Cancel pending save on unmount AND mark unmounted so any in-flight fetch
+  // that resolves after this point skips its state writes.
   useEffect(() => {
     return () => {
+      mountedRef.current = false
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
     }
   }, [])
 
