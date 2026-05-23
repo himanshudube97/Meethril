@@ -2,7 +2,16 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { DotLottieReact } from '@lottiefiles/dotlottie-react'
+import dynamic from 'next/dynamic'
+
+// Lottie runtime is ~200KB and only used by the firelight memory scene
+// (one of 10 themes). Load it on demand via next/dynamic so it never
+// ships in the main bundle for other-theme users. ssr:false because the
+// player touches `document` during init.
+const DotLottieReact = dynamic(
+  () => import('@lottiefiles/dotlottie-react').then((m) => m.DotLottieReact),
+  { ssr: false },
+)
 
 // Loaded from /public/lottie/hearth-fire.lottie. The file itself
 // is added separately in Task 12 (Himanshu picks a free animation

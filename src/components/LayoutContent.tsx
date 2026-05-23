@@ -12,6 +12,7 @@ import FullscreenButton from '@/components/FullscreenButton'
 import FullscreenPrompt from '@/components/FullscreenPrompt'
 import { useThemeStore } from '@/store/theme'
 import { useApplyCursorStyles } from '@/hooks/useApplyCursorStyles'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
 
 /**
  * Solid-to-transparent strip across the top of authed pages. Sits behind
@@ -41,7 +42,18 @@ export default function LayoutContent({
 }) {
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const { theme } = useThemeStore()
+  const { theme, themeName, setTheme } = useThemeStore()
+  const layoutMode = useLayoutMode()
+
+  // Mobile has no settings UI, so the theme is locked to sunset there.
+  // On desktop the user's last picked theme persists. Switching browser
+  // window from mobile width back to desktop will keep sunset until the
+  // user picks something else via the gear settings.
+  useEffect(() => {
+    if (layoutMode === 'mobile' && themeName !== 'sunset') {
+      setTheme('sunset')
+    }
+  }, [layoutMode, themeName, setTheme])
   const isLandingPage = pathname === '/'
   const isPricingPage = pathname === '/pricing'
   const isWritingPage = pathname === '/write'
@@ -53,6 +65,11 @@ export default function LayoutContent({
   // padded main wrapper — the page lays itself out full-bleed so it feels
   // like a moment, not another tab.
   const isOnboardingPage = pathname.startsWith('/onboarding')
+  // /letter/[token] is the public friend-letter recipient flow. It's a
+  // cinematic full-bleed scene and must NOT inherit the nav bar or the
+  // pt-20 main padding — both would push the letter scene down and break
+  // the absolute-positioned layout.
+  const isPublicLetterPage = pathname.startsWith('/letter/')
 
   // Apply the active cursor styles globally. The cursor selection now
   // lives entirely in the gear's DeskSettingsPanel, but the style
@@ -122,6 +139,14 @@ export default function LayoutContent({
         {children}
       </>
     )
+  }
+
+  if (isPublicLetterPage) {
+    // Public recipient flow (/letter/[token] and /letter/[token]/save).
+    // The recipient is often unauthenticated and arrives from an email link;
+    // no nav, no gear, no install prompt — just the letter scene the page
+    // renders on its own.
+    return <>{children}</>
   }
 
   return (

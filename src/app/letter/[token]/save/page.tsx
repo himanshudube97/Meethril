@@ -197,7 +197,7 @@ function Centered({ title, sub }: { title: string; sub?: string }) {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -316,7 +316,7 @@ function OtpFlow({ token }: { token: string }) {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

@@ -237,7 +237,7 @@ export default function LetterPage() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: '#f6efe2',
         color: '#3d342a',
         padding: '40px 24px',
@@ -283,7 +283,7 @@ function SealedScene({
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -402,7 +402,7 @@ function CenteredMessage({ title, sub }: { title: string; sub?: string }) {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
-import { toPng } from 'html-to-image'
+// html-to-image (~40-60KB) is only needed when the user taps Download.
+// Pulled in dynamically inside the handler so it doesn't ship in the main
+// bundle for every user who ever opens an arrived letter modal.
 import { useThemeStore } from '@/store/theme'
 import { themes, ThemeName } from '@/lib/themes'
 import DoodlePreview from '@/components/DoodlePreview'
@@ -354,6 +356,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
       // Wait for content to render
       await new Promise(resolve => setTimeout(resolve, 200))
 
+      const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(element, {
         quality: 1,
         pixelRatio: 2,
