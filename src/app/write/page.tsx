@@ -1,12 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DeskScene } from '@/components/desk'
 import OptInCard from '@/components/reminders/OptInCard'
 import { useDeskStore } from '@/store/desk'
 
 export default function WritePage() {
+  return (
+    <Suspense fallback={<DeskScene />}>
+      <WritePageInner />
+    </Suspense>
+  )
+}
+
+function WritePageInner() {
   const [optInShown, setOptInShown] = useState<boolean | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()

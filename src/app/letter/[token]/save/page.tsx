@@ -1,7 +1,7 @@
 // src/app/letter/[token]/save/page.tsx
 'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
+import { Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useE2EEStore } from '@/store/e2ee'
 import { encryptString, encryptBytes } from '@/lib/e2ee/crypto'
@@ -86,6 +86,14 @@ async function uploadKeptPhotos(args: {
 }
 
 export default function SavePage() {
+  return (
+    <Suspense fallback={<Centered title="Loading..." />}>
+      <SavePageInner />
+    </Suspense>
+  )
+}
+
+function SavePageInner() {
   const params = useParams<{ token: string }>()
   const router = useRouter()
   const search = useSearchParams()
@@ -113,7 +121,16 @@ export default function SavePage() {
         })
         return
       }
-      const cached: CachedLetter = JSON.parse(raw)
+      let cached: CachedLetter
+      try {
+        cached = JSON.parse(raw) as CachedLetter
+      } catch {
+        setState({
+          kind: 'error',
+          message: 'The cached letter looks corrupted. Please reopen the original link to try again.',
+        })
+        return
+      }
 
       // Branch 1: already logged in + unlocked
       if (loggedInHint && masterKey) {
@@ -259,7 +276,12 @@ function OtpFlow({ token }: { token: string }) {
       try {
         const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${token}`)
         if (!raw) throw new Error('Lost the decrypted letter — try reopening the original link.')
-        const cached: CachedLetter = JSON.parse(raw)
+        let cached: CachedLetter
+        try {
+          cached = JSON.parse(raw) as CachedLetter
+        } catch {
+          throw new Error('The cached letter looks corrupted — try reopening the original link.')
+        }
         const rawKey = cached.letterKey ? rawKeyFromBase64(cached.letterKey) : null
         const photoRefs =
           rawKey && cached.assets && cached.assets.length > 0
