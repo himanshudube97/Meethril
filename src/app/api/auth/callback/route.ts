@@ -4,10 +4,20 @@ import { prisma } from '@/lib/db'
 import { hasCompletedE2EEOnboarding } from '@/lib/auth'
 import { E2EE_ONBOARDED_COOKIE, E2EE_COOKIE_OPTS } from '@/lib/auth/e2ee-cookie'
 
+// Only accept same-origin paths. Reject anything starting with "//" (which
+// browsers resolve as a protocol-relative cross-origin redirect) and anything
+// that doesn't start with a single "/".
+function safeRedirectPath(raw: string | null): string {
+  if (!raw) return '/'
+  if (!raw.startsWith('/')) return '/'
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return '/'
+  return raw
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
-  const redirect = searchParams.get('redirect') || '/'
+  const redirect = safeRedirectPath(searchParams.get('redirect'))
 
   if (code) {
     const supabase = await createClient()

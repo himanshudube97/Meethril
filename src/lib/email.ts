@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { parseStoredSong, highResArt, appleMusicLink } from '@/lib/song'
+import { sanitizeLetterHtml, escapeHtml } from '@/lib/sanitize-html'
 
 let _resend: Resend | null = null
 function getResend() {
@@ -35,11 +36,17 @@ export function generateLetterEmail({
     day: 'numeric',
   })
 
-  // Strip HTML tags for plain text sections but keep formatting for the main content
-  const cleanContent = letterContent
+  // Sanitize first (allow only safe formatting tags), then collapse paragraph
+  // wrappers to <br/> so the email renders inline within the existing layout.
+  const safeContent = sanitizeLetterHtml(letterContent)
+  const cleanContent = safeContent
     .replace(/<p><\/p>/g, '<br/>')
     .replace(/<p>/g, '')
     .replace(/<\/p>/g, '<br/>')
+
+  const safeLocation = letterLocation ? escapeHtml(letterLocation) : null
+  const safeRecipient = escapeHtml(recipientName)
+  const safeSender = escapeHtml(senderName)
 
   // Build photos HTML
   const photosHtml = photos && photos.length > 0
@@ -143,7 +150,7 @@ export function generateLetterEmail({
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>A Letter From ${senderName}</title>
+  <title>A Letter From ${safeSender}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500&display=swap');
   </style>
@@ -162,7 +169,7 @@ export function generateLetterEmail({
                 A letter has arrived
               </h1>
               <p style="color: #9a7b5b; font-size: 14px; margin: 8px 0 0 0;">
-                Written ${letterLocation ? `from ${letterLocation}, ` : ''}${formattedDate}
+                Written ${safeLocation ? `from ${safeLocation}, ` : ''}${formattedDate}
               </p>
             </td>
           </tr>
@@ -178,7 +185,7 @@ export function generateLetterEmail({
                 <tr>
                   <td style="padding: 24px 32px 16px 32px; border-bottom: 1px solid rgba(232,148,90,0.1);">
                     <p style="color: #9a7b5b; font-size: 14px; margin: 0; font-style: italic;">
-                      Dear ${recipientName},
+                      Dear ${safeRecipient},
                     </p>
                   </td>
                 </tr>
@@ -200,7 +207,7 @@ ${doodleHtml}${musicHtml}
                 <tr>
                   <td style="padding: 16px 32px 24px 32px; border-top: 1px solid rgba(232,148,90,0.1);">
                     <p style="color: #9a7b5b; font-size: 14px; margin: 0; font-style: italic; text-align: right;">
-                      — ${senderName}
+                      — ${safeSender}
                     </p>
                   </td>
                 </tr>
@@ -245,12 +252,6 @@ ${doodleHtml}${musicHtml}
 </body>
 </html>
 `
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]!))
 }
 
 // Generate notification email for self-letters

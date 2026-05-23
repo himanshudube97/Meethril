@@ -23,6 +23,14 @@ function sanitizeLetter(html: string): string {
   return DOMPurify.sanitize(html, SANITIZE_CONFIG) as unknown as string
 }
 
+// Reject javascript:/data:/vbscript: hrefs. Returns null when the URL is not
+// a plain http(s)/mailto link — caller should skip rendering the <a> instead.
+function safeHref(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed
+  return null
+}
+
 type LetterContent = {
   text: string
   song: string | null
@@ -245,9 +253,9 @@ export default function LetterPage() {
           style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 18 }}
           dangerouslySetInnerHTML={{ __html: sanitizeLetter(state.data.text) }}
         />
-        {state.data.song && (
+        {state.data.song && safeHref(state.data.song) && (
           <p style={{ marginTop: 32, fontSize: 14, opacity: 0.7 }}>
-            Song they sent: <a href={state.data.song}>{state.data.song}</a>
+            Song they sent: <a href={safeHref(state.data.song)!} rel="noopener noreferrer" target="_blank">{state.data.song}</a>
           </p>
         )}
         <LetterPhotos
