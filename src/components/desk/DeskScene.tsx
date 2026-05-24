@@ -25,19 +25,37 @@ export default function DeskScene() {
   const [mounted, setMounted] = useState(false)
   const { theme } = useThemeStore()
   const layoutMode = useLayoutMode()
-  const [scaleForTablet, setScaleForTablet] = useState(1)
+  const [spreadScale, setSpreadScale] = useState(1)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Scale the book spread to fit both viewport dimensions on every non-mobile
+  // layout. Capped at 1 — we never grow the diary beyond its design size on
+  // large monitors. The diary is TOP-ANCHORED (not centered) so the gap
+  // between navbar → whisper → book stays visually identical no matter how
+  // tall the viewport is. Any excess vertical space falls to the bottom.
+  // SPREAD_W is the diary's design width (650 * 2) plus a ~100px right-side
+  // bleed for the date pendant + ribbon that hangs outside the page edge.
   useEffect(() => {
-    if (layoutMode === 'tablet') {
-      const calcScale = () => setScaleForTablet(Math.min(1, window.innerWidth / 1500))
-      calcScale()
-      window.addEventListener('resize', calcScale)
-      return () => window.removeEventListener('resize', calcScale)
+    if (layoutMode === 'mobile') return
+    const SPREAD_W = 1400
+    const SPREAD_H = 820
+    const MARGIN_X = 64
+    // Top reserves: navbar (16+48=64) + 24px gap + whisper (~24px) + 32px
+    // gap = 144px before the book starts. Bottom reserves footer (~96).
+    const MARGIN_Y_TOP = 144
+    const MARGIN_Y_BOTTOM = 96
+    const calcScale = () => {
+      const availW = window.innerWidth - MARGIN_X
+      const availH = window.innerHeight - MARGIN_Y_TOP - MARGIN_Y_BOTTOM
+      const s = Math.min(1, availW / SPREAD_W, availH / SPREAD_H)
+      setSpreadScale(s)
     }
+    calcScale()
+    window.addEventListener('resize', calcScale)
+    return () => window.removeEventListener('resize', calcScale)
   }, [layoutMode])
 
   if (!mounted) return null
@@ -98,30 +116,25 @@ export default function DeskScene() {
         <MobileJournalEntry />
       ) : (
         <>
-          {/* Whisper line — anchored just below the global navbar so it
-              hovers above the diary as a quiet header. */}
+          {/* Whisper line — sits 24px below the navbar (which ends at y=64). */}
           <div
             className="absolute left-0 right-0 z-30 flex justify-center pointer-events-none"
-            style={{ top: '70px' }}
+            style={{ top: '88px' }}
           >
             <WhisperFooter color={theme.text.muted} />
           </div>
 
-          {/* Book - center.
-              `top` uses max() so on short viewports the book stays
-              anchored ~100px below the page top, keeping the global
-              navigation bar and the book's top decorations from
-              colliding. On taller viewports the 50% wins and the book
-              renders perfectly centered as before. */}
+          {/* Book — TOP-anchored so the chrome above it (navbar + whisper)
+              keeps an identical visual gap regardless of viewport height.
+              On tall fullscreens any extra room falls below the book; on
+              shorter windows the scale calc above shrinks the book to fit. */}
           <div
             className="absolute z-30"
             style={{
-              top: 'max(50%, 510px)',
+              top: '144px',
               left: '50%',
-              transform: layoutMode === 'tablet'
-                ? `translate(-50%, -50%) scale(${scaleForTablet})`
-                : 'translate(-50%, -50%)',
-              transformOrigin: 'center center',
+              transform: `translateX(-50%) scale(${spreadScale})`,
+              transformOrigin: 'center top',
             }}
           >
             <BookSpread />

@@ -49,8 +49,6 @@ export default function Navigation() {
         className="fixed top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 p-1 rounded-full"
         style={{
           background: theme.glass.bg,
-          backdropFilter: `blur(${theme.glass.blur})`,
-          WebkitBackdropFilter: `blur(${theme.glass.blur})`,
           border: `1px solid ${theme.glass.border}`,
         }}
         aria-label="Primary navigation"
@@ -120,7 +118,6 @@ export default function Navigation() {
         className="flex gap-1 p-1 rounded-full items-center"
         style={{
           background: theme.glass.bg,
-          backdropFilter: `blur(${theme.glass.blur})`,
           border: `1px solid ${theme.glass.border}`,
         }}
       >

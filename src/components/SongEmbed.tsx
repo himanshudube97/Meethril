@@ -201,6 +201,133 @@ function VinylRecord({ isPlaying, color, size = 'md' }: { isPlaying: boolean; co
   )
 }
 
+// Music notes that drift up from the bottom of the player whenever a track
+// is loaded — running regardless of play state so the player never feels
+// dead. Positions are hard-coded so they don't reshuffle on re-render.
+// Color pulls from theme.accent.warm to fit every palette.
+// Notes are spread across the full width and vary in size/speed for an
+// organic, breeze-like feel; the small text-shadow gives a soft glow.
+const FLOATING_NOTES = [
+  { char: '♪', leftPct:  8, drift: -10, scale: 1.0,  delay: 0.0, duration: 3.6 },
+  { char: '♫', leftPct: 20, drift:   8, scale: 0.85, delay: 0.6, duration: 4.1 },
+  { char: '♩', leftPct: 34, drift:  12, scale: 0.95, delay: 1.2, duration: 3.4 },
+  { char: '♬', leftPct: 48, drift:  -8, scale: 1.0,  delay: 1.8, duration: 4.3 },
+  { char: '♪', leftPct: 60, drift:  10, scale: 0.8,  delay: 2.4, duration: 3.7 },
+  { char: '♫', leftPct: 74, drift: -14, scale: 0.9,  delay: 3.0, duration: 4.0 },
+  { char: '♩', leftPct: 88, drift:   6, scale: 0.75, delay: 3.6, duration: 3.5 },
+  { char: '♬', leftPct: 28, drift:  -6, scale: 0.7,  delay: 4.2, duration: 3.8 },
+  { char: '♪', leftPct: 66, drift:  14, scale: 0.85, delay: 4.8, duration: 3.6 },
+]
+
+function FloatingMusicNotes({ color }: { color: string }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+      {FLOATING_NOTES.map((n, i) => (
+        <motion.span
+          key={i}
+          className="absolute"
+          style={{
+            color,
+            left: `${n.leftPct}%`,
+            bottom: '18%',
+            fontSize: `${13 * n.scale}px`,
+            textShadow: `0 0 6px ${color}80`,
+            lineHeight: 1,
+          }}
+          initial={{ opacity: 0, y: 0, x: 0, rotate: 0 }}
+          animate={{
+            y: [0, -60],
+            x: [0, n.drift],
+            opacity: [0, 0.85, 0.85, 0],
+            rotate: [0, n.drift > 0 ? 12 : -12],
+          }}
+          transition={{
+            duration: n.duration,
+            times: [0, 0.18, 0.7, 1],
+            repeat: Infinity,
+            delay: n.delay,
+            ease: 'easeOut',
+          }}
+        >
+          {n.char}
+        </motion.span>
+      ))}
+    </div>
+  )
+}
+
+// Soft radial glow that breathes behind the album art — gives the player
+// a "warm and alive" feel even before the user hits play.
+function PulsingGlow({ color }: { color: string }) {
+  return (
+    <motion.div
+      className="absolute inset-0 pointer-events-none"
+      aria-hidden
+      style={{
+        background: `radial-gradient(circle at 22% 50%, ${color}33 0%, transparent 55%)`,
+      }}
+      animate={{ opacity: [0.45, 0.85, 0.45] }}
+      transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  )
+}
+
+// Faint highlight streak that slowly sweeps across the player — adds
+// motion to the otherwise static background without being distracting.
+function LightSweep({ color }: { color: string }) {
+  return (
+    <motion.div
+      className="absolute top-0 bottom-0 pointer-events-none"
+      aria-hidden
+      style={{
+        width: '35%',
+        background: `linear-gradient(90deg, transparent 0%, ${color}22 50%, transparent 100%)`,
+        filter: 'blur(2px)',
+      }}
+      animate={{ left: ['-35%', '135%'] }}
+      transition={{ duration: 6.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.8 }}
+    />
+  )
+}
+
+// Dancing equalizer bars. Heights are choreographed (not audio-reactive)
+// but the staggered durations give the impression of an actual beat.
+const EQ_BARS = [
+  { base: 0.6, dur: 1.05 },
+  { base: 1.0, dur: 1.25 },
+  { base: 0.8, dur: 0.9  },
+  { base: 1.1, dur: 1.35 },
+  { base: 0.7, dur: 1.1  },
+]
+
+function Equalizer({ color }: { color: string }) {
+  return (
+    <div className="flex items-end gap-0.75 shrink-0 h-6" aria-hidden>
+      {EQ_BARS.map((b, i) => (
+        <motion.span
+          key={i}
+          className="block rounded-full"
+          style={{
+            width: 2,
+            background: color,
+            opacity: 0.7,
+            transformOrigin: 'bottom',
+          }}
+          animate={{
+            height: [`${6 * b.base}px`, `${20 * b.base}px`, `${9 * b.base}px`, `${22 * b.base}px`, `${6 * b.base}px`],
+          }}
+          transition={{
+            duration: b.dur,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: i * 0.12,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function ItunesPlayer({
   id,
   title,
@@ -297,7 +424,11 @@ function ItunesPlayer({
         onError={() => setErrored(true)}
       />
 
-      <div className="flex items-center gap-3 w-full">
+      <PulsingGlow color={theme.accent.warm} />
+      <LightSweep color={theme.accent.warm} />
+      <FloatingMusicNotes color={theme.accent.warm} />
+
+      <div className="flex items-center gap-3 w-full relative z-10">
         {/* Album art as vinyl center */}
         <motion.div
           className={`relative ${size} rounded-full shrink-0 overflow-hidden`}
@@ -350,6 +481,9 @@ function ItunesPlayer({
             </a>
           )}
         </div>
+
+        {/* Dancing equalizer bars — sits just before the play button. */}
+        {!errored && <Equalizer color={theme.accent.warm} />}
 
         {/* Play/pause button */}
         {!errored && (

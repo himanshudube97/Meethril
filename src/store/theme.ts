@@ -27,35 +27,80 @@ function resolveThemeName(name: string | undefined): ThemeName {
   return 'rose'
 }
 
+type LayoutMode = 'mobile' | 'tablet' | 'desktop'
+const MOBILE_FORCED_THEME: ThemeName = 'sunset'
+
 interface ThemeStore {
+  /** Theme the user picked via the gear panel. Persisted. */
+  userThemeName: ThemeName
+  /** Effective theme name — equals userThemeName on desktop/tablet,
+   * forced to sunset on mobile. Not persisted. */
   themeName: ThemeName
+  /** Effective theme object. Not persisted. */
   theme: Theme
+  /** User-initiated theme pick (desktop settings panel + landing showcase). */
   setTheme: (name: ThemeName) => void
+  /** Called by LayoutContent whenever the viewport crosses a breakpoint. */
+  setLayoutMode: (mode: LayoutMode) => void
 }
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
+      userThemeName: 'rose',
       themeName: 'rose',
       theme: themes.rose,
-      setTheme: (name: ThemeName) => set({
-        themeName: name,
-        theme: themes[name],
-      }),
+      setTheme: (name: ThemeName) =>
+        set({
+          userThemeName: name,
+          themeName: name,
+          theme: themes[name],
+        }),
+      setLayoutMode: (mode: LayoutMode) => {
+        const userName = get().userThemeName
+        const effective: ThemeName = mode === 'mobile' ? MOBILE_FORCED_THEME : userName
+        if (get().themeName !== effective) {
+          set({ themeName: effective, theme: themes[effective] })
+        }
+      },
     }),
     {
       name: 'hearth-theme',
+      // Only the user's desktop pick persists. The effective themeName/theme
+      // are derived from layout at runtime, so they live in memory only.
+      partialize: (state) => ({
+        userThemeName: state.userThemeName,
+      }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        const resolved = resolveThemeName(state.themeName as unknown as string)
-        if (resolved !== state.themeName) {
-          state.themeName = resolved
-          state.theme = themes[resolved]
+        const stateLoose = state as unknown as { themeName?: string; userThemeName?: string }
+        // Resolution order:
+        // 1. New schema's `userThemeName` is the source of truth once present.
+        // 2. Old schema's `themeName` is migrated forward — UNLESS it's
+        //    'sunset', which was almost certainly written by an earlier bug
+        //    that forced sunset whenever the viewport went mobile. Treat
+        //    that case as contamination and fall back to the default. A
+        //    user who legitimately picked sunset on desktop will just need
+        //    to repick it from the gear once.
+        // 3. Nothing persisted → default 'rose'.
+        let resolved: ThemeName
+        if (stateLoose.userThemeName) {
+          resolved = resolveThemeName(stateLoose.userThemeName)
+        } else if (stateLoose.themeName && stateLoose.themeName !== 'sunset') {
+          resolved = resolveThemeName(stateLoose.themeName)
         } else {
-          // ensure the cached theme object matches the current themes export
-          // (shape may have changed across deploys, e.g. mode field added)
-          state.theme = themes[resolved]
+          resolved = 'rose'
         }
+        state.userThemeName = resolved
+        // If we're already on a mobile viewport at hydrate-time, apply the
+        // sunset override synchronously so the first paint matches what the
+        // user will see (avoids a brief flash of the desktop theme).
+        const isMobileNow =
+          typeof window !== 'undefined' &&
+          !window.matchMedia('(min-width: 1024px)').matches
+        const effective: ThemeName = isMobileNow ? MOBILE_FORCED_THEME : resolved
+        state.themeName = effective
+        state.theme = themes[effective]
       },
     }
   )

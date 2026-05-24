@@ -28,8 +28,6 @@ function TopChromeBackdrop() {
       style={{
         height: 80,
         background: `linear-gradient(180deg, ${theme.bg.primary} 0%, ${theme.bg.primary}cc 55%, transparent 100%)`,
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
       }}
     />
   )
@@ -42,18 +40,16 @@ export default function LayoutContent({
 }) {
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const { theme, themeName, setTheme } = useThemeStore()
+  const { theme } = useThemeStore()
+  const setLayoutModeOnTheme = useThemeStore(s => s.setLayoutMode)
   const layoutMode = useLayoutMode()
 
-  // Mobile has no settings UI, so the theme is locked to sunset there.
-  // On desktop the user's last picked theme persists. Switching browser
-  // window from mobile width back to desktop will keep sunset until the
-  // user picks something else via the gear settings.
+  // Mobile has no settings UI — the theme store flips the effective theme
+  // to sunset while in mobile mode without mutating the user's persisted
+  // desktop pick. Resizing back to desktop restores their choice.
   useEffect(() => {
-    if (layoutMode === 'mobile' && themeName !== 'sunset') {
-      setTheme('sunset')
-    }
-  }, [layoutMode, themeName, setTheme])
+    setLayoutModeOnTheme(layoutMode)
+  }, [layoutMode, setLayoutModeOnTheme])
   const isLandingPage = pathname === '/'
   const isPricingPage = pathname === '/pricing'
   const isWritingPage = pathname === '/write'
