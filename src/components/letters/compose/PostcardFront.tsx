@@ -9,19 +9,19 @@ import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { findLargestFittingPrefix } from '@/lib/text-fit'
+import { PostcardFrame } from './PostcardFrame'
 
-// ~12 lines × ~36 chars per line. Sized to match the visible writing area on
-// the 660-px-tall postcard so the line cap and the lines you can SEE are the
-// same number — no more "I can see empty lines but Enter is blocked."
-// Loose upper bound on chars that can fit in FRONT_LINES at the postcard's
-// width with the Caveat font. Earlier value (432) was based on a 36-chars/line
-// estimate that didn't match the actual writing-area width, so the cap fired
-// after ~5 visual lines instead of letting the user fill all 12. The visual
-// offsetHeight trim in onUpdate is the real source of truth for "front is
-// full" — this limit is just a generous safety net so CharacterCount doesn't
-// preemptively block typing before the visual cap is reached.
-export const FRONT_CHAR_LIMIT = 1500
-const FRONT_LINES = 12
+// The portrait postcard puts the WHOLE letter on the front, so the writing
+// area now fills whatever vertical room the card has. The visible line count
+// is measured at runtime (see the ResizeObserver below) and snapped to a whole
+// number of 36px lines, so "the lines you can SEE" and "the lines you can type"
+// stay the same number on any viewport — no internal scroll, ever.
+//
+// FRONT_CHAR_LIMIT is just a generous CharacterCount safety net; the measured
+// visual cap in onUpdate is the real source of truth for "the front is full".
+export const FRONT_CHAR_LIMIT = 2400
+const LINE_HEIGHT = 36
+const FALLBACK_LINES = 14
 
 function timeOfDay(d: Date): string {
   const h = d.getHours()
@@ -76,8 +76,9 @@ export function PostcardFront({
   const trimmingRef = useRef(false)
 
   // INVARIANTS for the postcard-front writing area:
-  //   1. The contentEditable surface is `FRONT_LINES * 36px` tall, clipped
-  //      by `overflow: hidden`. No internal scroll, ever.
+  //   1. The contentEditable surface is `linedHeight` tall (a whole number of
+  //      36px lines that fits the card), clipped by `overflow: hidden`. No
+  //      internal scroll, ever.
   //   2. Enter at the cap is pre-blocked (handleKeyDown below) so the user
   //      doesn't see a "type, then undo" flicker on the most common
   //      overflow attempt.
@@ -89,7 +90,31 @@ export function PostcardFront({
   //      cap — see `setAtVisualCap` below. Don't gate that on chars.
   // The trim algorithm is covered by src/__tests__/text-fit.test.ts. CSS
   // regressions in (1) need a manual smoke test (Vitest+jsdom has no layout).
-  const MAX_EDITOR_HEIGHT = FRONT_LINES * 36
+  //
+  // The cap height is measured (the portrait card height varies with the
+  // viewport). `maxHeightRef` is read inside the editor callbacks so they
+  // always see the latest value; `linedHeight` drives the ruled block's height.
+  const writingSurfaceRef = useRef<HTMLDivElement>(null)
+  const maxHeightRef = useRef(FALLBACK_LINES * LINE_HEIGHT)
+  const [linedHeight, setLinedHeight] = useState(FALLBACK_LINES * LINE_HEIGHT)
+
+  useEffect(() => {
+    const el = writingSurfaceRef.current
+    if (!el) return
+    const measure = () => {
+      // The ruled block fills the whole writing surface (clientHeight minus the
+      // 12px top padding) so the lines run all the way down to the footer. The
+      // typing cap stays a whole number of lines (floor) so text never lands on
+      // the partial sliver clipped at the very bottom.
+      const avail = el.clientHeight - 12
+      maxHeightRef.current = Math.max(4, Math.floor(avail / LINE_HEIGHT)) * LINE_HEIGHT
+      setLinedHeight(avail)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -103,14 +128,15 @@ export function PostcardFront({
       if (trimmingRef.current) return
 
       const editorDom = editor.view.dom as HTMLElement
+      const maxHeight = maxHeightRef.current
 
-      if (editorDom.offsetHeight > MAX_EDITOR_HEIGHT + 2) {
+      if (editorDom.offsetHeight > maxHeight + 2) {
         trimmingRef.current = true
         try {
           const fullText = editor.getText()
           const fits = (prefix: string): boolean => {
             editor.commands.setContent(prefix, { emitUpdate: false })
-            return editorDom.offsetHeight <= MAX_EDITOR_HEIGHT + 2
+            return editorDom.offsetHeight <= maxHeight + 2
           }
           const fittingLen = findLargestFittingPrefix(fullText, fits)
           editor.commands.setContent(fullText.slice(0, fittingLen), { emitUpdate: false })
@@ -123,7 +149,7 @@ export function PostcardFront({
       // Pulse the "turn over" prompt + button once the surface is fully
       // consumed (within 2px). Does NOT block further typing on the last
       // line — typing more chars on the same line doesn't add height.
-      const isFull = editorDom.offsetHeight >= MAX_EDITOR_HEIGHT - 2
+      const isFull = editorDom.offsetHeight >= maxHeight - 2
       setAtVisualCap(isFull)
       onBodyChange?.(editor.getText())
     },
@@ -135,7 +161,7 @@ export function PostcardFront({
       handleKeyDown: (view, event) => {
         if (event.key !== 'Enter' || event.shiftKey) return false
         const dom = view.dom as HTMLElement
-        if (dom.offsetHeight >= MAX_EDITOR_HEIGHT - 2) {
+        if (dom.offsetHeight >= maxHeightRef.current - 2) {
           event.preventDefault()
           return true
         }
@@ -181,17 +207,8 @@ export function PostcardFront({
         pointerEvents: active ? 'auto' : 'none',
       }}
     >
-      {/* Decorative inner frame — thin accent border inset from the edge */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 12,
-          border: `1px solid ${accent}38`,
-          borderRadius: 3,
-          pointerEvents: 'none',
-          zIndex: 1,
-        }}
-      />
+      {/* Decorative illuminated frame — double rule + corner flourishes. */}
+      <PostcardFrame accent={accent} />
 
       {/* TOP BAND — salutation block on the left, date on the right (where the
           bookmark/chapter used to live). Single row, drop-cap height drives
@@ -289,8 +306,11 @@ export function PostcardFront({
         </div>
       </div>
 
-      {/* WRITING SURFACE — lined editor with vertical column rule on the left */}
+      {/* WRITING SURFACE — lined editor with vertical column rule on the left.
+          Fills the remaining card height; the measured line count derives from
+          this element's height (see the ResizeObserver above). */}
       <div
+        ref={writingSurfaceRef}
         style={{
           flex: 1,
           padding: '12px 36px 0 56px',
@@ -314,15 +334,17 @@ export function PostcardFront({
           }}
         />
 
-        {/* Lined writing area — fixed at FRONT_LINES × 36px so the lines a
-            user can see is exactly the number of lines they can type. The
-            outer writing surface stays flex:1 (fills the card), but the
-            lined block sits at the top and any extra space below is just
-            empty paper. */}
+        {/* Lined writing area — fills the whole writing surface so the ruled
+            lines run down to the footer. Typing is capped at a whole number of
+            lines (maxHeightRef) so text never lands on the bottom sliver, but
+            the empty rules below still show, filling the page. Clicking
+            anywhere in the block places the cursor. */}
         <div
+          onClick={() => editor?.commands.focus()}
           style={{
+            cursor: 'text',
             backgroundImage: `repeating-linear-gradient(to bottom, transparent 0px, transparent 35px, ${LINE_COLOR} 35px, ${LINE_COLOR} 36px)`,
-            height: `${FRONT_LINES * 36}px`,
+            height: `${linedHeight}px`,
             overflow: 'hidden',
             position: 'relative',
             zIndex: 2,
@@ -340,52 +362,9 @@ export function PostcardFront({
         </div>
       </div>
 
-      {/* Floret ornament — fades out when the front fills up */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: atCap ? 0 : 0.7 }}
-        transition={{ duration: 0.35 }}
-        style={{
-          position: 'absolute',
-          bottom: 100,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          color: accent,
-          fontSize: 14,
-          letterSpacing: 10,
-          fontFamily: 'Cormorant Garamond, Georgia, serif',
-          zIndex: 2,
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        ❦ ✦ ❦
-      </motion.div>
-
-      {/* Turn-over hint — appears in the floret's spot when the front is full */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: atCap ? 1 : 0 }}
-        transition={{ duration: 0.35 }}
-        style={{
-          position: 'absolute',
-          bottom: 100,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          color: accent,
-          fontFamily: 'Cormorant Garamond, Georgia, serif',
-          fontStyle: 'italic',
-          fontSize: 14,
-          letterSpacing: 0.4,
-          zIndex: 2,
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        the front is full — turn over →
-      </motion.div>
-
-      {/* FOOTER BAND — cancel left, turn-over right */}
+      {/* FOOTER BAND — cancel left, turn-over right. The "turn over" button
+          pulses (below) once the front is full, which replaces the old floret
+          + hint that used to sit above it. */}
       <div
         style={{
           height: 84,

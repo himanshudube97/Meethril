@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RecipientPicker } from './RecipientPicker'
-import { PostcardFront, FRONT_CHAR_LIMIT } from './PostcardFront'
-import { PostcardBack, BACK_CHAR_LIMIT } from './PostcardBack'
+import { PostcardFront } from './PostcardFront'
+import { PostcardBack } from './PostcardBack'
 import { SealModal } from './SealModal'
 import { useAutosaveLetterDraft } from '@/hooks/useAutosaveLetterDraft'
 import { useE2EE } from '@/hooks/useE2EE'
@@ -22,38 +22,6 @@ import type { StrokeData } from '@/store/journal'
 
 type Phase = 'picker' | 'front' | 'back'
 
-const BODY_SEPARATOR = '\n\n'
-
-/**
- * Split a stored body into front/back slices.
- *
- * The compose UI keeps two strings so each editor can own its own slice.
- * Autosave joins them with `\n\n` before writing to `JournalEntry.text` —
- * splitBody is the inverse for draft resume.
- *
- * Legacy fallback (rows saved before this redesign): no separator present,
- * everything pre-cap goes to front; the overflow tail goes to back.
- */
-function splitBody(text: string): { front: string; back: string } {
-  if (!text) return { front: '', back: '' }
-  const sepIdx = text.indexOf(BODY_SEPARATOR)
-  if (sepIdx >= 0 && sepIdx <= FRONT_CHAR_LIMIT) {
-    return {
-      front: text.slice(0, sepIdx),
-      back: text.slice(sepIdx + BODY_SEPARATOR.length),
-    }
-  }
-  return {
-    front: text.slice(0, FRONT_CHAR_LIMIT),
-    back: text.slice(FRONT_CHAR_LIMIT, FRONT_CHAR_LIMIT + BACK_CHAR_LIMIT),
-  }
-}
-
-function joinBody(front: string, back: string): string {
-  if (!back) return front
-  return `${front}${BODY_SEPARATOR}${back}`
-}
-
 export default function ComposeView() {
   const router = useRouter()
   const params = useSearchParams()
@@ -67,8 +35,9 @@ export default function ComposeView() {
 
   const [phase, setPhase] = useState<Phase>(draftId ? 'front' : 'picker')
   const [recipient, setRecipient] = useState<RecipientChoice | null>(null)
+  // The portrait postcard keeps ALL the writing on the front. The back is
+  // song + photos + doodle only — so a single body string is the whole letter.
   const [bodyFront, setBodyFront] = useState('')
-  const [bodyBack, setBodyBack] = useState('')
   // Photo refs + doodle strokes are owned here so PhotoBlock's encrypted
   // {url | encryptedRef + encryptedRefIV} survive autosave and draft resume.
   // Previously these lived inside PostcardBack as local data: URLs and
@@ -134,9 +103,9 @@ export default function ComposeView() {
           })
         }
 
-        const { front, back } = splitBody(decrypted.text)
-        setBodyFront(front)
-        setBodyBack(back)
+        // Front owns the whole letter now. Legacy drafts saved as
+        // `front\n\nback` simply load in full and re-wrap on the front.
+        setBodyFront(decrypted.text)
 
         const hydratedPhotos: Photo[] = decrypted.photos
           .filter((p) => p.position === 1 || p.position === 2)
@@ -199,12 +168,11 @@ export default function ComposeView() {
     // that would race with the GET and wipe the row.
     if (loading) return
 
-    const joined = joinBody(bodyFront, bodyBack)
     const isSelf = recipient.recipient === 'self'
 
     autosave.trigger({
       letterType: isSelf ? 'self' : 'friend',
-      text: joined,
+      text: bodyFront,
       song,
       photos: photos.map((p) => ({
         url: p.url ?? null,
@@ -219,7 +187,7 @@ export default function ComposeView() {
       recipientEmail: null,
       letterLocation: null,
     })
-  }, [bodyFront, bodyBack, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
+  }, [bodyFront, recipient, phase, loading, photos, doodleStrokes, song, autosave.trigger])
 
   if (loading) {
     return (
@@ -256,8 +224,7 @@ export default function ComposeView() {
   const salutationName =
     recipient.recipient === 'self' ? 'future me' : recipient.name
 
-  const canSeal =
-    bodyFront.trim().length > 0 || bodyBack.trim().length > 0
+  const canSeal = bodyFront.trim().length > 0
 
   async function handleSeal({
     unlockDate,
@@ -284,7 +251,7 @@ export default function ComposeView() {
     }
     if (!recipient) throw new Error('No recipient selected.')
 
-    const combinedText = [bodyFront, bodyBack].filter(Boolean).join('\n\n')
+    const combinedText = bodyFront
 
     if (recipient.recipient === 'self') {
       const payload = await buildSelfLetterPayload({
@@ -416,26 +383,28 @@ export default function ComposeView() {
             'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25), 0 35px 70px rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.28)',
         }}
       >
-      {/* The postcard itself — landscape */}
+      {/* The postcard itself — portrait. Tall + narrow; the flip + perspective
+          are unchanged, only the aspect ratio. */}
       <motion.div
         style={{
-          width: 'min(1140px, calc(100vw - 80px))',
-          height: 'min(660px, calc(100vh - 140px))',
+          width: 'min(760px, calc(100vw - 48px))',
+          height: 'min(860px, calc(100vh - 104px))',
           position: 'relative',
           transformStyle: 'preserve-3d',
         }}
       >
-        {/* Quill — illustration asset standing beside the postcard. */}
+        {/* Quill — illustration asset standing beside the portrait postcard,
+            set off to the right with a clear gap from the paper's edge. */}
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.35, ease: [0.2, 0.7, 0.2, 1] }}
           style={{
             position: 'absolute',
-            right: -300,
-            bottom: 0,
-            width: 280,
-            height: 280,
+            right: -275,
+            bottom: -8,
+            width: 230,
+            height: 230,
             pointerEvents: 'none',
             filter: 'drop-shadow(0 14px 22px rgba(0,0,0,0.32))',
           }}
@@ -474,11 +443,10 @@ export default function ComposeView() {
             createdAt={createdAt}
           />
 
-          {/* BACK face — same active guard. */}
+          {/* BACK face — same active guard. Song + photos + doodle only;
+              the writing all lives on the front now. */}
           <PostcardBack
             active={phase === 'back'}
-            body={bodyBack}
-            onBodyChange={setBodyBack}
             photos={photos}
             onPhotoAdd={handlePhotoAdd}
             onPhotoRemove={handlePhotoRemove}
