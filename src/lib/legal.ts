@@ -9,6 +9,8 @@
  * Fill in the placeholders below once — every legal page reads from here.
  */
 
+const CONTACT_EMAIL = 'himanshu@meethril.com'
+
 export const legal = {
   // Consumer-facing brand name (Meethril is the public brand; "Hearth" is the
   // internal dev codename — do NOT show "Hearth" to users here).
@@ -24,8 +26,11 @@ export const legal = {
   governingLaw: 'India',
 
   // Public contact address for privacy requests, support and legal notices.
-  // TODO: replace with a real, monitored inbox.
-  contactEmail: 'hello@meethril.com',
+  contactEmail: CONTACT_EMAIL,
+  // Gmail web-compose link prefilled to the contact address. We link to this
+  // (opens in a new tab) instead of a mailto:, which silently does nothing for
+  // visitors with no default mail client. The address stays visible as text.
+  contactComposeUrl: `https://mail.google.com/mail/?view=cm&fs=1&to=${CONTACT_EMAIL}`,
 
   // Canonical site URL (no trailing slash).
   // TODO: replace with your real production domain.

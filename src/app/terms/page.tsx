@@ -66,7 +66,7 @@ export default function TermsPage() {
         <li>
           Except where required by law, payments are generally non-refundable. If you
           believe you were charged in error, contact{' '}
-          <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>.
+          <a href={legal.contactComposeUrl} target="_blank" rel="noopener noreferrer">{legal.contactEmail}</a>.
         </li>
         <li>Prices may change; we&apos;ll give notice before changes affect your renewal.</li>
       </ul>
@@ -115,7 +115,7 @@ export default function TermsPage() {
       <h2>Contact</h2>
       <p>
         Questions about these Terms? Email{' '}
-        <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>.
+        <a href={legal.contactComposeUrl} target="_blank" rel="noopener noreferrer">{legal.contactEmail}</a>.
       </p>
 
       <p className="disclaimer">

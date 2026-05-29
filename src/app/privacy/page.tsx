@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         {legal.brand} is a private journaling space. This policy explains what we
         collect, why, and the choices you have. We&apos;ve tried to write it in
         plain language. If anything is unclear, email{' '}
-        <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>.
+        <a href={legal.contactComposeUrl} target="_blank" rel="noopener noreferrer">{legal.contactEmail}</a>.
       </p>
 
       <h2>The short version</h2>
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
         Depending on where you live, you may have the right to access, correct, export,
         or delete your personal data, and to object to or restrict certain processing.
         To exercise any of these, email{' '}
-        <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>. Note that for
+        <a href={legal.contactComposeUrl} target="_blank" rel="noopener noreferrer">{legal.contactEmail}</a>. Note that for
         end-to-end encrypted content we can return only the encrypted data we hold, since
         we cannot decrypt it.
       </p>
@@ -135,7 +135,7 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         Questions about privacy? Email{' '}
-        <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>. This service is
+        <a href={legal.contactComposeUrl} target="_blank" rel="noopener noreferrer">{legal.contactEmail}</a>. This service is
         operated by {legal.entity}.
       </p>
 
