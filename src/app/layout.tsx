@@ -6,6 +6,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import LayoutContent from "@/components/LayoutContent";
+import AuthGate from "@/components/AuthGate";
 import AuthProvider from "@/components/AuthProvider";
 import E2EEProvider from "@/components/e2ee/E2EEProvider";
 import ServiceWorkerRegistrar from "@/components/reminders/ServiceWorkerRegistrar";
@@ -85,7 +86,9 @@ export default function RootLayout({
         <ComebackHost />
         <AuthProvider>
           <E2EEProvider>
-            <LayoutContent>{children}</LayoutContent>
+            <AuthGate>
+              <LayoutContent>{children}</LayoutContent>
+            </AuthGate>
           </E2EEProvider>
         </AuthProvider>
       </body>
