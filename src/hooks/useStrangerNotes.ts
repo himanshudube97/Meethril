@@ -1,6 +1,7 @@
+// src/hooks/useStrangerNotes.ts
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface InboxThread {
   id: string
@@ -8,6 +9,7 @@ export interface InboxThread {
   partnerDisplayName: string
   myDisplayName: string
   lastActivityAt: string
+  messageCount: number
   unreadCount: number
   waveEligible: boolean
   waveOfferedToMe: boolean
@@ -17,10 +19,11 @@ export interface InboxThread {
   preview: { isMine: boolean; encryptionTier: 'server' | 'thread'; body: string } | null
 }
 
-export interface InboxPayload {
-  outgoing: InboxThread[]
-  active: InboxThread[]
-  penpals: InboxThread[]
+export type StrangerFilter = 'all' | 'penpals' | 'strangers' | 'sent'
+
+interface InboxPage {
+  threads: InboxThread[]
+  nextCursor: string | null
   counters: { sent: number; received: number }
 }
 
@@ -45,16 +48,25 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 }
 
 export function useStrangerNotes() {
-  const [data, setData] = useState<InboxPayload | null>(null)
+  const [threads, setThreads] = useState<InboxThread[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [counters, setCounters] = useState<{ sent: number; received: number }>({ sent: 0, received: 0 })
+  const [filter, setFilterState] = useState<StrangerFilter>('all')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Tracks the filter of the most recent first-page load, so loadMore/refresh stay coherent.
+  const filterRef = useRef<StrangerFilter>('all')
 
-  const refresh = useCallback(async () => {
+  const loadFirstPage = useCallback(async (f: StrangerFilter) => {
     setLoading(true)
     setError(null)
+    filterRef.current = f
     try {
-      const inbox = await jsonFetch<InboxPayload>('/api/stranger-notes/inbox')
-      setData(inbox)
+      const page = await jsonFetch<InboxPage>(`/api/stranger-notes/inbox?filter=${f}`)
+      setThreads(page.threads)
+      setNextCursor(page.nextCursor)
+      setCounters(page.counters)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -62,9 +74,36 @@ export function useStrangerNotes() {
     }
   }, [])
 
-  // Focus-event refetch: tab visibility, window focus, manual pull.
+  const refresh = useCallback(async () => {
+    await loadFirstPage(filterRef.current)
+  }, [loadFirstPage])
+
+  const setFilter = useCallback(
+    (f: StrangerFilter) => {
+      setFilterState(f)
+      loadFirstPage(f)
+    },
+    [loadFirstPage],
+  )
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const page = await jsonFetch<InboxPage>(
+        `/api/stranger-notes/inbox?filter=${filterRef.current}&cursor=${encodeURIComponent(nextCursor)}`,
+      )
+      setThreads((prev) => [...prev, ...page.threads])
+      setNextCursor(page.nextCursor)
+    } catch {
+      // keep what we have; user can retry
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [nextCursor, loadingMore])
+
   useEffect(() => {
-    refresh()
+    loadFirstPage('all')
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refresh()
     }
@@ -74,7 +113,7 @@ export function useStrangerNotes() {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', refresh)
     }
-  }, [refresh])
+  }, [loadFirstPage, refresh])
 
   const sendNewNote = useCallback(
     async (content: string, country?: string, stateName?: string) => {
@@ -84,7 +123,7 @@ export function useStrangerNotes() {
       })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const sendReply = useCallback(
@@ -95,7 +134,7 @@ export function useStrangerNotes() {
       })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const sendReplyEncrypted = useCallback(
@@ -106,7 +145,7 @@ export function useStrangerNotes() {
       })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const skip = useCallback(
@@ -114,7 +153,7 @@ export function useStrangerNotes() {
       await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/skip`, { method: 'POST' })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const block = useCallback(
@@ -122,7 +161,7 @@ export function useStrangerNotes() {
       await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/block`, { method: 'POST' })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const waveOffered = useCallback(async (threadId: string) => {
@@ -134,7 +173,7 @@ export function useStrangerNotes() {
       await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}/wave`, { method: 'POST' })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   const endPenPal = useCallback(
@@ -142,12 +181,18 @@ export function useStrangerNotes() {
       await jsonFetch(`/api/stranger-notes/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' })
       await refresh()
     },
-    [refresh]
+    [refresh],
   )
 
   return {
-    data,
+    threads,
+    nextCursor,
+    counters,
+    filter,
+    setFilter,
+    loadMore,
     loading,
+    loadingMore,
     error,
     refresh,
     sendNewNote,
