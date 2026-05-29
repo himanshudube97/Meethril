@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useThemeStore } from '@/store/theme'
 
 const CONTACT_EMAIL = 'himanshu@meethril.com'
+// Opens Gmail's web compose, prefilled to us. mailto: was unreliable — it
+// silently does nothing for visitors with no default mail client. We also
+// render the address as visible text so non-Gmail visitors can read/copy it.
+const GMAIL_COMPOSE = `https://mail.google.com/mail/?view=cm&fs=1&to=${CONTACT_EMAIL}`
 
 /**
  * Closing footer of the landing page. Stripped of the ambient glow,
@@ -14,22 +17,6 @@ const CONTACT_EMAIL = 'himanshu@meethril.com'
  */
 export default function FooterCTA() {
   const { theme } = useThemeStore()
-  const [emailCopied, setEmailCopied] = useState(false)
-
-  // mailto: only works when the visitor has a default mail client configured;
-  // for everyone else (webmail users) it silently does nothing. So we also
-  // copy the address to the clipboard and show brief feedback — the click
-  // always does *something*. We don't preventDefault, so mailto still fires
-  // for those who do have a client.
-  const handleEmailClick = () => {
-    navigator.clipboard?.writeText(CONTACT_EMAIL).then(
-      () => {
-        setEmailCopied(true)
-        setTimeout(() => setEmailCopied(false), 2200)
-      },
-      () => {},
-    )
-  }
 
   return (
     <section
@@ -102,33 +89,21 @@ export default function FooterCTA() {
             >
               <InstagramIcon />
             </a>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              onClick={handleEmailClick}
-              aria-label="Email Meethril"
-              className="opacity-70 hover:opacity-100 transition-opacity"
-            >
-              <MailIcon />
-            </a>
           </div>
 
-          {/* Email-copied feedback */}
-          <div className="h-4 -mt-3">
-            <AnimatePresence>
-              {emailCopied && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="text-sm"
-                  style={{ color: theme.text.secondary, fontFamily: 'Georgia, serif' }}
-                >
-                  Copied {CONTACT_EMAIL} to clipboard
-                </motion.p>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Contact */}
+          <p className="text-base" style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}>
+            Contact us —{' '}
+            <a
+              href={GMAIL_COMPOSE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4 hover:opacity-100 opacity-90 transition-opacity"
+              style={{ color: theme.text.secondary }}
+            >
+              {CONTACT_EMAIL}
+            </a>
+          </p>
 
           {/* Brand + legal */}
           <div className="flex flex-col items-center gap-3 pt-2">
@@ -175,11 +150,3 @@ function InstagramIcon() {
   )
 }
 
-function MailIcon() {
-  return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="5" width="18" height="14" rx="2.5" />
-      <path d="M3.5 7.5l8.5 5.5 8.5-5.5" />
-    </svg>
-  )
-}
