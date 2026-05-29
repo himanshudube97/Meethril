@@ -1,8 +1,11 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useThemeStore } from '@/store/theme'
+
+const CONTACT_EMAIL = 'himanshu@meethril.com'
 
 /**
  * Closing footer of the landing page. Stripped of the ambient glow,
@@ -11,6 +14,22 @@ import { useThemeStore } from '@/store/theme'
  */
 export default function FooterCTA() {
   const { theme } = useThemeStore()
+  const [emailCopied, setEmailCopied] = useState(false)
+
+  // mailto: only works when the visitor has a default mail client configured;
+  // for everyone else (webmail users) it silently does nothing. So we also
+  // copy the address to the clipboard and show brief feedback — the click
+  // always does *something*. We don't preventDefault, so mailto still fires
+  // for those who do have a client.
+  const handleEmailClick = () => {
+    navigator.clipboard?.writeText(CONTACT_EMAIL).then(
+      () => {
+        setEmailCopied(true)
+        setTimeout(() => setEmailCopied(false), 2200)
+      },
+      () => {},
+    )
+  }
 
   return (
     <section
@@ -84,12 +103,31 @@ export default function FooterCTA() {
               <InstagramIcon />
             </a>
             <a
-              href="mailto:himanshu@meethril.com"
+              href={`mailto:${CONTACT_EMAIL}`}
+              onClick={handleEmailClick}
               aria-label="Email Meethril"
               className="opacity-70 hover:opacity-100 transition-opacity"
             >
               <MailIcon />
             </a>
+          </div>
+
+          {/* Email-copied feedback */}
+          <div className="h-4 -mt-3">
+            <AnimatePresence>
+              {emailCopied && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="text-sm"
+                  style={{ color: theme.text.secondary, fontFamily: 'Georgia, serif' }}
+                >
+                  Copied {CONTACT_EMAIL} to clipboard
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Brand + legal */}
