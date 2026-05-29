@@ -1,3 +1,4 @@
+// src/app/api/stranger-notes/inbox/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
@@ -9,6 +10,7 @@ interface InboxThread {
   partnerDisplayName: string
   myDisplayName: string
   lastActivityAt: string
+  messageCount: number
   unreadCount: number
   waveEligible: boolean
   waveOfferedToMe: boolean
@@ -18,32 +20,58 @@ interface InboxThread {
   preview: { isMine: boolean; encryptionTier: 'server' | 'thread'; body: string } | null
 }
 
-export async function GET(_req: NextRequest) {
+type Filter = 'all' | 'penpals' | 'strangers' | 'sent'
+
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Pull every thread this user is in (sender OR recipient), excluding dismissed.
+  const params = req.nextUrl.searchParams
+  const filter = (params.get('filter') ?? 'all') as Filter
+  const cursor = params.get('cursor')
+  const limit = Math.min(Math.max(Number(params.get('limit')) || 30, 1), 50)
+
+  // status slice per filter
+  const statusWhere =
+    filter === 'penpals'
+      ? { status: 'pen_pal' as const }
+      : filter === 'strangers'
+      ? { status: 'active' as const }
+      : filter === 'sent'
+      ? { status: 'unmatched' as const, senderId: user.id }
+      : { status: { in: ['unmatched', 'active', 'pen_pal'] } }
+
   const rows = await prisma.strangerThread.findMany({
     where: {
-      OR: [
-        { senderId: user.id, senderDismissedAt: null },
-        { recipientId: user.id, recipientDismissedAt: null },
+      AND: [
+        {
+          OR: [
+            { senderId: user.id, senderDismissedAt: null },
+            { recipientId: user.id, recipientDismissedAt: null },
+          ],
+        },
+        statusWhere,
       ],
-      status: { in: ['unmatched', 'active', 'pen_pal'] },
     },
-    orderBy: { lastActivityAt: 'desc' },
+    orderBy: [{ lastActivityAt: 'desc' }, { id: 'desc' }],
+    take: limit,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       waves: { where: { userId: user.id }, take: 1 },
     },
   })
 
-  // Per-thread per-sender message counts, for wave eligibility.
-  const userMessageCounts = await prisma.strangerMessage.groupBy({
-    by: ['threadId', 'senderId'],
-    where: { threadId: { in: rows.map((r) => r.id) } },
-    _count: { _all: true },
-  })
+  const ids = rows.map((r) => r.id)
+
+  // Per-thread per-sender counts (wave eligibility + "N letters deep").
+  const userMessageCounts = ids.length
+    ? await prisma.strangerMessage.groupBy({
+        by: ['threadId', 'senderId'],
+        where: { threadId: { in: ids } },
+        _count: { _all: true },
+      })
+    : []
 
   const countsByThread = new Map<string, { sender: number; recipient: number }>()
   for (const row of userMessageCounts) {
@@ -55,9 +83,7 @@ export async function GET(_req: NextRequest) {
     countsByThread.set(row.threadId, t)
   }
 
-  // Batch unread counts in a single query instead of one COUNT per thread.
-  // Pull every message sent by the other party across all the user's threads,
-  // then tally per-thread in memory using each thread's own lastViewedAt.
+  // Batch unread counts for this page only.
   const lastViewedByThread = new Map<string, Date | null>()
   for (const r of rows) {
     lastViewedByThread.set(
@@ -65,13 +91,12 @@ export async function GET(_req: NextRequest) {
       r.senderId === user.id ? r.senderLastViewedAt : r.recipientLastViewedAt,
     )
   }
-  const incomingMessages = await prisma.strangerMessage.findMany({
-    where: {
-      threadId: { in: rows.map((r) => r.id) },
-      senderId: { not: user.id },
-    },
-    select: { threadId: true, createdAt: true },
-  })
+  const incomingMessages = ids.length
+    ? await prisma.strangerMessage.findMany({
+        where: { threadId: { in: ids }, senderId: { not: user.id } },
+        select: { threadId: true, createdAt: true },
+      })
+    : []
   const unreadByThread = new Map<string, number>()
   for (const m of incomingMessages) {
     const lvAt = lastViewedByThread.get(m.threadId) ?? null
@@ -79,67 +104,47 @@ export async function GET(_req: NextRequest) {
     unreadByThread.set(m.threadId, (unreadByThread.get(m.threadId) ?? 0) + 1)
   }
 
-  const outgoing: InboxThread[] = []
-  const active: InboxThread[] = []
-  const penpals: InboxThread[] = []
-
-  for (const t of rows) {
+  const threads: InboxThread[] = rows.map((t) => {
     const isSender = t.senderId === user.id
-    const partnerDisplayName = isSender
-      ? (t.recipientDisplayName ?? 'A wandering light')
-      : t.senderDisplayName
-    const myDisplayName = isSender ? t.senderDisplayName : (t.recipientDisplayName ?? '—')
-    const unreadCount = unreadByThread.get(t.id) ?? 0
-
     const c = countsByThread.get(t.id) ?? { sender: 0, recipient: 0 }
-    const waveEligible =
-      t.status === 'active' &&
-      c.sender >= WAVE_ELIGIBLE_PER_SIDE &&
-      c.recipient >= WAVE_ELIGIBLE_PER_SIDE
-    const waveOfferedToMe = Boolean(isSender ? t.senderWaveOfferedAt : t.recipientWaveOfferedAt)
-    const myWaveCast = t.waves.length > 0
-
-    const myWrappedKey = isSender ? t.wrappedKeyForSender : t.wrappedKeyForRecipient
-
     const lastMsg = t.messages[0] ?? null
-    const preview = lastMsg
-      ? {
-          isMine: lastMsg.senderId === user.id,
-          encryptionTier: (lastMsg.encryptionTier as 'server' | 'thread') ?? 'server',
-          body:
-            lastMsg.encryptionTier === 'thread'
-              ? lastMsg.content // ciphertext — client decrypts
-              : decryptServerTier(lastMsg.content).slice(0, 80),
-        }
-      : null
-
-    const inboxThread: InboxThread = {
+    return {
       id: t.id,
       status: t.status as InboxThread['status'],
-      partnerDisplayName,
-      myDisplayName,
+      partnerDisplayName: isSender
+        ? (t.recipientDisplayName ?? 'A wandering light')
+        : t.senderDisplayName,
+      myDisplayName: isSender ? t.senderDisplayName : (t.recipientDisplayName ?? '—'),
       lastActivityAt: t.lastActivityAt.toISOString(),
-      unreadCount,
-      waveEligible,
-      waveOfferedToMe,
-      myWaveCast,
+      messageCount: c.sender + c.recipient,
+      unreadCount: unreadByThread.get(t.id) ?? 0,
+      waveEligible:
+        t.status === 'active' &&
+        c.sender >= WAVE_ELIGIBLE_PER_SIDE &&
+        c.recipient >= WAVE_ELIGIBLE_PER_SIDE,
+      waveOfferedToMe: Boolean(isSender ? t.senderWaveOfferedAt : t.recipientWaveOfferedAt),
+      myWaveCast: t.waves.length > 0,
       pendingKeyExchange: t.pendingKeyExchange,
-      myWrappedKey,
-      preview,
+      myWrappedKey: isSender ? t.wrappedKeyForSender : t.wrappedKeyForRecipient,
+      preview: lastMsg
+        ? {
+            isMine: lastMsg.senderId === user.id,
+            encryptionTier: (lastMsg.encryptionTier as 'server' | 'thread') ?? 'server',
+            body:
+              lastMsg.encryptionTier === 'thread'
+                ? lastMsg.content
+                : decryptServerTier(lastMsg.content).slice(0, 80),
+          }
+        : null,
     }
-
-    if (t.status === 'unmatched' && isSender) outgoing.push(inboxThread)
-    else if (t.status === 'pen_pal') penpals.push(inboxThread)
-    else active.push(inboxThread)
-  }
-
-  return NextResponse.json({
-    outgoing,
-    active,
-    penpals,
-    counters: {
-      sent: rows.filter((r) => r.senderId === user.id).length,
-      received: rows.filter((r) => r.recipientId === user.id).length,
-    },
   })
+
+  const nextCursor = rows.length === limit ? rows[rows.length - 1].id : null
+
+  const [sent, received] = await Promise.all([
+    prisma.strangerThread.count({ where: { senderId: user.id } }),
+    prisma.strangerThread.count({ where: { recipientId: user.id } }),
+  ])
+
+  return NextResponse.json({ threads, nextCursor, counters: { sent, received } })
 }
