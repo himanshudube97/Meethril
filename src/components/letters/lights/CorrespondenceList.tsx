@@ -3,6 +3,7 @@
 
 import type { InboxThread, StrangerFilter } from '@/hooks/useStrangerNotes'
 import { monogram } from '@/lib/monogram'
+import { shortDate } from '@/lib/date-format'
 
 interface Props {
   threads: InboxThread[]
@@ -21,17 +22,11 @@ const CHIPS: { key: StrangerFilter; label: string }[] = [
   { key: 'sent', label: 'sent' },
 ]
 
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-
-function shortDate(iso: string): string {
-  const d = new Date(iso)
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
-}
-
 function statusLabel(t: InboxThread): string {
   if (t.status === 'pen_pal') return 'pen pal'
   if (t.status === 'unmatched') return 'awaiting a reply'
-  return t.messageCount > 0 ? `${t.messageCount} letters deep` : 'a stranger'
+  // messageCount includes the opening note, so a real back-and-forth needs >1.
+  return t.messageCount > 1 ? `${t.messageCount} letters deep` : 'a stranger'
 }
 
 function previewLine(t: InboxThread): string {

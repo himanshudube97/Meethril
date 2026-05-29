@@ -141,10 +141,5 @@ export async function GET(req: NextRequest) {
 
   const nextCursor = rows.length === limit ? rows[rows.length - 1].id : null
 
-  const [sent, received] = await Promise.all([
-    prisma.strangerThread.count({ where: { senderId: user.id } }),
-    prisma.strangerThread.count({ where: { recipientId: user.id } }),
-  ])
-
-  return NextResponse.json({ threads, nextCursor, counters: { sent, received } })
+  return NextResponse.json({ threads, nextCursor })
 }

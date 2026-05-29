@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { monogram } from '@/lib/monogram'
+import { shortDate } from '@/lib/date-format'
 import {
   useStrangerThreadKey,
   encryptThreadMessage,
@@ -434,12 +435,6 @@ function flagOf(code: string): string {
   return String.fromCodePoint(base + upper.charCodeAt(0), base + upper.charCodeAt(1))
 }
 
-const MONTHS_MB = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-function mbDate(iso: string): string {
-  const d = new Date(iso)
-  return `${MONTHS_MB[d.getMonth()]} ${d.getDate()}`
-}
-
 function MessageBlock({ isMine, body, postmark, createdAt }: MessageBlockProps) {
   // Two-ink contrast that holds on every theme: you = ink, them = accent.
   const ink = isMine ? 'var(--text-primary)' : 'var(--accent-primary)'
@@ -463,7 +458,7 @@ function MessageBlock({ isMine, body, postmark, createdAt }: MessageBlockProps) 
             letterSpacing: '0.1em',
           }}
         >
-          {postmark ? `${flagOf(postmark)} ` : ''}— {mbDate(createdAt)}
+          {postmark ? `${flagOf(postmark)} ` : ''}— {shortDate(createdAt)}
         </span>
       </p>
     </motion.div>

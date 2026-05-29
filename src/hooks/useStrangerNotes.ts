@@ -24,7 +24,6 @@ export type StrangerFilter = 'all' | 'penpals' | 'strangers' | 'sent'
 interface InboxPage {
   threads: InboxThread[]
   nextCursor: string | null
-  counters: { sent: number; received: number }
 }
 
 const TZ_HEADER = 'X-User-TZ'
@@ -50,27 +49,33 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 export function useStrangerNotes() {
   const [threads, setThreads] = useState<InboxThread[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [counters, setCounters] = useState<{ sent: number; received: number }>({ sent: 0, received: 0 })
   const [filter, setFilterState] = useState<StrangerFilter>('all')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Tracks the filter of the most recent first-page load, so loadMore/refresh stay coherent.
   const filterRef = useRef<StrangerFilter>('all')
+  // Monotonic load id: a newer first-page load invalidates any in-flight
+  // first-page OR loadMore response, so a fast filter switch can't append /
+  // overwrite with stale data.
+  const reqIdRef = useRef(0)
 
   const loadFirstPage = useCallback(async (f: StrangerFilter) => {
+    const myReq = ++reqIdRef.current
     setLoading(true)
     setError(null)
+    setNextCursor(null) // drop the previous filter's cursor immediately
     filterRef.current = f
     try {
       const page = await jsonFetch<InboxPage>(`/api/stranger-notes/inbox?filter=${f}`)
+      if (myReq !== reqIdRef.current) return
       setThreads(page.threads)
       setNextCursor(page.nextCursor)
-      setCounters(page.counters)
     } catch (e) {
+      if (myReq !== reqIdRef.current) return
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
-      setLoading(false)
+      if (myReq === reqIdRef.current) setLoading(false)
     }
   }, [])
 
@@ -88,11 +93,14 @@ export function useStrangerNotes() {
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return
+    const myReq = reqIdRef.current
     setLoadingMore(true)
     try {
       const page = await jsonFetch<InboxPage>(
         `/api/stranger-notes/inbox?filter=${filterRef.current}&cursor=${encodeURIComponent(nextCursor)}`,
       )
+      // A filter switch (loadFirstPage) since we started invalidates this append.
+      if (myReq !== reqIdRef.current) return
       setThreads((prev) => [...prev, ...page.threads])
       setNextCursor(page.nextCursor)
     } catch {
@@ -187,7 +195,6 @@ export function useStrangerNotes() {
   return {
     threads,
     nextCursor,
-    counters,
     filter,
     setFilter,
     loadMore,
