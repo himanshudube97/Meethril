@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import type { SentStamp } from '../letterTypes'
-import { useE2EEStore } from '@/store/e2ee'
-import { decryptString } from '@/lib/e2ee/crypto'
 import { useSubscription } from '@/hooks/useSubscription'
 import { SenderReceiptStatus } from '../SenderReceiptStatus'
 import { AskForCopyButton } from '../AskForCopyButton'
@@ -14,44 +12,15 @@ interface Props {
 }
 
 export default function ReceiptModal({ stamp, onClose }: Props) {
-  const [peeked, setPeeked] = useState<string | null>(null)
-  const masterKey = useE2EEStore((s) => s.masterKey)
   const { isPremium } = useSubscription()
 
   useEffect(() => {
-    setPeeked(null)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [stamp, onClose])
+  }, [onClose])
 
   if (!stamp) return null
-
-  async function peek() {
-    if (!confirm('this breaks the seal early.\nare you sure you want to read it now?')) return
-    const res = await fetch(`/api/letters/${stamp!.id}/peek`, { method: 'POST' })
-    const data = await res.json()
-    // For E2EE, the server returns ciphertext + the IV; decrypt locally.
-    if (data.encryptionType === 'e2ee') {
-      if (!masterKey) {
-        setPeeked('[Unlock E2EE to read this letter.]')
-        return
-      }
-      const iv = (data.e2eeIVs as { text?: string } | null)?.text
-      if (!iv || !data.body) {
-        setPeeked('')
-        return
-      }
-      try {
-        const plaintext = await decryptString(data.body, iv, masterKey)
-        setPeeked(plaintext)
-      } catch {
-        setPeeked('[Could not decrypt letter.]')
-      }
-      return
-    }
-    setPeeked(data.body || '')
-  }
 
   return (
     <div
@@ -87,23 +56,6 @@ export default function ReceiptModal({ stamp, onClose }: Props) {
             <AskForCopyButton letterId={stamp.id} recipientName={stamp.recipientName} />
           )}
         </div>
-
-        {!stamp.isDelivered && !peeked && (
-          <div className="peek" onClick={peek}>peek at this letter · breaks the seal</div>
-        )}
-        {peeked && (
-          <div
-            className="peek-content"
-            style={{
-              marginTop: 18, padding: 14, background: 'var(--paper-2)',
-              borderRadius: 4, textAlign: 'left',
-              fontFamily: 'var(--font-caveat), Caveat, cursive',
-              fontSize: 16, color: 'var(--text-primary)',
-            }}
-          >
-            {peeked}
-          </div>
-        )}
       </div>
       <style jsx>{`
         .receipt-overlay {
@@ -172,14 +124,6 @@ export default function ReceiptModal({ stamp, onClose }: Props) {
           font-size: 13px;
         }
         .receipt .seal-status.delivered { color: var(--accent-secondary); }
-        .receipt .peek {
-          margin-top: 14px;
-          font-size: 12px;
-          color: var(--text-muted);
-          opacity: 0.65;
-          cursor: pointer;
-          text-decoration: underline dotted;
-        }
         .receipt .close-btn {
           position: absolute;
           top: 10px; right: 12px;
