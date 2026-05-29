@@ -6,6 +6,7 @@ import LettersNav from '@/components/letters/LettersNav'
 import InboxView from '@/components/letters/inbox/InboxView'
 import SentView from '@/components/letters/sent/SentView'
 import LightsView from '@/components/letters/lights/LightsView'
+import LettersScene from '@/components/letters/LettersScene'
 import MobileLettersView from '@/components/letters/MobileLettersView'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
 import type { LettersTab } from '@/components/letters/letterTypes'
@@ -31,8 +32,16 @@ export default function LettersPage() {
       <LettersTokens />
       <LettersNav active={tab} onChange={setTab} newCount={newCount} />
       {tab === 'inbox' && <InboxView onUnreadCountChange={setNewCount} />}
-      {tab === 'sent' && <SentView />}
-      {tab === 'lights' && <LightsView />}
+      {tab === 'sent' && (
+        <LettersScene>
+          <SentView />
+        </LettersScene>
+      )}
+      {tab === 'lights' && (
+        <LettersScene>
+          <LightsView />
+        </LettersScene>
+      )}
     </>
   )
 }

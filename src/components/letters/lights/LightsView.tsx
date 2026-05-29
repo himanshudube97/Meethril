@@ -59,7 +59,7 @@ export default function LightsView() {
       <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14">
         {/* Compose column */}
         <div className="flex justify-center lg:justify-end">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-lg">
             <Compose
               key={composeKey}
               onSend={(content, country, stateName) => sn.sendNewNote(content, country, stateName)}
@@ -93,8 +93,6 @@ export default function LightsView() {
             </p>
             <CorrespondenceList
               threads={sn.threads}
-              filter={sn.filter}
-              onFilter={sn.setFilter}
               onPick={(id) => setActiveThreadId(id)}
               onLoadMore={sn.loadMore}
               hasMore={Boolean(sn.nextCursor)}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import PaperWatermark from './PaperWatermark'
 
 const COUNTRIES: { code: string; name: string }[] = [
   { code: 'IN', name: 'India' },
@@ -35,75 +36,6 @@ function flagOf(code: string): string {
   const base = 0x1f1e6 - 'A'.charCodeAt(0)
   return String.fromCodePoint(base + upper.charCodeAt(0), base + upper.charCodeAt(1))
 }
-
-// Irregular torn edge — clip-path polygon with hand-tuned points.
-// Anchored to a 100×100 viewport (percentage). Tuned for a parchment feel.
-const TORN_EDGE_CLIP =
-  'polygon(' +
-  [
-    '0% 4%',
-    '2% 1%',
-    '6% 3%',
-    '10% 0%',
-    '15% 2%',
-    '20% 1%',
-    '26% 3%',
-    '32% 0%',
-    '38% 2%',
-    '44% 1%',
-    '50% 3%',
-    '57% 0%',
-    '63% 2%',
-    '70% 1%',
-    '76% 3%',
-    '82% 1%',
-    '88% 0%',
-    '94% 2%',
-    '98% 0%',
-    '100% 4%',
-    '99% 10%',
-    '100% 18%',
-    '98% 26%',
-    '100% 34%',
-    '99% 42%',
-    '100% 50%',
-    '98% 58%',
-    '100% 66%',
-    '99% 74%',
-    '100% 82%',
-    '98% 90%',
-    '100% 96%',
-    '96% 100%',
-    '90% 98%',
-    '84% 100%',
-    '78% 99%',
-    '72% 100%',
-    '66% 97%',
-    '60% 100%',
-    '54% 99%',
-    '48% 100%',
-    '42% 98%',
-    '36% 100%',
-    '30% 99%',
-    '24% 100%',
-    '18% 98%',
-    '12% 100%',
-    '6% 99%',
-    '2% 100%',
-    '0% 95%',
-    '2% 88%',
-    '0% 80%',
-    '1% 72%',
-    '0% 64%',
-    '2% 56%',
-    '0% 48%',
-    '1% 40%',
-    '0% 32%',
-    '2% 24%',
-    '0% 16%',
-    '1% 8%',
-  ].join(', ') +
-  ')'
 
 interface Props {
   /** Send the message to the server. Resolves on network success. */
@@ -183,8 +115,8 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
 
   return (
     <div
-      className="relative mx-auto w-full max-w-md"
-      style={{ minHeight: 360, perspective: 1200 }}
+      className="relative mx-auto w-full max-w-lg"
+      style={{ minHeight: 440, perspective: 1200 }}
     >
       <AnimatePresence>
         {showPaper && (
@@ -216,33 +148,20 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
             }
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="relative flex flex-col gap-3"
+            className="relative flex flex-col gap-3 overflow-hidden"
             style={{
-              padding: '28px 30px 22px',
-              background: `radial-gradient(
-                ellipse at center,
-                var(--paper-1) 0%,
-                var(--paper-1) 55%,
-                color-mix(in oklab, var(--paper-1) 60%, #3a2008) 100%
-              )`,
-              clipPath: TORN_EDGE_CLIP,
-              filter:
-                'drop-shadow(0 10px 24px rgba(60, 30, 10, 0.25)) drop-shadow(0 1px 2px rgba(60, 30, 10, 0.15))',
+              minHeight: 320,
+              padding: '34px 36px 28px',
+              background: 'var(--paper-1)',
+              borderRadius: 16,
+              border: '1px solid color-mix(in oklab, var(--text-primary) 12%, transparent)',
+              boxShadow:
+                '0 24px 60px -18px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.08)',
               transformOrigin: 'center',
             }}
           >
-            {/* Burnt highlights at corners (small darker patches) */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  'radial-gradient(circle at 2% 4%, rgba(60,30,10,0.25), transparent 8%), ' +
-                  'radial-gradient(circle at 97% 6%, rgba(60,30,10,0.2), transparent 7%), ' +
-                  'radial-gradient(circle at 3% 96%, rgba(60,30,10,0.2), transparent 8%), ' +
-                  'radial-gradient(circle at 95% 94%, rgba(60,30,10,0.25), transparent 8%)',
-              }}
-            />
+            {/* Faint pressed-flower watermark, theme-tinted */}
+            <PaperWatermark />
 
             {/* Top-right corner: flag picker */}
             <div className="absolute right-4 top-4 z-10">

@@ -136,8 +136,9 @@ export default function JarSentView({
       className="sent"
       style={{
         minHeight: '100vh',
-        background:
-          'radial-gradient(ellipse at 50% -10%, var(--paper-1), transparent 55%), linear-gradient(180deg, var(--bg-1), var(--bg-2))',
+        // Backdrop (sky + particles) is provided by LettersScene; keep this
+        // transparent so it shows through. A faint top glow stays for warmth.
+        background: 'radial-gradient(ellipse at 50% -10%, color-mix(in oklab, var(--paper-1) 60%, transparent), transparent 55%)',
         padding: '170px 56px 100px',
         display: 'flex',
         flexDirection: 'column',

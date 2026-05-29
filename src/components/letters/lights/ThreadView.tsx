@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { monogram } from '@/lib/monogram'
 import { shortDate } from '@/lib/date-format'
+import PaperWatermark from './PaperWatermark'
 import {
   useStrangerThreadKey,
   encryptThreadMessage,
@@ -44,19 +45,6 @@ interface Props {
   onWavePromptShown: () => Promise<void>
   onWave: () => Promise<void>
 }
-
-// Smaller, tighter torn-edge polygon for individual letters.
-const LETTER_EDGE_CLIP =
-  'polygon(' +
-  [
-    '0% 3%', '3% 0%', '8% 2%', '15% 0%', '23% 1%', '32% 0%', '42% 2%', '52% 0%',
-    '62% 2%', '72% 0%', '82% 1%', '90% 0%', '97% 2%', '100% 5%',
-    '99% 15%', '100% 28%', '98% 42%', '100% 58%', '99% 72%', '100% 85%', '98% 95%',
-    '95% 100%', '85% 98%', '72% 100%', '58% 99%', '42% 100%', '28% 98%', '15% 100%',
-    '5% 99%', '0% 95%',
-    '1% 82%', '0% 68%', '2% 55%', '0% 42%', '1% 28%', '0% 15%',
-  ].join(', ') +
-  ')'
 
 export default function ThreadView({
   threadId,
@@ -192,14 +180,16 @@ export default function ThreadView({
 
   return (
     <div
-      className="flex w-full max-w-md flex-col gap-5"
+      className="relative flex w-full max-w-lg flex-col gap-5 overflow-hidden"
       style={{
-        padding: '28px 26px 24px',
+        padding: '32px 32px 28px',
         background: 'var(--paper-1)',
-        clipPath: LETTER_EDGE_CLIP,
-        filter: 'drop-shadow(0 10px 28px rgba(60, 30, 10, 0.22))',
+        borderRadius: 16,
+        border: '1px solid color-mix(in oklab, var(--text-primary) 14%, transparent)',
+        boxShadow: '0 28px 70px -18px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.1)',
       }}
     >
+      <PaperWatermark />
       {/* Header with partner name + close */}
       <header className="flex items-baseline justify-between">
         <div className="flex flex-col">
