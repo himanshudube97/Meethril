@@ -54,36 +54,94 @@ export default function FooterCTA() {
           Start your journey
         </Link>
 
-        <div className="mt-12">
+        <div className="mt-14 flex flex-col items-center gap-7">
           <Link
             href="/download"
-            className="text-sm italic underline-offset-4 hover:underline"
+            className="text-base italic underline-offset-4 hover:underline"
             style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
           >
             Also on desktop — Mac · Windows · Linux
           </Link>
-        </div>
 
-        <p
-          className="mt-8 text-sm"
-          style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
-        >
-          Hearth — a meditative journal that listens
-        </p>
+          {/* Social */}
+          <div className="flex items-center gap-7" style={{ color: theme.text.secondary }}>
+            <a
+              href="https://x.com/meethril_space"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Meethril on X"
+              className="opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <XIcon />
+            </a>
+            <a
+              href="https://www.instagram.com/meethril_space/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Meethril on Instagram"
+              className="opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <InstagramIcon />
+            </a>
+            <a
+              href="mailto:himanshu@meethril.com"
+              aria-label="Email Meethril"
+              className="opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <MailIcon />
+            </a>
+          </div>
 
-        <div
-          className="mt-4 flex items-center justify-center gap-4 text-xs"
-          style={{ color: theme.text.muted }}
-        >
-          <Link href="/privacy" className="hover:underline underline-offset-4 transition">
-            Privacy
-          </Link>
-          <span aria-hidden>·</span>
-          <Link href="/terms" className="hover:underline underline-offset-4 transition">
-            Terms
-          </Link>
+          {/* Brand + legal */}
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <p
+              className="text-base"
+              style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
+            >
+              Hearth — a meditative journal that listens
+            </p>
+            <div
+              className="flex items-center gap-4 text-sm"
+              style={{ color: theme.text.muted }}
+            >
+              <Link href="/privacy" className="hover:underline underline-offset-4 transition">
+                Privacy
+              </Link>
+              <span aria-hidden>·</span>
+              <Link href="/terms" className="hover:underline underline-offset-4 transition">
+                Terms
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </section>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z" />
+    </svg>
+  )
+}
+
+function InstagramIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function MailIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3.5 7.5l8.5 5.5 8.5-5.5" />
+    </svg>
   )
 }
