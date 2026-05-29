@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { monogram } from '@/lib/monogram'
 import {
   useStrangerThreadKey,
   encryptThreadMessage,
@@ -189,7 +190,15 @@ export default function ThreadView({
   const firstThreadIdx = thread.messages.findIndex((m) => m.encryptionTier === 'thread')
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-5">
+    <div
+      className="flex w-full max-w-md flex-col gap-5"
+      style={{
+        padding: '28px 26px 24px',
+        background: 'var(--paper-1)',
+        clipPath: LETTER_EDGE_CLIP,
+        filter: 'drop-shadow(0 10px 28px rgba(60, 30, 10, 0.22))',
+      }}
+    >
       {/* Header with partner name + close */}
       <header className="flex items-baseline justify-between">
         <div className="flex flex-col">
@@ -203,10 +212,10 @@ export default function ThreadView({
             {thread.status === 'pen_pal' ? 'pen pal' : 'a stranger'}
           </span>
           <h3
-            className="font-serif text-[18px] italic"
+            className="font-serif text-[20px]"
             style={{ color: 'var(--text-primary)' }}
           >
-            {thread.partnerDisplayName}
+            to {monogram(thread.partnerDisplayName)}
           </h3>
         </div>
         <button
@@ -218,13 +227,25 @@ export default function ThreadView({
         </button>
       </header>
 
-      {/* Letters stack */}
-      <div className="flex flex-col gap-4">
+      {/* Conversation */}
+      <div className="flex flex-col gap-5">
         {thread.messages.map((m, i) => (
-          <div key={m.id}>
+          <div key={m.id} className="flex flex-col">
+            {i > 0 && (
+              <p
+                aria-hidden
+                className="mb-5 text-center font-serif text-[12px]"
+                style={{
+                  color: 'color-mix(in oklab, var(--text-primary) 35%, transparent)',
+                  letterSpacing: '0.4em',
+                }}
+              >
+                . . .
+              </p>
+            )}
             {firstThreadIdx > 0 && i === firstThreadIdx && (
               <p
-                className="my-3 text-center font-serif text-[10px] italic"
+                className="mb-4 text-center font-serif text-[10px] italic"
                 style={{
                   color: 'color-mix(in oklab, var(--text-primary) 50%, transparent)',
                   letterSpacing: '0.18em',
@@ -233,7 +254,7 @@ export default function ThreadView({
                 — from here, only you two can read these —
               </p>
             )}
-            <LetterCard
+            <MessageBlock
               isMine={m.isMine}
               body={
                 m.encryptionTier === 'thread'
@@ -241,7 +262,7 @@ export default function ThreadView({
                   : m.body
               }
               postmark={m.countryCode}
-              displayName={m.isMine ? thread.myDisplayName : thread.partnerDisplayName}
+              createdAt={m.createdAt}
             />
           </div>
         ))}
@@ -397,13 +418,13 @@ export default function ThreadView({
   )
 }
 
-// ───────────────────────────── LetterCard ─────────────────────────────
+// ───────────────────────────── MessageBlock ─────────────────────────────
 
-interface LetterCardProps {
+interface MessageBlockProps {
   isMine: boolean
   body: string
   postmark: string | null
-  displayName: string
+  createdAt: string
 }
 
 function flagOf(code: string): string {
@@ -413,76 +434,38 @@ function flagOf(code: string): string {
   return String.fromCodePoint(base + upper.charCodeAt(0), base + upper.charCodeAt(1))
 }
 
-function LetterCard({ isMine, body, postmark, displayName }: LetterCardProps) {
-  // Subtle tilt — partner's letters lean left, yours lean right.
-  const tilt = isMine ? 1.2 : -1.5
-  // Different shade so the eye instantly groups same-author messages.
-  const paperVar = isMine ? 'var(--paper-2)' : 'var(--paper-1)'
+const MONTHS_MB = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+function mbDate(iso: string): string {
+  const d = new Date(iso)
+  return `${MONTHS_MB[d.getMonth()]} ${d.getDate()}`
+}
 
+function MessageBlock({ isMine, body, postmark, createdAt }: MessageBlockProps) {
+  // Two-ink contrast that holds on every theme: you = ink, them = accent.
+  const ink = isMine ? 'var(--text-primary)' : 'var(--accent-primary)'
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className={`relative ${isMine ? 'ml-6 self-end' : 'mr-6 self-start'}`}
-      style={{
-        transform: `rotate(${tilt}deg)`,
-        maxWidth: '85%',
-      }}
+      className={isMine ? 'self-end text-right' : 'self-start text-left'}
+      style={{ maxWidth: '88%' }}
     >
-      <div
-        className="relative"
-        style={{
-          padding: '14px 18px 12px',
-          background: `radial-gradient(
-            ellipse at center,
-            ${paperVar} 0%,
-            ${paperVar} 60%,
-            color-mix(in oklab, ${paperVar} 70%, #3a2008) 100%
-          )`,
-          clipPath: LETTER_EDGE_CLIP,
-          filter: 'drop-shadow(0 4px 12px rgba(60, 30, 10, 0.18))',
-        }}
+      <p
+        className="whitespace-pre-wrap font-serif"
+        style={{ color: ink, fontSize: '16px', lineHeight: '1.55' }}
       >
-        {/* Subtle ruled lines */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
+        {body}
+        <span
+          className="ml-2 font-serif text-[11px] uppercase not-italic"
           style={{
-            backgroundImage:
-              'repeating-linear-gradient(transparent, transparent 1.3rem, color-mix(in oklab, var(--text-primary) 28%, transparent) 1.3rem, color-mix(in oklab, var(--text-primary) 28%, transparent) calc(1.3rem + 1px))',
-            opacity: 0.3,
-          }}
-        />
-
-        {/* From label */}
-        <p
-          className="relative mb-1 font-serif text-[10px] italic"
-          style={{
-            color: 'color-mix(in oklab, var(--text-primary) 55%, transparent)',
+            color: 'color-mix(in oklab, var(--text-primary) 45%, transparent)',
             letterSpacing: '0.1em',
           }}
         >
-          {isMine ? 'you wrote' : `${displayName} wrote`}
-          {postmark && (
-            <span className="ml-2">
-              <span className="mr-1">{flagOf(postmark)}</span>
-            </span>
-          )}
-        </p>
-
-        {/* Body */}
-        <p
-          className="relative whitespace-pre-wrap leading-[1.3rem]"
-          style={{
-            color: 'var(--text-primary)',
-            fontFamily: '"Caveat", "Patrick Hand", cursive',
-            fontSize: '15px',
-          }}
-        >
-          {body}
-        </p>
-      </div>
+          {postmark ? `${flagOf(postmark)} ` : ''}— {mbDate(createdAt)}
+        </span>
+      </p>
     </motion.div>
   )
 }
@@ -500,26 +483,12 @@ function ReplyPaper({ draft, setDraft, disabled }: ReplyPaperProps) {
     <div
       className="relative"
       style={{
-        padding: '14px 18px 14px',
-        background: `radial-gradient(
-          ellipse at center,
-          var(--paper-1) 0%,
-          var(--paper-1) 60%,
-          color-mix(in oklab, var(--paper-1) 70%, #3a2008) 100%
-        )`,
-        clipPath: LETTER_EDGE_CLIP,
-        filter: 'drop-shadow(0 6px 16px rgba(60, 30, 10, 0.2))',
+        padding: '12px 14px',
+        background: 'color-mix(in oklab, var(--text-primary) 5%, transparent)',
+        borderRadius: 10,
+        border: '1px solid color-mix(in oklab, var(--text-primary) 15%, transparent)',
       }}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(transparent, transparent 1.3rem, color-mix(in oklab, var(--text-primary) 28%, transparent) 1.3rem, color-mix(in oklab, var(--text-primary) 28%, transparent) calc(1.3rem + 1px))',
-          opacity: 0.3,
-        }}
-      />
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -527,12 +496,12 @@ function ReplyPaper({ draft, setDraft, disabled }: ReplyPaperProps) {
         rows={3}
         placeholder="write back…"
         disabled={disabled}
-        className="relative w-full resize-none bg-transparent leading-[1.3rem] focus:outline-none disabled:opacity-90"
+        className="relative w-full resize-none bg-transparent font-serif focus:outline-none disabled:opacity-90"
         style={{
           color: 'var(--text-primary)',
-          fontFamily: '"Caveat", "Patrick Hand", cursive',
           fontSize: '15px',
-          caretColor: 'var(--accent-warm)',
+          lineHeight: '1.5',
+          caretColor: 'var(--accent-primary)',
         }}
       />
     </div>
