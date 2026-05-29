@@ -231,17 +231,6 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
               transformOrigin: 'center',
             }}
           >
-            {/* Ruled lines, layered over the paper */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(transparent, transparent 1.7rem, color-mix(in oklab, var(--text-primary) 35%, transparent) 1.7rem, color-mix(in oklab, var(--text-primary) 35%, transparent) calc(1.7rem + 1px))',
-                opacity: 0.35,
-              }}
-            />
-
             {/* Burnt highlights at corners (small darker patches) */}
             <div
               aria-hidden
@@ -281,7 +270,7 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
               className="relative w-full resize-none bg-transparent text-[15px] leading-[1.7rem] focus:outline-none disabled:opacity-90"
               style={{
                 color: 'var(--text-primary)',
-                fontFamily: '"Caveat", "Patrick Hand", cursive',
+                fontFamily: 'var(--font-serif), Georgia, serif',
                 caretColor: 'var(--accent-warm)',
               }}
               autoFocus

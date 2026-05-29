@@ -82,9 +82,9 @@ export default function MobileComposePaper({ onSend, onDismiss }: Props) {
         className="w-full resize-none outline-none rounded-lg p-3"
         style={{
           color: theme.text.primary,
-          fontFamily: 'var(--font-caveat), Georgia, serif',
-          fontSize: '20px',
-          lineHeight: '30px',
+          fontFamily: 'var(--font-serif), Georgia, serif',
+          fontSize: '17px',
+          lineHeight: '28px',
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${theme.glass.border}`,
           minHeight: 140,
