@@ -56,6 +56,37 @@ export default function LightsView() {
 
   return (
     <div className="relative mx-auto w-full max-w-6xl p-6 pt-32 sm:p-10 sm:pt-36">
+      {/* Intro — mirrors the "sent" tab's header so this page reads as a place,
+          not an empty form. Explains the ritual in the app's voice. */}
+      <header className="mb-12 text-center">
+        <h2
+          style={{
+            fontFamily: 'var(--font-caveat), Caveat, cursive',
+            fontSize: 38,
+            lineHeight: 1.1,
+            margin: 0,
+            color: 'var(--text-primary)',
+          }}
+        >
+          notes to a stranger
+        </h2>
+        <p
+          className="mx-auto mt-3.5 max-w-xl font-serif italic"
+          style={{ color: 'var(--text-primary)', fontSize: 24, lineHeight: 1.35, letterSpacing: 0.3 }}
+        >
+          <span style={{ fontSize: 13, opacity: 0.55, color: 'var(--accent-primary)' }}>✦</span>{' '}
+          say something true to{' '}
+          <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>someone you&rsquo;ll never meet</span>{' '}
+          <span style={{ fontSize: 13, opacity: 0.55, color: 'var(--accent-primary)' }}>✦</span>
+        </p>
+        <p
+          className="mt-1.5 font-serif italic"
+          style={{ color: 'color-mix(in oklab, var(--text-primary) 60%, transparent)', fontSize: 13, letterSpacing: 0.4 }}
+        >
+          release it into the night — somewhere it finds a stranger, who may write back.
+        </p>
+      </header>
+
       <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14">
         {/* Compose column */}
         <div className="flex justify-center lg:justify-end">

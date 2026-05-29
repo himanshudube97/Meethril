@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { monogram } from '@/lib/monogram'
 import { shortDate } from '@/lib/date-format'
-import PaperWatermark from './PaperWatermark'
 import {
   useStrangerThreadKey,
   encryptThreadMessage,
@@ -69,6 +68,15 @@ export default function ThreadView({
   const [decryptedBodies, setDecryptedBodies] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Keep the newest note in view — the window is fixed-height and scrolls
+  // internally, so land the reader on the latest message when it opens or a
+  // new one arrives.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [thread?.messages.length, decryptedBodies])
 
   useEffect(() => {
     let cancelled = false
@@ -179,19 +187,9 @@ export default function ThreadView({
   const firstThreadIdx = thread.messages.findIndex((m) => m.encryptionTier === 'thread')
 
   return (
-    <div
-      className="relative flex w-full max-w-lg flex-col gap-5 overflow-hidden"
-      style={{
-        padding: '32px 32px 28px',
-        background: 'var(--paper-1)',
-        borderRadius: 16,
-        border: '1px solid color-mix(in oklab, var(--text-primary) 14%, transparent)',
-        boxShadow: '0 28px 70px -18px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.1)',
-      }}
-    >
-      <PaperWatermark />
-      {/* Header with partner name + close */}
-      <header className="flex items-baseline justify-between">
+    <div className="relative flex w-full max-w-4xl flex-col gap-4">
+      {/* Header with partner name + close — sits above the window */}
+      <header className="flex items-baseline justify-between px-1">
         <div className="flex flex-col">
           <span
             className="font-serif text-[10px] uppercase italic"
@@ -218,45 +216,53 @@ export default function ThreadView({
         </button>
       </header>
 
-      {/* Conversation */}
-      <div className="flex flex-col gap-5">
-        {thread.messages.map((m, i) => (
-          <div key={m.id} className="flex flex-col">
-            {i > 0 && (
-              <p
-                aria-hidden
-                className="mb-5 text-center font-serif text-[12px]"
-                style={{
-                  color: 'color-mix(in oklab, var(--text-primary) 35%, transparent)',
-                  letterSpacing: '0.4em',
-                }}
-              >
-                . . .
-              </p>
-            )}
-            {firstThreadIdx > 0 && i === firstThreadIdx && (
-              <p
-                className="mb-4 text-center font-serif text-[10px] italic"
-                style={{
-                  color: 'color-mix(in oklab, var(--text-primary) 50%, transparent)',
-                  letterSpacing: '0.18em',
-                }}
-              >
-                — from here, only you two can read these —
-              </p>
-            )}
-            <MessageBlock
-              isMine={m.isMine}
-              body={
-                m.encryptionTier === 'thread'
-                  ? (decryptedBodies[m.id] ?? '✦ sealed')
-                  : m.body
-              }
-              postmark={m.countryCode}
-              createdAt={m.createdAt}
-            />
-          </div>
-        ))}
+      {/* The window — a fixed-height frosted pane the notes float and scroll
+          inside, so each message reads as its own kept object rather than a
+          chat row. Translucent + blurred so the night sky shows through. */}
+      <div
+        ref={scrollRef}
+        className="relative overflow-y-auto"
+        style={{
+          height: 'min(58vh, 520px)',
+          padding: '26px 22px',
+          background: 'color-mix(in oklab, var(--paper-1) 32%, transparent)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRadius: 18,
+          border: '1px solid color-mix(in oklab, var(--text-primary) 16%, transparent)',
+          boxShadow:
+            '0 1px 0 color-mix(in oklab, white 28%, transparent) inset, 0 22px 60px -24px rgba(0,0,0,0.34)',
+        }}
+      >
+        <WindowFoliage />
+        <div className="relative flex flex-col gap-7">
+          {thread.messages.map((m, i) => (
+            <div key={m.id} className="flex flex-col">
+              {firstThreadIdx > 0 && i === firstThreadIdx && (
+                <p
+                  className="mb-5 text-center font-serif text-[10px] italic"
+                  style={{
+                    color: 'color-mix(in oklab, var(--text-primary) 50%, transparent)',
+                    letterSpacing: '0.18em',
+                  }}
+                >
+                  — from here, only you two can read these —
+                </p>
+              )}
+              <MessageNote
+                index={i}
+                isMine={m.isMine}
+                body={
+                  m.encryptionTier === 'thread'
+                    ? (decryptedBodies[m.id] ?? '✦ sealed')
+                    : m.body
+                }
+                postmark={m.countryCode}
+                createdAt={m.createdAt}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Wave-back prompt */}
@@ -411,7 +417,8 @@ export default function ThreadView({
 
 // ───────────────────────────── MessageBlock ─────────────────────────────
 
-interface MessageBlockProps {
+interface MessageNoteProps {
+  index: number
   isMine: boolean
   body: string
   postmark: string | null
@@ -425,33 +432,92 @@ function flagOf(code: string): string {
   return String.fromCodePoint(base + upper.charCodeAt(0), base + upper.charCodeAt(1))
 }
 
-function MessageBlock({ isMine, body, postmark, createdAt }: MessageBlockProps) {
-  // Two-ink contrast that holds on every theme: you = ink, them = accent.
-  const ink = isMine ? 'var(--text-primary)' : 'var(--accent-primary)'
+/**
+ * One message as its own small paper note floating in the window. Yours lean
+ * right on plain paper; theirs lean left on a faintly accent-tinted paper so
+ * you can tell sides apart at a glance. Width is capped so notes stay
+ * note-sized even in the wide window. Body is the journal's hand (Caveat); the
+ * postmark stays serif.
+ */
+function MessageNote({ index, isMine, body, postmark, createdAt }: MessageNoteProps) {
+  const tilt = isMine ? 1.6 : -1.6
+  const paper = isMine
+    ? 'var(--paper-1)'
+    : 'color-mix(in oklab, var(--paper-1) 85%, var(--accent-primary) 15%)'
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className={isMine ? 'self-end text-right' : 'self-start text-left'}
-      style={{ maxWidth: '88%' }}
+      transition={{ duration: 0.4, delay: Math.min(index * 0.05, 0.4) }}
+      className={isMine ? 'self-end' : 'self-start'}
+      style={{ maxWidth: 'min(76%, 440px)' }}
     >
-      <p
-        className="whitespace-pre-wrap font-serif"
-        style={{ color: ink, fontSize: '16px', lineHeight: '1.55' }}
+      <div
+        style={{
+          transform: `rotate(${tilt}deg)`,
+          background: paper,
+          borderRadius: 14,
+          padding: '15px 18px 11px',
+          border: '1px solid color-mix(in oklab, var(--text-primary) 16%, transparent)',
+          boxShadow:
+            '0 1px 0 color-mix(in oklab, white 45%, transparent) inset, 0 10px 22px -12px rgba(0,0,0,0.28), 0 2px 5px rgba(0,0,0,0.10)',
+        }}
       >
-        {body}
-        <span
-          className="ml-2 font-serif text-[11px] uppercase not-italic"
+        <p
+          className="whitespace-pre-wrap"
           style={{
-            color: 'color-mix(in oklab, var(--text-primary) 45%, transparent)',
+            fontFamily: 'var(--font-caveat), Caveat, cursive',
+            color: 'var(--text-primary)',
+            fontSize: '21px',
+            lineHeight: '1.5',
+          }}
+        >
+          {body}
+        </p>
+        <p
+          className={`mt-1.5 font-serif text-[10px] uppercase not-italic ${isMine ? 'text-right' : 'text-left'}`}
+          style={{
+            color: 'color-mix(in oklab, var(--text-primary) 50%, transparent)',
             letterSpacing: '0.1em',
           }}
         >
-          {postmark ? `${flagOf(postmark)} ` : ''}— {shortDate(createdAt)}
-        </span>
-      </p>
+          {postmark ? `${flagOf(postmark)} ` : ''}{shortDate(createdAt)}
+        </p>
+      </div>
     </motion.div>
+  )
+}
+
+/**
+ * A faint, theme-tinted scatter of pressed foliage filling the thread window
+ * behind the leaves — "a little fancy, not too much." Decorative; the window
+ * must be position:relative + overflow.
+ */
+function WindowFoliage() {
+  const sprig = (x: number, y: number, scale: number, rot: number, key: number) => (
+    <g key={key} transform={`translate(${x} ${y}) scale(${scale}) rotate(${rot})`}>
+      <path d="M0 40 C 14 30 22 14 20 -4" />
+      <path d="M10 22 C 0 18 -6 8 -4 -2 C 6 2 12 12 10 22 Z" fill="currentColor" fillOpacity="0.5" stroke="none" />
+      <path d="M16 6 C 26 2 32 -8 30 -18 C 20 -14 14 -4 16 6 Z" fill="currentColor" fillOpacity="0.5" stroke="none" />
+      <path d="M19 -2 C 30 -8 35 -20 33 -32" />
+    </g>
+  )
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 400 300"
+      preserveAspectRatio="xMidYMid slice"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      style={{ color: 'var(--text-primary)', opacity: 0.05 }}
+    >
+      <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+        {sprig(54, 70, 1.5, -18, 1)}
+        {sprig(330, 120, 1.7, 150, 2)}
+        {sprig(120, 250, 1.3, 95, 3)}
+        {sprig(300, 250, 1.4, -120, 4)}
+        {sprig(210, 150, 1.1, 30, 5)}
+      </g>
+    </svg>
   )
 }
 
@@ -468,10 +534,14 @@ function ReplyPaper({ draft, setDraft, disabled }: ReplyPaperProps) {
     <div
       className="relative"
       style={{
-        padding: '12px 14px',
-        background: 'color-mix(in oklab, var(--text-primary) 5%, transparent)',
-        borderRadius: 10,
-        border: '1px solid color-mix(in oklab, var(--text-primary) 15%, transparent)',
+        padding: '13px 16px',
+        // A real paper field, not a faint wash — was near-transparent and
+        // read as dull/empty. Solid paper + a clear edge + soft lift.
+        background: 'var(--paper-1)',
+        borderRadius: 12,
+        border: '1px solid color-mix(in oklab, var(--text-primary) 26%, transparent)',
+        boxShadow:
+          '0 1px 0 color-mix(in oklab, white 45%, transparent) inset, 0 6px 16px -10px rgba(0,0,0,0.25)',
       }}
     >
       <textarea
@@ -481,10 +551,11 @@ function ReplyPaper({ draft, setDraft, disabled }: ReplyPaperProps) {
         rows={3}
         placeholder="write back…"
         disabled={disabled}
-        className="relative w-full resize-none bg-transparent font-serif focus:outline-none disabled:opacity-90"
+        className="stranger-note-field relative w-full resize-none bg-transparent focus:outline-none disabled:opacity-90"
         style={{
           color: 'var(--text-primary)',
-          fontSize: '15px',
+          fontFamily: 'var(--font-caveat), Caveat, cursive',
+          fontSize: '20px',
           lineHeight: '1.5',
           caretColor: 'var(--accent-primary)',
         }}

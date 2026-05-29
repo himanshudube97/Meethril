@@ -79,12 +79,12 @@ export default function MobileComposePaper({ onSend, onDismiss }: Props) {
         placeholder="A short note, sent to someone you'll never meet…"
         maxLength={MAX}
         rows={6}
-        className="w-full resize-none outline-none rounded-lg p-3"
+        className="stranger-note-field w-full resize-none outline-none rounded-lg p-3"
         style={{
           color: theme.text.primary,
-          fontFamily: 'var(--font-serif), Georgia, serif',
-          fontSize: '17px',
-          lineHeight: '28px',
+          fontFamily: 'var(--font-caveat), Caveat, cursive',
+          fontSize: '21px',
+          lineHeight: '30px',
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${theme.glass.border}`,
           minHeight: 140,

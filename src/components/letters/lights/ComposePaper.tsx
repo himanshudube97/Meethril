@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useThemeStore } from '@/store/theme'
 import PaperWatermark from './PaperWatermark'
 
 const COUNTRIES: { code: string; name: string }[] = [
@@ -52,6 +53,10 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const dismissedRef = useRef(false)
+  // Light themes have near-white scenes, so the paper must be lifted to a
+  // clearly brighter sheet or it dissolves into the page. Dark themes already
+  // have contrast, so keep the paper close to its own tone there.
+  const isDark = useThemeStore((s) => s.theme.mode === 'dark')
 
   useEffect(() => {
     try {
@@ -152,11 +157,18 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
             style={{
               minHeight: 320,
               padding: '34px 36px 28px',
-              background: 'var(--paper-1)',
+              // Lift the paper off the page so it doesn't melt into light
+              // themes. On light scenes the sheet goes near-white (a clear
+              // value step above the blush/cream background); on dark scenes it
+              // stays close to its own paper tone. A crisp edge + top highlight
+              // + layered shadow define it on both.
+              background: isDark
+                ? 'linear-gradient(180deg, color-mix(in oklab, var(--paper-1) 86%, white) 0%, var(--paper-1) 50%, color-mix(in oklab, var(--paper-1) 90%, var(--bg-2)) 100%)'
+                : 'linear-gradient(180deg, color-mix(in oklab, var(--paper-1) 42%, white) 0%, color-mix(in oklab, var(--paper-1) 60%, white) 52%, color-mix(in oklab, var(--paper-1) 80%, var(--bg-2)) 100%)',
               borderRadius: 16,
-              border: '1px solid color-mix(in oklab, var(--text-primary) 12%, transparent)',
+              border: `1px solid color-mix(in oklab, var(--text-primary) ${isDark ? 22 : 26}%, transparent)`,
               boxShadow:
-                '0 24px 60px -18px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.08)',
+                '0 1px 0 color-mix(in oklab, white 60%, transparent) inset, 0 20px 46px -14px rgba(0,0,0,0.34), 0 50px 100px -44px rgba(0,0,0,0.28)',
               transformOrigin: 'center',
             }}
           >
@@ -186,10 +198,14 @@ export default function ComposePaper({ onSend, onDismiss }: Props) {
               rows={6}
               placeholder="write something true. a gratitude. a hope. a small kindness."
               disabled={phase !== 'idle'}
-              className="relative w-full resize-none bg-transparent text-[15px] leading-[1.7rem] focus:outline-none disabled:opacity-90"
+              className="stranger-note-field relative w-full resize-none bg-transparent focus:outline-none disabled:opacity-90"
               style={{
                 color: 'var(--text-primary)',
-                fontFamily: 'var(--font-serif), Georgia, serif',
+                // Match the journal's hand (Caveat); sized up so handwriting
+                // stays legible against the serif chrome around it.
+                fontFamily: 'var(--font-caveat), Caveat, cursive',
+                fontSize: '20px',
+                lineHeight: '1.65',
                 caretColor: 'var(--accent-warm)',
               }}
               autoFocus

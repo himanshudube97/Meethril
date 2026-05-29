@@ -89,6 +89,15 @@ textarea,
   line-height: 36px;
 }
 
+/* Stranger-note inputs use the journal hand (Caveat). The browser-default
+   placeholder opacity reads as washed grey on the pale note paper, so set a
+   legible, theme-aware placeholder ink instead. opacity:1 overrides Firefox's
+   default placeholder dimming. */
+.stranger-note-field::placeholder {
+  color: color-mix(in oklab, var(--text-primary) 52%, transparent);
+  opacity: 1;
+}
+
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;
