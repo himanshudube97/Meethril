@@ -1,14 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
-import { useE2EE } from '@/hooks/useE2EE'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { JournalEntry } from '@/store/journal'
+import { useMemories } from '@/hooks/useMemories'
+import MemoryLocked from './MemoryLocked'
 import MemoryEntryReader from './MemoryEntryReader'
-
-const VISIBLE_BUTTERFLIES = 5
 
 // Spread positions across the viewport. Slightly varied so it doesn't
 // look like a grid. Coordinates are % of viewport.
@@ -21,49 +20,20 @@ const HOMES: Array<{ x: number; y: number }> = [
 ]
 
 /**
- * Memory surface — same on mobile and desktop. Five butterflies drift
- * across the screen, each carrying one of your past entries. Tapping
- * a butterfly opens the entry as a read-only scrollable reader.
+ * Memory surface — same on mobile and desktop. Butterflies drift across the
+ * screen, each carrying one of your past entries (journals + delivered
+ * letters). Tapping a butterfly opens it as a read-only scrollable reader.
  *
- * Replaces the constellation / garden / firelight scenes which were
- * desktop-only and didn't translate to mobile.
+ * Gating + the fixed daily selection (issue #37) live in useMemories; this
+ * view just renders the locked/loading/ready states.
  */
 export default function ButterflyMemoryView() {
   const { theme } = useThemeStore()
-  const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
   const prefersReducedMotion = usePrefersReducedMotion()
-  const [entries, setEntries] = useState<JournalEntry[] | null>(null)
-  const [loadError, setLoadError] = useState(false)
+  const { status, progress, items, reload } = useMemories()
   const [selected, setSelected] = useState<JournalEntry | null>(null)
 
-  const fetchEntries = useCallback(async () => {
-    setLoadError(false)
-    try {
-      const res = await fetch('/api/entries?limit=50')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const raw = (data.entries || []) as JournalEntry[]
-      const decrypted = await decryptEntriesFromServer(raw)
-      setEntries(decrypted)
-    } catch {
-      // Earlier the catch silently set entries to [] which then rendered as
-      // "Memories appear here once you've written a few entries" — a false
-      // empty state for users who had entries but the fetch failed.
-      setLoadError(true)
-      setEntries([])
-    }
-  }, [decryptEntriesFromServer])
-
-  useEffect(() => { fetchEntries() }, [fetchEntries, isE2EEReady])
-
-  const visible = useMemo(() => {
-    if (!entries) return []
-    if (entries.length === 0) return []
-    const shuffled = [...entries].sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, Math.min(VISIBLE_BUTTERFLIES, entries.length))
-  }, [entries])
-
-  if (entries === null) {
+  if (status === 'loading') {
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
@@ -74,30 +44,30 @@ export default function ButterflyMemoryView() {
     )
   }
 
-  if (visible.length === 0) {
+  if (status === 'locked') {
+    return <MemoryLocked progress={progress} />
+  }
+
+  if (status === 'error' || items.length === 0) {
     return (
       <div
         className="fixed inset-0 flex flex-col items-center justify-center px-8 text-center gap-3"
         style={{ color: theme.text.muted, fontFamily: 'Georgia, serif', fontStyle: 'italic' }}
       >
-        <p>
-          {loadError
-            ? "we couldn't reach your memories — give it another try in a moment"
-            : 'Memories appear here once you’ve written a few entries.'}
-        </p>
-        {loadError && (
-          <button
-            type="button"
-            onClick={fetchEntries}
-            className="underline text-xs"
-            style={{ color: theme.text.muted }}
-          >
-            try again
-          </button>
-        )}
+        <p>we couldn&apos;t reach your memories — give it another try in a moment</p>
+        <button
+          type="button"
+          onClick={reload}
+          className="underline text-xs"
+          style={{ color: theme.text.muted }}
+        >
+          try again
+        </button>
       </div>
     )
   }
+
+  const visible = items
 
   return (
     <div className="fixed inset-0 overflow-hidden">
