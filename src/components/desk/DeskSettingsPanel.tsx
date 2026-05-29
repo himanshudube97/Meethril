@@ -165,7 +165,11 @@ export default function DeskSettingsPanel() {
                   </div>
                 </section>
 
-                {/* Cursor */}
+                {/* Cursor — custom cursors are a pointer-device feature, so
+                    only offer them on true desktop. On tablet/responsive
+                    widths (touch) they're dead options that just clutter the
+                    panel (issue #41). */}
+                {layoutMode === 'desktop' && (
                 <section>
                   <h3 className="text-xs uppercase tracking-[0.15em] mb-3" style={{ color: theme.text.muted }}>
                     Cursor
@@ -202,6 +206,7 @@ export default function DeskSettingsPanel() {
                     })}
                   </div>
                 </section>
+                )}
 
                 {/* Background animations */}
                 <section>

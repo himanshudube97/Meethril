@@ -46,7 +46,10 @@ export default function JarSentView({
 }: JarSentViewProps) {
   const [open, setOpen] = useState<SentStamp | null>(null)
   const [opened, setOpened] = useState(false)
-  const [mode, setMode] = useState<Mode>('monthly')
+  // Sent letters are always browsed by month now (the monthly/full-year
+  // toggle was removed). `mode` stays 'monthly'; the yearly branches below are
+  // retained but inert.
+  const [mode] = useState<Mode>('monthly')
 
   const canGoPrev = (mode: Mode, year: number, month: number): boolean => {
     if (mode === 'yearly') return year > launchYear
@@ -114,21 +117,6 @@ export default function JarSentView({
     }
   }
 
-  const onModeChange = (m: Mode) => {
-    setOpened(false)
-    if (m === 'monthly') {
-      // when entering monthly, ensure (year, month) is within bounds
-      const c = clampToBounds(year, month)
-      setYear(c.y); setMonth(c.m)
-    } else {
-      // yearly: clamp year alone
-      const t = todayYM()
-      if (year > t.y) setYear(t.y)
-      else if (year < launchYear) setYear(launchYear)
-    }
-    setMode(m)
-  }
-
   const tagLabel = mode === 'yearly' ? String(year) : `${MONTHS[month]} ${year}`
 
   return (
@@ -191,8 +179,6 @@ export default function JarSentView({
           each stamp inside is a letter you&rsquo;ve sent on its way
         </p>
       </header>
-
-      <ModeToggle mode={mode} onChange={onModeChange} />
 
       {/* Fanout area — appears above jar when opened */}
       <div className={`fanout ${opened ? 'is-open' : ''}`}>
@@ -343,53 +329,6 @@ export default function JarSentView({
   )
 }
 
-/* ---------- Mode toggle ---------- */
-
-function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
-  return (
-    <div className="mt">
-      <button className={mode === 'monthly' ? 'on' : ''} onClick={() => onChange('monthly')}>
-        monthly
-      </button>
-      <button className={mode === 'yearly' ? 'on' : ''} onClick={() => onChange('yearly')}>
-        full year
-      </button>
-      <style jsx>{`
-        .mt {
-          display: flex;
-          gap: 4px;
-          justify-content: center;
-          margin: 0 auto 8px;
-          background: var(--paper-1);
-          border: 1px solid var(--paper-2);
-          padding: 4px;
-          border-radius: 999px;
-          width: fit-content;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-        }
-        button {
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          padding: 6px 16px;
-          border-radius: 999px;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 12.5px;
-          letter-spacing: 0.5px;
-          cursor: pointer;
-          transition: background .25s, color .25s;
-        }
-        button:hover { color: var(--text-primary); }
-        button.on {
-          background: var(--accent-primary);
-          color: #fff;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-      `}</style>
-    </div>
-  )
-}
-
 /* ---------- Jar (SVG) ---------- */
 
 interface JarProps {
@@ -427,10 +366,13 @@ function Jar({ sealed, delivered, total, totalEver, loading, loadError, opened, 
     >
       <svg width="320" height="388" viewBox="0 0 280 340" fill="none" style={{ overflow: 'visible' }}>
         <defs>
+          {/* Inner glow follows the theme's warm accent so the jar harmonises
+              on every palette instead of always reading warm-amber (which only
+              suited rose). Cool themes get a cool glow, warm themes a warm one. */}
           <radialGradient id="jar-glow" cx="50%" cy="95%" r="65%">
-            <stop offset="0%" stopColor="rgba(255, 218, 170, 0.55)" />
-            <stop offset="55%" stopColor="rgba(255, 218, 170, 0.10)" />
-            <stop offset="100%" stopColor="rgba(255, 218, 170, 0)" />
+            <stop offset="0%" stopColor="color-mix(in oklab, var(--accent-warm) 55%, transparent)" />
+            <stop offset="55%" stopColor="color-mix(in oklab, var(--accent-warm) 12%, transparent)" />
+            <stop offset="100%" stopColor="color-mix(in oklab, var(--accent-warm) 0%, transparent)" />
           </radialGradient>
           <linearGradient id="cork" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%"   stopColor="#d6b48b" />
@@ -560,24 +502,25 @@ function Jar({ sealed, delivered, total, totalEver, loading, loadError, opened, 
           {sealedPositions.map((p, i) => (
             <Envelope key={`s-${i}`} x={p.x} y={p.y} rot={p.rot} />
           ))}
-          {/* fireflies — tiny warm glow particles */}
+          {/* fireflies — tiny glow particles, tinted to the theme's warm accent
+              (was hardcoded amber, which clashed on cool themes). */}
           <g className="fireflies">
-            <circle cx="92" cy="200" r="1.6" fill="rgba(255,210,140,0.85)">
+            <circle cx="92" cy="200" r="1.6" fill="color-mix(in oklab, var(--accent-warm) 82%, white 18%)">
               {!reducedMotion && (
                 <animate attributeName="opacity" values="0.3;1;0.3" dur="3.4s" repeatCount="indefinite" />
               )}
             </circle>
-            <circle cx="178" cy="170" r="1.3" fill="rgba(255,225,160,0.8)">
+            <circle cx="178" cy="170" r="1.3" fill="color-mix(in oklab, var(--accent-warm) 70%, white 30%)">
               {!reducedMotion && (
                 <animate attributeName="opacity" values="1;0.3;1" dur="2.8s" repeatCount="indefinite" />
               )}
             </circle>
-            <circle cx="155" cy="225" r="1.7" fill="rgba(255,210,140,0.85)">
+            <circle cx="155" cy="225" r="1.7" fill="color-mix(in oklab, var(--accent-warm) 82%, white 18%)">
               {!reducedMotion && (
                 <animate attributeName="opacity" values="0.4;1;0.4" dur="4.1s" repeatCount="indefinite" />
               )}
             </circle>
-            <circle cx="105" cy="255" r="1.2" fill="rgba(255,225,170,0.75)">
+            <circle cx="105" cy="255" r="1.2" fill="color-mix(in oklab, var(--accent-warm) 72%, white 28%)">
               {!reducedMotion && (
                 <animate attributeName="opacity" values="0.5;1;0.5" dur="3.2s" repeatCount="indefinite" />
               )}
@@ -700,6 +643,7 @@ function HangingTag({ label, count, onPrev, onNext, canPrev, canNext }: TagProps
               onClick={onPrev}
               disabled={!canPrev}
               aria-label={`Previous ${label}`}
+              title="Previous month"
             >‹</button>
             <div className="label">
               <div className="title">
@@ -714,9 +658,13 @@ function HangingTag({ label, count, onPrev, onNext, canPrev, canNext }: TagProps
               onClick={onNext}
               disabled={!canNext}
               aria-label={`Next ${label}`}
+              title="Next month"
             >›</button>
           </div>
         </div>
+        {(canPrev || canNext) && (
+          <div className="tag-hint">tap ‹ › to change month</div>
+        )}
       </div>
 
       <style jsx>{`
@@ -823,28 +771,45 @@ function HangingTag({ label, count, onPrev, onNext, canPrev, canNext }: TagProps
           margin-top: 3px;
         }
         .nav {
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          font-size: 24px;
+          /* Persistent circular affordance so the arrows read as buttons at
+             rest (issue #32/#34: "make them more readable / should be clear"),
+             not just faint glyphs that only appear on hover. */
+          background: color-mix(in oklab, var(--text-primary) 6%, transparent);
+          border: 1px solid color-mix(in oklab, var(--text-primary) 22%, transparent);
+          color: var(--text-secondary);
+          font-size: 20px;
           line-height: 1;
-          padding: 4px 4px;
+          width: 24px;
+          height: 24px;
+          padding: 0;
           cursor: pointer;
           font-family: 'Cormorant Garamond', serif;
-          align-self: stretch;
+          align-self: center;
           display: flex;
           align-items: center;
-          border-radius: 3px;
-          transition: background .2s, color .2s, transform .15s;
+          justify-content: center;
+          border-radius: 50%;
+          transition: background .2s, color .2s, transform .15s, border-color .2s;
         }
         .nav:hover:not(:disabled) {
           color: var(--accent-primary);
-          background: color-mix(in oklab, var(--accent-primary) 10%, transparent);
+          background: color-mix(in oklab, var(--accent-primary) 14%, transparent);
+          border-color: color-mix(in oklab, var(--accent-primary) 45%, transparent);
           transform: scale(1.08);
         }
         .nav:disabled {
-          opacity: 0.25;
+          opacity: 0.3;
           cursor: not-allowed;
+        }
+        .tag-hint {
+          margin-top: 7px;
+          text-align: center;
+          font-family: 'Cormorant Garamond', serif;
+          font-style: italic;
+          font-size: 11px;
+          letter-spacing: 0.3px;
+          color: var(--text-muted);
+          opacity: 0.75;
         }
         @media (max-width: 640px) {
           /* On mobile the tag stacks UNDER the jar instead of dangling
