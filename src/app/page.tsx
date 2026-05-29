@@ -9,12 +9,16 @@ import FooterCTA from '@/components/landing/FooterCTA'
 import StickyHeader from '@/components/landing/StickyHeader'
 
 /**
- * Landing page: HeroSection → DiarySection → FeaturesSection → FooterCTA.
+ * Landing page (issue #44). The 3D diary and the flat "What's inside"
+ * feature grid are two presentations of the SAME content — each diary
+ * spread is a feature — so they're shown as responsive alternates, never
+ * both at once:
  *
- * The interactive 3D diary flip (issue #44) sits between the hero and the
- * feature grid — desktop/tablet only (≥ 1024px). On the mobile responsive
- * view it's omitted to keep the landing light on small/low-end devices; the
- * hero + feature grid carry it there instead.
+ *   • Desktop / tablet (≥ 1024px): the interactive 3D diary flip.
+ *   • Mobile (< 1024px): the flat feature grid — 3D omitted to keep the
+ *     landing light on small/low-end devices.
+ *
+ * Hero + footer render on every viewport.
  *
  * Safe to branch on viewport without a hydration mismatch: the global
  * LayoutContent renders this page's children only after the client mounts.
@@ -33,8 +37,7 @@ export default function LandingPage() {
     >
       <StickyHeader />
       <HeroSection />
-      {!isMobile && <DiarySection />}
-      <FeaturesSection />
+      {isMobile ? <FeaturesSection /> : <DiarySection />}
       <FooterCTA />
     </main>
   )
