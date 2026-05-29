@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
@@ -58,6 +58,33 @@ function useCursorTilt(maxTilt = 12) {
     y.set(0)
   }
   return { ref, onMove, onLeave, rotateX, rotateY, lightX, lightY }
+}
+
+/**
+ * The book is authored at a fixed desktop size (1080×660). On narrow
+ * viewports (the diary only renders on mobile now — issue #44) that fixed
+ * size would overflow and the spine would slice through the text. This
+ * measures the available width and returns a uniform scale factor so the
+ * whole book — type, spine, page-turn — shrinks proportionally to fit.
+ */
+function useFitScale(targetWidth: number) {
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => {
+      const w = el.clientWidth
+      setScale(w > 0 ? Math.min(1, w / targetWidth) : 1)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [targetWidth])
+
+  return { wrapRef, scale }
 }
 
 function CornerFlourish({ position, color }: { position: 'tl' | 'tr' | 'bl' | 'br'; color: string }) {
@@ -481,6 +508,7 @@ export default function Diary() {
 
   const bookW = 1080
   const bookH = 660
+  const { wrapRef, scale } = useFitScale(bookW)
 
   const pageVariants = {
     enter: (d: number) => ({
@@ -550,18 +578,31 @@ export default function Diary() {
         </p>
       </div>
 
+      {/* Measuring wrapper: full available width, reserves the scaled book
+          height so the surrounding flow stays correct. */}
       <div
-        ref={tilt.ref}
-        onMouseMove={tilt.onMove}
-        onMouseLeave={tilt.onLeave}
+        ref={wrapRef}
         style={{
-          width: bookW,
-          maxWidth: '100%',
-          height: bookH,
-          perspective: 1800,
-          position: 'relative',
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          height: bookH * scale,
         }}
       >
+        <div
+          ref={tilt.ref}
+          onMouseMove={tilt.onMove}
+          onMouseLeave={tilt.onLeave}
+          style={{
+            width: bookW,
+            height: bookH,
+            flex: 'none',
+            perspective: 1800,
+            position: 'relative',
+            transform: `scale(${scale})`,
+            transformOrigin: 'top center',
+          }}
+        >
         <motion.div
           style={{
             width: '100%',
@@ -661,6 +702,7 @@ export default function Diary() {
             <KnotBinding palette={palette} />
           </div>
         </motion.div>
+        </div>
       </div>
 
       {/* Pagination */}

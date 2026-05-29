@@ -52,6 +52,8 @@ export default function LayoutContent({
   }, [layoutMode, setLayoutModeOnTheme])
   const isLandingPage = pathname === '/'
   const isPricingPage = pathname === '/pricing'
+  // Public legal pages — long-form reading, themed flat background, no nav.
+  const isLegalPage = pathname === '/privacy' || pathname === '/terms'
   const isWritingPage = pathname === '/write'
   const isLettersPage = pathname.startsWith('/letters')
   // /scrapbook (the listing) is a full-bleed scene like /letters; the
@@ -99,6 +101,12 @@ export default function LayoutContent({
         <InstallPrompt />
       </>
     )
+  }
+
+  if (isLegalPage) {
+    // Public /privacy & /terms — the page paints its own themed full-bleed
+    // reading surface (LegalShell). No nav, no gear, no particles.
+    return <>{children}</>
   }
 
   // Background renders for every authed page (write, letters, timeline, etc.)

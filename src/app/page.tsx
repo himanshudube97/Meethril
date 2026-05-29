@@ -2,20 +2,18 @@
 
 import { useThemeStore } from '@/store/theme'
 import HeroSection from '@/components/landing/HeroSection'
+import DiarySection from '@/components/landing/DiarySection'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import FooterCTA from '@/components/landing/FooterCTA'
 import StickyHeader from '@/components/landing/StickyHeader'
 
 /**
- * Landing page — kept minimal so it loads cleanly on mobile and on
- * lower-end devices.
+ * Landing page: HeroSection → DiarySection → FeaturesSection → FooterCTA.
  *
- * Previously this rendered HeroSection → DiarySection (a 715-line 3D
- * book) → FooterCTA inside a scroll-snap container with body overflow
- * locked and ambient blobs animating below the fold. All of that is
- * gone: two sections, normal page scroll, no 3D, no orbs, no snap.
- * The Hero and Footer keep just the gentle fades that feel like
- * Hearth without taxing the device.
+ * The interactive 3D diary flip (issue #44) sits between the hero and the
+ * feature grid on every viewport. The book is authored at a fixed desktop
+ * size (1080×660); Diary's own useFitScale shrinks it to fit narrow screens
+ * so the mobile responsive view gets the same tactile, page-turning preview.
  */
 export default function LandingPage() {
   const { theme } = useThemeStore()
@@ -30,6 +28,7 @@ export default function LandingPage() {
     >
       <StickyHeader />
       <HeroSection />
+      <DiarySection />
       <FeaturesSection />
       <FooterCTA />
     </main>

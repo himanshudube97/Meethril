@@ -70,6 +70,19 @@ export default function FooterCTA() {
         >
           Hearth — a meditative journal that listens
         </p>
+
+        <div
+          className="mt-4 flex items-center justify-center gap-4 text-xs"
+          style={{ color: theme.text.muted }}
+        >
+          <Link href="/privacy" className="hover:underline underline-offset-4 transition">
+            Privacy
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/terms" className="hover:underline underline-offset-4 transition">
+            Terms
+          </Link>
+        </div>
       </div>
     </section>
   )

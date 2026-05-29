@@ -12,7 +12,7 @@
 
 // Routes that render without an authenticated user. `/api/*` is omitted —
 // these helpers only ever see page pathnames.
-const PUBLIC_EXACT = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download']
+const PUBLIC_EXACT = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download', '/privacy', '/terms']
 const PUBLIC_PREFIXES = ['/login', '/onboarding', '/letter']
 
 export function isPublicRoute(pathname: string): boolean {

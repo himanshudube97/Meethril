@@ -36,6 +36,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [otpCode, setOtpCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [loginError, setLoginError] = useState(error ? 'Authentication failed. Please try again.' : '')
@@ -243,12 +244,15 @@ function LoginForm() {
                 <label htmlFor="password" className="block text-sm text-[var(--text-muted)] mb-2">
                   Password <span className="ml-2 text-xs opacity-60">(any password works in dev mode)</span>
                 </label>
-                <input
-                  type="password" id="password" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'} id="password" value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 pr-12 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
+                  />
+                  <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(v => !v)} />
+                </div>
               </div>
               <button
                 type="submit" disabled={loading || !email}
@@ -281,12 +285,15 @@ function LoginForm() {
                 </div>
                 <div>
                   <label htmlFor="password" className="block text-sm text-[var(--text-muted)] mb-2">Password</label>
-                  <input
-                    type="password" id="password" value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••" required minLength={6}
-                    className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'} id="password" value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••" required minLength={6}
+                      className="w-full px-4 py-3 pr-12 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
+                    />
+                    <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(v => !v)} />
+                  </div>
                 </div>
                 <button
                   type="submit" disabled={loading || !email || !password}
@@ -333,6 +340,15 @@ function LoginForm() {
               <p className="text-center text-xs text-[var(--text-muted)]">
                 Your journal entries are private and secure
               </p>
+
+              {authMode === 'signup' && (
+                <p className="text-center text-xs text-[var(--text-muted)] leading-relaxed">
+                  By creating an account you agree to our{' '}
+                  <Link href="/terms" className="text-[var(--accent-primary)] hover:opacity-80 transition-opacity">Terms</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" className="text-[var(--accent-primary)] hover:opacity-80 transition-opacity">Privacy Policy</Link>.
+                </p>
+              )}
             </div>
           )}
 
@@ -345,8 +361,9 @@ function LoginForm() {
                 </label>
                 <input
                   type="text" id="otp" value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="000000" required maxLength={6}
+                  inputMode="numeric" autoComplete="one-time-code"
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  placeholder="000000" required maxLength={8}
                   className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors text-center text-2xl tracking-widest"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-2 text-center">
@@ -359,6 +376,9 @@ function LoginForm() {
               >
                 {loading ? 'Verifying...' : 'Verify & Continue'}
               </button>
+              <p className="text-xs text-[var(--text-muted)] text-center -mt-2">
+                Enter the {' '}code from your email (6–8 digits)
+              </p>
               <button
                 type="button" onClick={handleResendOtp} disabled={resendCooldown > 0 || !email}
                 className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -376,6 +396,30 @@ function LoginForm() {
         </div>
       </motion.div>
     </div>
+  )
+}
+
+function PasswordToggle({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={shown ? 'Hide password' : 'Show password'}
+      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+    >
+      {shown ? (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3l18 18" />
+          <path d="M10.58 10.58a2 2 0 002.83 2.83" />
+          <path d="M9.36 5.18A9.46 9.46 0 0112 5c4.64 0 8.58 3.06 9.9 7a10.7 10.7 0 01-2.07 3.4M6.1 6.1A10.75 10.75 0 002.1 12c1.32 3.94 5.26 7 9.9 7a9.5 9.5 0 003.9-.83" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2.1 12C3.42 8.06 7.36 5 12 5s8.58 3.06 9.9 7c-1.32 3.94-5.26 7-9.9 7s-8.58-3.06-9.9-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )}
+    </button>
   )
 }
 

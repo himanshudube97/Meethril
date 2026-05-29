@@ -15,7 +15,7 @@ const PUBLIC_PATHS = [
   '/api/download',
   '/letter',
 ]
-const PUBLIC_EXACT_PATHS = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download']
+const PUBLIC_EXACT_PATHS = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download', '/privacy', '/terms']
 
 // Must stay in sync with E2EE_ONBOARDED_COOKIE in src/lib/auth/e2ee-cookie.ts.
 // Kept local here so middleware stays safe on the edge runtime.
