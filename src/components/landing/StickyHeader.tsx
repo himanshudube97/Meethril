@@ -8,7 +8,7 @@ import { useThemeStore } from '@/store/theme'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
 
 /**
- * Landing-page header. On desktop it's a pill with HEARTH + links + a CTA.
+ * Landing-page header. On desktop it's a pill with MEETHRIL + links + a CTA.
  * On mobile we mirror the in-app hamburger so the chrome stays consistent:
  * a circular hamburger button top-left + a circular CTA top-right (Begin
  * Writing). The hamburger opens a compact drop-panel with the public

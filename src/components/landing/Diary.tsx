@@ -195,7 +195,7 @@ function WaxSeal({ color, threadColor }: { color: string; threadColor: string })
       />
       <svg viewBox="0 0 36 36" width="36" height="36" style={{ position: 'absolute', inset: 0 }}>
         <text x="18" y="22" textAnchor="middle" fontSize="11" fontFamily="Georgia, serif" fontStyle="italic" fill="rgba(255,255,255,0.6)">
-          h
+          m
         </text>
       </svg>
     </motion.div>

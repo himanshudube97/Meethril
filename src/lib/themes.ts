@@ -102,7 +102,7 @@ export const rivendellTheme: Theme = {
 
 // Hearth — firelight night (deep brown + amber + cream)
 export const hearthTheme: Theme = {
-  name: 'Hearth',
+  name: 'Firelight',
   description: 'Firelight at the close of the day',
   mode: 'dark',
   bg: {

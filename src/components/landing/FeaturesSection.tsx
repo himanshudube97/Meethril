@@ -18,7 +18,7 @@ const FEATURES: Feature[] = [
   {
     icon: '✉',
     title: 'Letters across time',
-    body: 'Write to your future self or someone close. Hearth keeps the letter sealed until the day you chose — a week from now, a year from now — then delivers it.',
+    body: 'Write to your future self or someone close. Meethril keeps the letter sealed until the day you chose — a week from now, a year from now — then delivers it.',
   },
   {
     icon: '✦',

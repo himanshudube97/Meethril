@@ -82,7 +82,7 @@ export const SPREADS: Spread[] = [
     n: 'VIII',
     title: 'On your desk, too',
     blurb:
-      'Hearth runs natively on your Mac. A quiet little app on the dock — open, write, close.',
+      'Meethril runs natively on your Mac. A quiet little app on the dock — open, write, close.',
     bullets: ['macOS · Apple Silicon + Intel', 'Offline-first, encrypted', 'One-time install'],
     media: 'Open the app. Write. Close it.',
     annotation: 'kept on your desk',

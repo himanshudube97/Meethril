@@ -44,14 +44,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Hearth — a meditative journal that listens",
+  title: "Meethril — a meditative journal that listens",
   description: "Write freely, and over time, it gently shows you who you are.",
   manifest: "/manifest.json",
 
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Hearth",
+    title: "Meethril",
   },
 
   icons: {
@@ -65,9 +65,9 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "Hearth",
+    title: "Meethril",
     description: "A meditative journal that listens",
-    siteName: "Hearth",
+    siteName: "Meethril",
     type: "website",
   },
 };
