@@ -1,6 +1,6 @@
 // Cookie name must stay in sync with the local const in src/middleware.ts
 // (middleware keeps its own copy to stay safe on the edge runtime).
-export const E2EE_ONBOARDED_COOKIE = 'hearth-e2ee-onboarded'
+export const E2EE_ONBOARDED_COOKIE = 'meethril-e2ee-onboarded'
 
 export const E2EE_COOKIE_OPTS = {
   httpOnly: true,

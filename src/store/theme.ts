@@ -65,7 +65,7 @@ export const useThemeStore = create<ThemeStore>()(
       },
     }),
     {
-      name: 'hearth-theme',
+      name: 'meethril-theme',
       // Only the user's desktop pick persists. The effective themeName/theme
       // are derived from layout at runtime, so they live in memory only.
       partialize: (state) => ({

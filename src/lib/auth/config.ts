@@ -19,4 +19,4 @@ function resolveDevJwtSecret(): string {
 }
 
 export const DEV_JWT_SECRET = resolveDevJwtSecret()
-export const AUTH_COOKIE_NAME = 'hearth-auth-token'
+export const AUTH_COOKIE_NAME = 'meethril-auth-token'

@@ -20,6 +20,6 @@ export const useSoundStore = create<SoundStore>()(
       setAmbientVolume: (v) => set({ ambientVolume: Math.max(0, Math.min(1, v)) }),
       setUiSoundsEnabled: (v) => set({ uiSoundsEnabled: v }),
     }),
-    { name: 'hearth-sound' }
+    { name: 'meethril-sound' }
   )
 )

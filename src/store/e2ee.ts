@@ -82,7 +82,7 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
   setBackfillProgress: (patch) =>
     set(s => {
       const next = { ...s.backfillProgress, ...patch }
-      try { localStorage.setItem('hearth-backfill-progress', JSON.stringify(next)) } catch {}
+      try { localStorage.setItem('meethril-backfill-progress', JSON.stringify(next)) } catch {}
       return { backfillProgress: next }
     }),
 
@@ -131,7 +131,7 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
     try {
       // Hydrate backfill progress from localStorage
       try {
-        const raw = localStorage.getItem('hearth-backfill-progress')
+        const raw = localStorage.getItem('meethril-backfill-progress')
         if (raw) set({ backfillProgress: JSON.parse(raw) })
       } catch {}
 

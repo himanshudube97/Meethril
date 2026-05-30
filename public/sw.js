@@ -23,7 +23,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || 'hearth', {
       body: payload.body || '',
-      tag: 'hearth-reminder',
+      tag: 'meethril-reminder',
       renotify: true,
     })
   )

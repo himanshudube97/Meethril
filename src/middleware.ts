@@ -19,12 +19,12 @@ const PUBLIC_EXACT_PATHS = ['/', '/pricing', '/forgot', '/reset', '/verify', '/d
 
 // Must stay in sync with E2EE_ONBOARDED_COOKIE in src/lib/auth/e2ee-cookie.ts.
 // Kept local here so middleware stays safe on the edge runtime.
-const E2EE_ONBOARDED_COOKIE = 'hearth-e2ee-onboarded'
+const E2EE_ONBOARDED_COOKIE = 'meethril-e2ee-onboarded'
 const STATIC_PATHS = ['/_next', '/favicon.ico', '/images', '/icons', '/manifest.json', '/sw.js', '/workbox']
 
 const isDevAuth = process.env.USE_DEV_AUTH === 'true'
 const DEV_JWT_SECRET = process.env.DEV_JWT_SECRET || 'dev-secret-key-for-local-development-only-min-32-chars'
-const AUTH_COOKIE_NAME = 'hearth-auth-token'
+const AUTH_COOKIE_NAME = 'meethril-auth-token'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -42,13 +42,13 @@ export async function middleware(request: NextRequest) {
   return checkSupabaseAuth(request, pathname)
 }
 
-// Strip any client-supplied x-hearth-* auth headers before forwarding the
+// Strip any client-supplied x-meethril-* auth headers before forwarding the
 // request to a route handler. Without this, /api/auth/me (which bypasses
 // auth checks) would be impersonable by setting these headers on the request.
 function scrubAuthHeaders(request: NextRequest): Headers {
   const h = new Headers(request.headers)
-  h.delete('x-hearth-user-id')
-  h.delete('x-hearth-user-email')
+  h.delete('x-meethril-user-id')
+  h.delete('x-meethril-user-email')
   return h
 }
 
@@ -108,8 +108,8 @@ async function checkSupabaseAuth(request: NextRequest, pathname: string): Promis
   // Forward the verified identity so route handlers can skip a redundant
   // supabase.auth.getUser() round-trip. scrubAuthHeaders() above already
   // stripped any client-supplied versions of these.
-  forwardHeaders.set('x-hearth-user-id', user.id)
-  if (user.email) forwardHeaders.set('x-hearth-user-email', user.email)
+  forwardHeaders.set('x-meethril-user-id', user.id)
+  if (user.email) forwardHeaders.set('x-meethril-user-email', user.email)
 
   const response = NextResponse.next({ request: { headers: forwardHeaders } })
   pendingCookies.forEach(({ name, value, options }) =>
