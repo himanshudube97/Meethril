@@ -305,7 +305,7 @@ export default function SetupModal() {
               </div>
 
               <p className="text-xs" style={{ color: theme.text.muted }}>
-                Minimum 8 characters. You'll re-enter this every 7 days, or on a new device.
+                Minimum 8 characters. You'll re-enter this each time you reopen the app, or on a new device.
               </p>
 
               {error && (

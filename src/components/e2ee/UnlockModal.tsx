@@ -21,7 +21,6 @@ export default function UnlockModal() {
   } = useE2EEStore()
 
   const [dailyKey, setDailyKey] = useState('')
-  const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -46,8 +45,9 @@ export default function UnlockModal() {
         keyData.masterKeyIV
       )
 
-      // Store master key and close modal
-      await storeMasterKey(masterKey, remember ? 7 : 0)
+      // Store master key (sessionStorage — cleared when the tab closes) and
+      // close the modal. We keep the key for the session only; no device-trust.
+      await storeMasterKey(masterKey)
       setShowUnlockModal(false)
       setDailyKey('')
     } catch {
@@ -127,22 +127,6 @@ export default function UnlockModal() {
                     }}
                   />
                 </div>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    className="w-4 h-4 rounded mt-0.5"
-                    style={{ accentColor: theme.accent.primary }}
-                  />
-                  <span className="text-sm" style={{ color: theme.text.secondary }}>
-                    Trust this device for 7 days
-                    <span className="block text-xs mt-0.5" style={{ color: theme.text.muted }}>
-                      Uncheck on shared or public devices &mdash; your key will be cleared when this tab closes.
-                    </span>
-                  </span>
-                </label>
 
                 {error && (
                   <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
