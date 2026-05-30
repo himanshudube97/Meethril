@@ -353,7 +353,7 @@ export function parseSalt(saltBase64: string): Uint8Array {
 // Key Storage Helpers
 // ============================================
 
-const MASTER_KEY_STORAGE_KEY = 'hearth-e2ee-master-key'
+const MASTER_KEY_STORAGE_KEY = 'meethril-e2ee-master-key'
 
 /** Export master key to base64. */
 export async function exportMasterKey(masterKey: CryptoKey): Promise<string> {

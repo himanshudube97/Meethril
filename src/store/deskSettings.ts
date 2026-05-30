@@ -13,7 +13,7 @@ export const useDeskSettings = create<DeskSettingsStore>()(
       setAnimationsEnabled: (value) => set({ animationsEnabled: value }),
     }),
     {
-      name: 'hearth-desk-settings',
+      name: 'meethril-desk-settings',
       storage: createJSONStorage(() => localStorage),
     }
   )

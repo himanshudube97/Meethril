@@ -27,8 +27,8 @@ function formattedDate(): string {
 
 export function downloadDailyKeyFile(passphrase: string, accountEmail?: string) {
   const accountLine = accountEmail ? `Account: ${accountEmail}\n` : ''
-  const body = `HEARTH DAILY KEY
-====================
+  const body = `MEETHRIL DAILY KEY
+======================
 
 ${accountLine}Generated: ${formattedDate()}
 
@@ -42,13 +42,13 @@ device that hasn't been "trusted." Keep this file somewhere safe.
 If you lose both your daily key and your recovery key,
 your encrypted journal cannot be recovered.
 `
-  triggerDownload(`hearth-daily-key-${todaySuffix()}.txt`, body)
+  triggerDownload(`meethril-daily-key-${todaySuffix()}.txt`, body)
 }
 
 export function downloadRecoveryKeyFile(recoveryKey: string, accountEmail?: string) {
   const accountLine = accountEmail ? `Account: ${accountEmail}\n` : ''
-  const body = `HEARTH RECOVERY KEY
-====================
+  const body = `MEETHRIL RECOVERY KEY
+======================
 
 ${accountLine}Generated: ${formattedDate()}
 
@@ -57,7 +57,7 @@ Recovery Key:
     ${recoveryKey}
 
 To recover access:
-  1. Open Hearth → "Forgot daily key? Use recovery key"
+  1. Open Meethril → "Forgot daily key? Use recovery key"
   2. Enter the key above
   3. Set a new daily key
 

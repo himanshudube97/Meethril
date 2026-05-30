@@ -213,10 +213,10 @@ export async function wrapInPolaroid(
   })
 }
 
-/** `hearth-diary-2026-05-09.png` */
+/** `meethril-diary-2026-05-09.png` */
 export function makeShareFilename(surface: ShareSurface, date: Date): string {
   const yyyy = date.getFullYear()
   const mm = String(date.getMonth() + 1).padStart(2, '0')
   const dd = String(date.getDate()).padStart(2, '0')
-  return `hearth-${surface}-${yyyy}-${mm}-${dd}.png`
+  return `meethril-${surface}-${yyyy}-${mm}-${dd}.png`
 }

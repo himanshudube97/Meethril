@@ -19,7 +19,7 @@ export const useCursorStore = create<CursorStore>()(
       }),
     }),
     {
-      name: 'hearth-cursor',
+      name: 'meethril-cursor',
     }
   )
 )

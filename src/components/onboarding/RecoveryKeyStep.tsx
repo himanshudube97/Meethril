@@ -123,7 +123,7 @@ function downloadRecoveryKey(key: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'hearth-recovery-key.txt'
+  a.download = 'meethril-recovery-key.txt'
   a.click()
   URL.revokeObjectURL(url)
 }

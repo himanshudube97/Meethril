@@ -13,4 +13,4 @@ export function pickReminderLine(): string {
   return REMINDER_LINES[Math.floor(Math.random() * REMINDER_LINES.length)]
 }
 
-export const REMINDER_TITLE = 'hearth'
+export const REMINDER_TITLE = 'meethril'

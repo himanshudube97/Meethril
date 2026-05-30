@@ -1,4 +1,4 @@
-// Hearth service worker — push reminders only (v2).
+// Meethril service worker — push reminders only (v2).
 // Plain JS, no build step. Lives in public/ so it's served at /sw.js.
 
 self.addEventListener('install', (event) => {
