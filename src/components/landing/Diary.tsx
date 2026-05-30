@@ -352,7 +352,7 @@ function PageContent({ spread, idx, palette: p }: { spread: Spread; idx: number;
             letterSpacing: '.08em',
           }}
         >
-          {spread.title.toLowerCase()} · hearth
+          {spread.title.toLowerCase()} · meethril
         </motion.div>
 
         {/* Wax seal */}

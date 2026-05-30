@@ -208,10 +208,10 @@ function LoginForm() {
             href="/"
             className="inline-block mb-6 text-xs tracking-[0.3em] text-[var(--text-muted)] opacity-60 hover:opacity-100 transition"
           >
-            ← HEARTH
+            ← MEETHRIL
           </Link>
           <h1 className="font-[var(--font-serif)] text-4xl text-[var(--text-primary)] mb-2">
-            Welcome to Hearth
+            Welcome to Meethril
           </h1>
           <p className="text-[var(--text-muted)]">A meditative journal that listens</p>
         </div>

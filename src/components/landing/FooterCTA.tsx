@@ -111,7 +111,7 @@ export default function FooterCTA() {
               className="text-base"
               style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
             >
-              Hearth — a meditative journal that listens
+              Meethril — a meditative journal that listens
             </p>
             <div
               className="flex items-center gap-4 text-sm"

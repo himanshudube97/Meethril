@@ -113,7 +113,7 @@ export default function StickyHeader() {
             style={{ color: theme.text.primary }}
             whileHover={{ scale: 1.02 }}
           >
-            HEARTH
+            MEETHRIL
           </motion.span>
         </Link>
 
