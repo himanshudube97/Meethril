@@ -167,12 +167,13 @@ export default function Postbox({ children, onClick }: Props) {
           top: 140px;
           left: 50%;
           transform: translateX(-50%);
-          color: rgba(255, 245, 230, 0.92);
+          color: rgba(255, 248, 236, 1);
           font-family: 'Cormorant Garamond', serif;
-          font-size: 9px;
+          font-weight: 600;
+          font-size: 10px;
           letter-spacing: 2.5px;
           z-index: 3;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
+          text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.95);
         }
 
         /* Middle horizontal black band */
@@ -208,11 +209,12 @@ export default function Postbox({ children, onClick }: Props) {
         .postbox .swoosh-area .label {
           font-family: 'Cormorant Garamond', serif;
           font-style: italic;
-          color: rgba(255, 245, 230, 0.95);
-          font-size: 9px;
+          color: rgba(255, 248, 236, 1);
+          font-size: 10px;
+          font-weight: 600;
           letter-spacing: 3px;
           text-transform: lowercase;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
+          text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.95);
         }
 
         /* Bottom black base ring */
