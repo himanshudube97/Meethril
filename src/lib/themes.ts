@@ -1,8 +1,8 @@
-// Theme definitions for Hearth
+// Theme definitions for Meethril
 
 export type ThemeName =
   | 'rivendell'
-  | 'hearth'
+  | 'firelight'
   | 'rose'
   | 'sage'
   | 'ocean'
@@ -101,7 +101,7 @@ export const rivendellTheme: Theme = {
 }
 
 // Hearth — firelight night (deep brown + amber + cream)
-export const hearthTheme: Theme = {
+export const firelightTheme: Theme = {
   name: 'Firelight',
   description: 'Firelight at the close of the day',
   mode: 'dark',
@@ -430,7 +430,7 @@ export const themes: Record<ThemeName, Theme> = {
   postal: postalTheme,
   ocean: oceanTheme,
   rivendell: rivendellTheme,
-  hearth: hearthTheme,
+  firelight: firelightTheme,
   linen: linenTheme,
   sunset: sunsetTheme,
   rain: rainTheme,

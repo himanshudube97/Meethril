@@ -38,7 +38,7 @@ export default function DeskSettingsPanel() {
 
   // Themes hidden from the picker (still registered, just not offered).
   // Hearth and Linen are temporarily hidden until their views are polished.
-  const HIDDEN_THEMES: ThemeName[] = ['hearth', 'linen']
+  const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen']
   // Mobile keeps just two themes: sunset + rose. The other ambiences depend
   // on particles, scenes, and chrome that don't translate well to small
   // screens. A user who set a desktop-only theme still sees it apply; they

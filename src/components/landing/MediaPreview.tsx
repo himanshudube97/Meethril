@@ -477,8 +477,8 @@ function MockLockApp({ p }: { p: Palette }) {
 }
 
 // VII — Interactive theme switcher (special, no AppWindow shell — IT IS the switcher)
-const HIDDEN_THEMES: ThemeName[] = ['hearth', 'linen']
-const THEME_ORDER: ThemeName[] = ['rivendell', 'hearth', 'rose', 'sage', 'ocean', 'rain', 'postal', 'linen', 'sunset']
+const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen']
+const THEME_ORDER: ThemeName[] = ['rivendell', 'firelight', 'rose', 'sage', 'ocean', 'rain', 'postal', 'linen', 'sunset']
 const VISIBLE_THEMES = THEME_ORDER.filter((n) => !HIDDEN_THEMES.includes(n))
 
 function MockThemeSwitcher() {
