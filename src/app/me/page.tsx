@@ -91,7 +91,7 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
   return (
     <div>
       <label
-        className="block text-xs mb-2"
+        className="block text-sm mb-2"
         style={{ color: theme.text.muted }}
       >
         {label}
@@ -141,7 +141,7 @@ const DateOfBirthInput = memo(function DateOfBirthInput({
   return (
     <div>
       <label
-        className="block text-xs mb-2"
+        className="block text-sm mb-2"
         style={{ color: theme.text.muted }}
       >
         when were you born?
@@ -249,12 +249,12 @@ const E2EESettings = memo(function E2EESettings() {
 
           {isEnabled && (
             <>
-              <p className="text-xs" style={{ color: theme.text.secondary }}>
+              <p className="text-sm" style={{ color: theme.text.secondary }}>
                 {keyData?.e2eeSetupAt
                   ? `Encrypted on ${new Date(keyData.e2eeSetupAt).toLocaleDateString()}.`
                   : 'Encrypted.'}
               </p>
-              <p className="text-xs" style={{ color: theme.text.secondary }}>
+              <p className="text-sm" style={{ color: theme.text.secondary }}>
                 {isUnlocked
                   ? 'Unlocked on this device (session only).'
                   : 'Locked.'}
@@ -262,7 +262,7 @@ const E2EESettings = memo(function E2EESettings() {
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   onClick={() => clearMasterKey()}
-                  className="px-3 py-1.5 rounded-lg text-xs"
+                  className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -273,7 +273,7 @@ const E2EESettings = memo(function E2EESettings() {
                 </button>
                 <button
                   onClick={() => setShowUnlockModal(true)}
-                  className="px-3 py-1.5 rounded-lg text-xs"
+                  className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -285,7 +285,7 @@ const E2EESettings = memo(function E2EESettings() {
                 <button
                   onClick={() => setShowRotate(true)}
                   disabled={!isUnlocked}
-                  className="px-3 py-1.5 rounded-lg text-xs"
+                  className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -302,7 +302,7 @@ const E2EESettings = memo(function E2EESettings() {
 
           <Link
             href="/security"
-            className="text-xs underline block pt-1"
+            className="text-sm underline block pt-1"
             style={{ color: theme.text.muted }}
           >
             How E2EE works →

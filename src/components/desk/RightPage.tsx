@@ -340,7 +340,7 @@ const RightPage = memo(forwardRef<RightPageHandle, RightPageProps>(function Righ
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-start gap-2 mb-1 flex-shrink-0">
             <div
-              className="text-xs italic flex-1 leading-relaxed"
+              className="text-sm italic flex-1 leading-relaxed"
               style={{ color: colors.prompt }}
             >
               {prompt}
@@ -453,7 +453,7 @@ const RightPage = memo(forwardRef<RightPageHandle, RightPageProps>(function Righ
           no right-page content. */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div
-          className="text-xs italic mb-1 flex-shrink-0 leading-relaxed"
+          className="text-sm italic mb-1 flex-shrink-0 leading-relaxed"
           style={{ color: colors.prompt }}
         >
           {prompt}

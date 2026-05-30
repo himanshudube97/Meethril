@@ -242,7 +242,7 @@ export function SealModal({
                     <button
                       type="button"
                       onClick={() => setShowExamples((v) => !v)}
-                      className="text-xs italic"
+                      className="text-sm italic"
                       style={{ color: theme.text.muted, opacity: 0.7 }}
                       aria-label="See example questions"
                     >
@@ -251,7 +251,7 @@ export function SealModal({
                   </div>
                   {showExamples && (
                     <ul
-                      className="text-xs italic mb-3 list-disc list-inside"
+                      className="text-sm italic mb-3 list-disc list-inside"
                       style={{ color: theme.text.muted, opacity: 0.8 }}
                     >
                       <li>Where did we meet?</li>
@@ -293,7 +293,7 @@ export function SealModal({
                     }}
                   />
                   <p
-                    className="text-xs italic mb-4"
+                    className="text-sm italic mb-4"
                     style={{ color: theme.text.muted, opacity: 0.7 }}
                   >
                     Type it exactly the way they will. Capitalization, spaces, and punctuation are ignored.
@@ -305,7 +305,7 @@ export function SealModal({
                     if (tooShort || tooNumeric) {
                       return (
                         <p
-                          className="text-xs italic mb-4"
+                          className="text-sm italic mb-4"
                           style={{ color: '#b91c1c', opacity: 0.85 }}
                         >
                           That might be too easy to guess. Try something only the two of you would know.

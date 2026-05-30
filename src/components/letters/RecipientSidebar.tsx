@@ -58,7 +58,7 @@ export default function RecipientSidebar({ recipient, onRecipientChange, unlock,
                 <span className="block text-xl leading-tight" style={{ color: '#1f2750' }}>
                   {t.title}
                 </span>
-                <span className="block text-xs italic" style={{ color: '#7a5b3a' }}>
+                <span className="block text-sm italic" style={{ color: '#7a5b3a' }}>
                   {t.subtitle}
                 </span>
               </span>
@@ -68,7 +68,7 @@ export default function RecipientSidebar({ recipient, onRecipientChange, unlock,
       </div>
 
       <div
-        className="mt-7 rounded-lg p-3 text-xs leading-relaxed italic"
+        className="mt-7 rounded-lg p-3 text-sm leading-relaxed italic"
         style={{
           border: '1px dashed rgba(120,90,50,0.4)',
           color: '#6b4d28',
@@ -94,7 +94,7 @@ export default function RecipientSidebar({ recipient, onRecipientChange, unlock,
                   onUnlockChange({ kind: k })
                 }
               }}
-              className="rounded-md px-3 py-1.5 text-xs transition"
+              className="rounded-md px-3 py-1.5 text-sm transition"
               style={{
                 border: '1px solid rgba(120,90,50,0.35)',
                 backgroundColor: selected ? '#d8b878' : '#e6d5a7',
@@ -110,7 +110,7 @@ export default function RecipientSidebar({ recipient, onRecipientChange, unlock,
 
       {showPicker && unlock.kind === 'someday' && (
         <div className="mt-3">
-          <label className="block text-xs mb-1" style={{ color: '#7a5b3a' }}>pick a date</label>
+          <label className="block text-sm mb-1" style={{ color: '#7a5b3a' }}>pick a date</label>
           <input
             type="date"
             min={new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}
