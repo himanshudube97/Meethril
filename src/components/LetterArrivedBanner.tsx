@@ -48,7 +48,7 @@ function parseViewedIds(raw: string | null): Set<string> {
 // Theme-specific stamps
 const themeStamps: Record<ThemeName, { icon: string; color: string }> = {
   rivendell: { icon: '🌲', color: '#5E8B5A' },
-  hearth: { icon: '🔥', color: '#C8742C' },
+  firelight: { icon: '🔥', color: '#C8742C' },
   rose: { icon: '🌸', color: '#9A4555' },
   sage: { icon: '🌿', color: '#6B7A4B' },
   ocean: { icon: '🌊', color: '#2C5260' },

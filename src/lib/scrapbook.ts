@@ -528,5 +528,5 @@ const PAPER_PRESETS: Record<ThemeName, PaperPreset> = {
 }
 
 export function paperForTheme(themeName: ThemeName): PaperPreset {
-  return PAPER_PRESETS[themeName] ?? PAPER_PRESETS.hearth
+  return PAPER_PRESETS[themeName] ?? PAPER_PRESETS.firelight
 }
