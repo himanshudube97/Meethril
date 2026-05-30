@@ -56,11 +56,11 @@ async function getDevUser(): Promise<AuthUser | null> {
 
 async function getSupabaseUser(): Promise<AuthUser | null> {
   // Fast path: middleware already validated the JWT and forwarded the
-  // verified email via x-hearth-user-email. Skip the Supabase round-trip
+  // verified email via x-meethril-user-email. Skip the Supabase round-trip
   // and just look up the local user record. Middleware scrubs any
   // client-supplied version of this header, so it's trustworthy here.
   const headerStore = await headers()
-  const verifiedEmail = headerStore.get('x-hearth-user-email')
+  const verifiedEmail = headerStore.get('x-meethril-user-email')
   if (verifiedEmail) {
     const existing = await prisma.user.findUnique({ where: { email: verifiedEmail } })
     if (existing) {
