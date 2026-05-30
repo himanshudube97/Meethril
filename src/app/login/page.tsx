@@ -263,7 +263,7 @@ function LoginForm() {
               <button type="button" onClick={fillDevCreds} className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                 Fill Dev Creds
               </button>
-              <p className="text-center text-xs text-[var(--text-muted)] mt-2">
+              <p className="text-center text-sm text-[var(--text-muted)] mt-2">
                 Development mode — any email creates or logs into an account
               </p>
             </form>
@@ -337,12 +337,12 @@ function LoginForm() {
                 {loading ? 'Redirecting...' : 'Sign in with Google'}
               </button>
 
-              <p className="text-center text-xs text-[var(--text-muted)]">
+              <p className="text-center text-sm text-[var(--text-muted)]">
                 Your journal entries are private and secure
               </p>
 
               {authMode === 'signup' && (
-                <p className="text-center text-xs text-[var(--text-muted)] leading-relaxed">
+                <p className="text-center text-sm text-[var(--text-muted)] leading-relaxed">
                   By creating an account you agree to our{' '}
                   <Link href="/terms" className="text-[var(--accent-primary)] hover:opacity-80 transition-opacity">Terms</Link>
                   {' '}and{' '}
@@ -366,7 +366,7 @@ function LoginForm() {
                   placeholder="000000" required maxLength={8}
                   className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors text-center text-2xl tracking-widest"
                 />
-                <p className="text-xs text-[var(--text-muted)] mt-2 text-center">
+                <p className="text-sm text-[var(--text-muted)] mt-2 text-center">
                   Sent to {email}
                 </p>
               </div>
@@ -376,7 +376,7 @@ function LoginForm() {
               >
                 {loading ? 'Verifying...' : 'Verify & Continue'}
               </button>
-              <p className="text-xs text-[var(--text-muted)] text-center -mt-2">
+              <p className="text-sm text-[var(--text-muted)] text-center -mt-2">
                 Enter the {' '}code from your email (6–8 digits)
               </p>
               <button

@@ -156,7 +156,7 @@ export default function DeskSettingsPanel() {
                           >
                             {themeIcons[name]}
                           </span>
-                          <span className="text-xs leading-tight" style={{ color: theme.text.primary }}>
+                          <span className="text-sm leading-tight" style={{ color: theme.text.primary }}>
                             {t.name}
                           </span>
                         </motion.button>
@@ -198,7 +198,7 @@ export default function DeskSettingsPanel() {
                           >
                             {cursorIcons[name]}
                           </span>
-                          <span className="text-xs leading-tight" style={{ color: theme.text.primary }}>
+                          <span className="text-sm leading-tight" style={{ color: theme.text.primary }}>
                             {c.name}
                           </span>
                         </motion.button>
@@ -215,10 +215,10 @@ export default function DeskSettingsPanel() {
                   </h3>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs" style={{ color: theme.text.primary }}>
+                      <p className="text-sm" style={{ color: theme.text.primary }}>
                         Animations
                       </p>
-                      <p className="text-[10px] mt-0.5" style={{ color: theme.text.muted }}>
+                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
                         Particles, drifting glows, and ambient motion
                       </p>
                     </div>
@@ -247,10 +247,10 @@ export default function DeskSettingsPanel() {
 
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs" style={{ color: theme.text.primary }}>
+                      <p className="text-sm" style={{ color: theme.text.primary }}>
                         Ambient
                       </p>
-                      <p className="text-[10px] mt-0.5" style={{ color: theme.text.muted }}>
+                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
                         Background loop matched to your theme
                       </p>
                     </div>
@@ -297,10 +297,10 @@ export default function DeskSettingsPanel() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs" style={{ color: theme.text.primary }}>
+                      <p className="text-sm" style={{ color: theme.text.primary }}>
                         UI sounds
                       </p>
-                      <p className="text-[10px] mt-0.5" style={{ color: theme.text.muted }}>
+                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
                         Page turn sound when navigating the diary
                       </p>
                     </div>

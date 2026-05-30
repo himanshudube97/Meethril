@@ -107,7 +107,7 @@ export default function UnlockModal() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+                  <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                     Daily Key
                   </label>
                   <input

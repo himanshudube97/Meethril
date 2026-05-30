@@ -269,7 +269,7 @@ export default function SetupModal() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                   Daily Key
                 </label>
                 <input
@@ -287,7 +287,7 @@ export default function SetupModal() {
               </div>
 
               <div>
-                <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                   Confirm Daily Key
                 </label>
                 <input
@@ -304,7 +304,7 @@ export default function SetupModal() {
                 />
               </div>
 
-              <p className="text-xs" style={{ color: theme.text.muted }}>
+              <p className="text-sm" style={{ color: theme.text.muted }}>
                 Minimum 8 characters. You'll re-enter this each time you reopen the app, or on a new device.
               </p>
 
@@ -376,7 +376,7 @@ export default function SetupModal() {
               className="p-4 rounded-xl text-center"
               style={{ background: theme.glass.bg, border: `1px solid ${theme.accent.primary}50` }}
             >
-              <p className="text-xs mb-3" style={{ color: theme.text.muted }}>
+              <p className="text-sm mb-3" style={{ color: theme.text.muted }}>
                 Your Recovery Key
               </p>
               <p
@@ -427,7 +427,7 @@ export default function SetupModal() {
               className="pt-4 border-t space-y-3"
               style={{ borderColor: `${theme.glass.border}` }}
             >
-              <p className="text-xs" style={{ color: theme.text.muted }}>
+              <p className="text-sm" style={{ color: theme.text.muted }}>
                 Want to also download your daily key as a file?
               </p>
               <button
@@ -446,7 +446,7 @@ export default function SetupModal() {
                 </svg>
                 Download daily key as file
               </button>
-              <p className="text-xs" style={{ color: theme.text.muted }}>
+              <p className="text-sm" style={{ color: theme.text.muted }}>
                 (Optional — many users prefer to remember their daily key)
               </p>
             </div>
