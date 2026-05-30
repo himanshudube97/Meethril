@@ -17,7 +17,7 @@ export default function Postbox({ children, onClick }: Props) {
         <div className="body" />
         <div className="slot-hood"><span>letters</span></div>
         <div className="slot" />
-        <div className="pincode">HEARTH · 1</div>
+        <div className="pincode">MEETHRIL · 1</div>
         <div className="band-mid" />
         <div className="swoosh-area">
           <svg viewBox="0 0 56 16" width="44" height="13" aria-hidden>
@@ -26,7 +26,7 @@ export default function Postbox({ children, onClick }: Props) {
                   fill="none" strokeLinecap="round" strokeLinejoin="round" />
             <circle cx="53" cy="9" r="2.2" fill="var(--accent-warm)" />
           </svg>
-          <span className="label">hearth post</span>
+          <span className="label">meethril post</span>
         </div>
 
         {children}
@@ -105,11 +105,11 @@ export default function Postbox({ children, onClick }: Props) {
           background:
             linear-gradient(90deg,
               var(--postbox-3) 0%,
-              var(--postbox-2) 12%,
-              var(--postbox-1) 32%,
-              color-mix(in oklab, var(--postbox-1) 88%, white) 50%,
-              var(--postbox-1) 68%,
-              var(--postbox-2) 88%,
+              var(--postbox-2) 14%,
+              var(--postbox-1) 36%,
+              var(--postbox-1) 50%,
+              var(--postbox-1) 64%,
+              var(--postbox-2) 86%,
               var(--postbox-3) 100%);
           border-radius: 4px 4px 6px 6px;
           box-shadow:
@@ -167,12 +167,12 @@ export default function Postbox({ children, onClick }: Props) {
           top: 140px;
           left: 50%;
           transform: translateX(-50%);
-          color: rgba(255, 240, 220, 0.65);
+          color: rgba(255, 245, 230, 0.92);
           font-family: 'Cormorant Garamond', serif;
           font-size: 9px;
           letter-spacing: 2.5px;
           z-index: 3;
-          text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+          text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
         }
 
         /* Middle horizontal black band */
@@ -190,7 +190,7 @@ export default function Postbox({ children, onClick }: Props) {
           z-index: 3;
         }
 
-        /* Swoosh logo + "hearth post" label */
+        /* Swoosh logo + "meethril post" label */
         .postbox .swoosh-area {
           position: absolute;
           top: 196px;
@@ -208,11 +208,11 @@ export default function Postbox({ children, onClick }: Props) {
         .postbox .swoosh-area .label {
           font-family: 'Cormorant Garamond', serif;
           font-style: italic;
-          color: rgba(255, 240, 220, 0.82);
+          color: rgba(255, 245, 230, 0.95);
           font-size: 9px;
           letter-spacing: 3px;
           text-transform: lowercase;
-          text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+          text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
         }
 
         /* Bottom black base ring */
