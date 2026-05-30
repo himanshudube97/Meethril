@@ -18,7 +18,7 @@ const ornaments: Record<ThemeName, React.ReactNode> = {
       />
     </>
   ),
-  hearth: (
+  firelight: (
     <>
       <path
         d="M16 4 Q 12 10 14 16 Q 10 14 12 22 Q 14 28 18 26 Q 22 22 20 16 Q 18 12 16 4 Z"

@@ -46,7 +46,7 @@ export interface SpineDesign {
 }
 
 export const spineDesigns: Record<ThemeName, SpineDesign> = {
-  hearth: {
+  firelight: {
     material: 'leather',
     baseColor: '#7A5230',
     shadowColor: '#4A2E18',

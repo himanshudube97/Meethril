@@ -31,7 +31,7 @@ export async function POST() {
   if (!sub) return NextResponse.json({ error: 'No active subscription' }, { status: 404 })
 
   const payload = JSON.stringify({
-    title: 'hearth',
+    title: 'meethril',
     body: 'this is what a gentle nudge feels like.',
   })
 

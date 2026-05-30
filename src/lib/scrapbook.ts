@@ -463,7 +463,7 @@ export interface PaperPreset {
 
 const PAPER_PRESETS: Record<ThemeName, PaperPreset> = {
   // kraft cream — warm cozy brown undertones
-  hearth: {
+  firelight: {
     base: '#e8d8b0',
     grain: 'rgba(120, 80, 30, 0.06)',
     highlight: 'rgba(255, 240, 200, 0.45)',
