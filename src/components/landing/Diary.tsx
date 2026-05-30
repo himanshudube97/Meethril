@@ -15,21 +15,56 @@ type Palette = {
   inkQuiet: string
   accent: string
   thread: string
+  // Theme-derived hardcover frame around the spread (issue #53) — replaces
+  // the old hardcoded brown leather so the book matches every theme.
+  cover: string
+  coverBorder: string
 }
 
 function useDiaryPalette(): Palette {
   const { theme } = useThemeStore()
   const colors = getGlassDiaryColors(theme)
+
+  // The landing book always reads as paper — a warm, lightly theme-tinted
+  // page with a themed cover + accents. Three cases keep every theme legible
+  // (issue #53; Rivendell/Rain looked muddy under a single cream-mix rule):
+  //  • light themes        → soften the light page toward cream
+  //  • dark + own paper    → Rain ships a pale grey paper; use it as-is
+  //  • dark, no paper      → Rivendell/Hearth: warm parchment + dark ink,
+  //                          because their paper ink is light and would
+  //                          vanish on a light page.
+  let page: string
+  let ink: string
+  let inkSoft: string
+  let inkQuiet: string
+
+  if (theme.mode === 'light') {
+    page = `color-mix(in oklab, ${colors.pageBgSolid} 62%, #fbf5e2 38%)`
+    ink = colors.bodyText
+    inkSoft = colors.prompt
+    inkQuiet = colors.sectionLabel
+  } else if (theme.paper) {
+    page = colors.pageBgSolid
+    ink = colors.bodyText
+    inkSoft = colors.prompt
+    inkQuiet = colors.sectionLabel
+  } else {
+    page = `color-mix(in oklab, #ece4d0 90%, ${theme.accent.primary} 10%)`
+    ink = '#3a342a'
+    inkSoft = 'rgba(58, 52, 42, 0.72)'
+    inkQuiet = 'rgba(58, 52, 42, 0.55)'
+  }
+
   return {
-    // Soften the rose/sage saturation by mixing in cream paper at 38%.
-    // Reads as paper first, theme tint second.
-    page: `color-mix(in oklab, ${colors.pageBgSolid} 62%, #fbf5e2 38%)`,
+    page,
     pageEdge: colors.coverBorder,
-    ink: colors.bodyText,
-    inkSoft: colors.prompt,
-    inkQuiet: colors.sectionLabel,
+    ink,
+    inkSoft,
+    inkQuiet,
     accent: theme.accent.primary,
     thread: theme.accent.warm,
+    cover: colors.cover,
+    coverBorder: colors.coverBorder,
   }
 }
 
@@ -342,7 +377,7 @@ function PageContent({ spread, idx, palette: p }: { spread: Spread; idx: number;
           style={{
             flex: 1,
             position: 'relative',
-            background: '#fbf6e7',
+            background: p.page,
             padding: 14,
             borderRadius: 2,
             boxShadow: `0 1px 0 ${p.pageEdge}88, 0 14px 28px rgba(0,0,0,0.16), 0 4px 8px rgba(0,0,0,0.08)`,
@@ -613,14 +648,16 @@ export default function Diary() {
             rotateY: tilt.rotateY,
           }}
         >
-          {/* Brown leather frame — uniform on all four sides. */}
+          {/* Hardcover frame — theme-derived (issue #53), uniform on all
+              four sides. The crosshatch + inner shadows keep the leather
+              texture on whatever cover colour the theme provides. */}
           <div
             aria-hidden
             style={{
               position: 'absolute',
               inset: -14,
               borderRadius: 6,
-              background: '#3e2718',
+              background: palette.cover,
               backgroundImage:
                 'repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 5px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.06) 0 1px, transparent 1px 5px)',
               boxShadow:
