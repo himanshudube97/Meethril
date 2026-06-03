@@ -19,7 +19,13 @@ const GRACE_MS = 4 * DAY_MS // failed-payment grace window
 export function isPaidUser(user: {
   subscriptionStatus: string | null
   currentPeriodEnd: Date | null
+  // Friends & family / comps: full paid tier, no subscription, no expiry.
+  complimentaryAccess?: boolean | null
 }): boolean {
+  // Complimentary access trumps everything — entitled regardless of any
+  // subscription state. There is no expiry; revoke by clearing the flag.
+  if (user.complimentaryAccess) return true
+
   const status = user.subscriptionStatus
   if (!status) return false
 

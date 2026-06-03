@@ -17,6 +17,7 @@ export async function GET() {
         subscriptionStatus: true,
         dodoProductId: true,
         currentPeriodEnd: true,
+        complimentaryAccess: true,
       },
     })
 
@@ -29,8 +30,10 @@ export async function GET() {
 
     return NextResponse.json({
       isPremium: premium,
+      // Complimentary (friends & family) access: premium with no Dodo plan.
+      complimentary: dbUser.complimentaryAccess,
       plan,
-      status: dbUser.subscriptionStatus,
+      status: dbUser.complimentaryAccess ? 'complimentary' : dbUser.subscriptionStatus,
       currentPeriodEnd: dbUser.currentPeriodEnd,
     })
   } catch (error) {

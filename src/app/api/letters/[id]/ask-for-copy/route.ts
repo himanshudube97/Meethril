@@ -16,7 +16,7 @@ export async function POST(
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { name: true, subscriptionStatus: true, currentPeriodEnd: true },
+    select: { name: true, subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
   if (!dbUser) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   if (!isPaidUser(dbUser)) {

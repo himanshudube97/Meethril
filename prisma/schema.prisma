@@ -66,6 +66,12 @@ model User {
   dodoSubscriptionId String? @unique // Dodo subscription ID
   dodoProductId      String? // Dodo product ID — identifies monthly vs yearly plan
 
+  // Complimentary access (friends & family / comps). When true the user gets
+  // the full PAID feature tier with no Dodo subscription — isPaidUser() returns
+  // true regardless of subscriptionStatus. Toggle in Prisma Studio or via
+  // scripts/grant-comp.ts. No billing, no expiry.
+  complimentaryAccess Boolean @default(false)
+
   // E2EE fields
   e2eeEnabled                Boolean   @default(false)
   encryptedMasterKey         String? // Master key encrypted with daily key

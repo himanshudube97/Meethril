@@ -119,7 +119,7 @@ export async function checkQuota(
 ): Promise<QuotaResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { subscriptionStatus: true, currentPeriodEnd: true },
+    select: { subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
 
   const isPaid = user ? isPaidUser(user) : false

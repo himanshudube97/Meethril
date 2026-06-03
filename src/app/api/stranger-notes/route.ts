@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const tz = safeIanaTz(req.headers.get('X-User-TZ'))
   const dbUserForTier = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { subscriptionStatus: true, currentPeriodEnd: true },
+    select: { subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
   const dailyLimit = limitsFor(dbUserForTier ? isPaidUser(dbUserForTier) : false).strangerNotesPerDay
   const todaysCount = await countTodaysNewNotes(user.id, tz)
