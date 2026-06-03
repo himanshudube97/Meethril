@@ -36,28 +36,55 @@ it has been exercised on a live Dodo account yet.
 - Register the production webhook endpoint (`/api/webhooks/dodo`) in the Dodo
   dashboard against the production domain.
 
+### 4. Apply DB migrations on production (⚠️ migration history is drifted)
+Two new additive migrations must be on the production DB before the billing +
+comp-access code works:
+- `20260530000000_add_dodo_fields_and_webhook_ledger` — `dodo*` User columns + `processed_webhooks` table.
+- `20260603000000_add_complimentary_access` — `User.complimentaryAccess`.
+
+**Heads-up:** the **local** DB was kept in sync with `prisma db push`, not
+`migrate`, so its `_prisma_migrations` history is incomplete — `prisma migrate
+status` lists ~12 migrations as "not applied" even though the columns/tables
+exist. `migrate deploy` there would fail replaying already-existing objects.
+Before touching production:
+- [ ] Run `prisma migrate status` against **production** and confirm whether its
+      history is clean (sequential) or also drifted.
+- [ ] If clean → `prisma migrate deploy` applies just the two new migrations.
+- [ ] If drifted → do NOT blindly `migrate deploy`. Either `prisma db push`
+      (additive, safe — what we did locally) or `prisma migrate resolve
+      --applied <name>` to baseline the already-present migrations first.
+- [ ] After applying, verify: `users.complimentaryAccess` exists and
+      `processed_webhooks` / `dodo*` columns exist.
+
 ---
 
 ## 🟡 Should do before launch
 
-### 4. Legal pages reviewed
+### 5. Legal pages reviewed
 `src/lib/legal.ts` carries `TODO` placeholders (legal entity, jurisdiction). The
 processor list now names **Dodo Payments** as Merchant of Record — confirm that
 matches your signed Dodo agreement. Have a human review `/privacy` and `/terms`.
 
-### 5. Drop legacy Lemon Squeezy DB columns
+### 6. Drop legacy Lemon Squeezy DB columns
 The LS code is gone, but the `User` table still has `lemonSqueezyCustomerId`,
 `subscriptionId`, etc. (kept per the additive-only migration rule). Once Dodo is
 verified in production, write a cleanup migration to drop them. Until then they
 are harmless dead columns.
 
-### 6. Confirm production cron secrets / schedules
+### 7. Confirm production cron secrets / schedules
 `CRON_SECRET` set; letter-delivery and stranger-thread crons scheduled.
+
+### 8. (Optional) Grant comp access to your friends & family
+Once they've signed up on production:
+`npx tsx scripts/grant-comp.ts <email>` (or toggle `complimentaryAccess` in
+Prisma Studio). `--list` to audit, `--revoke` to remove.
 
 ---
 
-## ✅ Already handled
+## ✅ Already handled / verified
 - Dodo webhook signature verify + idempotency (`ProcessedWebhook`) + order-independent state writes.
 - Billing-anchored usage limits (free vs paid) enforced server-side on all create routes.
 - Failed-payment 4-day grace + 2-day renewal leeway in `isPaidUser`.
 - Privacy/terms/subprocessor list updated from Lemon Squeezy → Dodo Payments.
+- Complimentary (friends & family) full-access flag — migration applied **locally**
+  and grant/list/revoke script smoke-tested. Still needs applying on production (item 4).

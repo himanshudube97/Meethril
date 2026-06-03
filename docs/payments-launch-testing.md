@@ -91,6 +91,9 @@ scrapbooks 30/mo, self 10/mo, friend 20/mo, stranger 5/day.
 
 ## Phase 5 — Production cutover
 
+- [ ] **Apply DB migrations on production** (`dodo_fields_and_webhook_ledger`,
+  `add_complimentary_access`). ⚠️ Migration history is drifted — see
+  [`pre-launch-checklist.md`](./pre-launch-checklist.md) item 4 for the safe path.
 - [ ] `DODO_ENVIRONMENT=live_mode` + live API key + live product IDs + live
   webhook secret + production webhook endpoint registered.
 - [ ] Revert the letter 7-day minimum (see [`pre-launch-checklist.md`](./pre-launch-checklist.md), `TEST-PILL`).
