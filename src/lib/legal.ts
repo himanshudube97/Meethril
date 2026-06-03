@@ -44,7 +44,7 @@ export const legal = {
   processors: [
     { name: 'Supabase', purpose: 'Authentication & database hosting', link: 'https://supabase.com/privacy' },
     { name: 'Vercel', purpose: 'Application hosting & delivery', link: 'https://vercel.com/legal/privacy-policy' },
-    { name: 'Lemon Squeezy', purpose: 'Payments & subscription billing (Merchant of Record)', link: 'https://www.lemonsqueezy.com/privacy' },
+    { name: 'Dodo Payments', purpose: 'Payments & subscription billing (Merchant of Record)', link: 'https://dodopayments.com/privacy-policy' },
     { name: 'Resend', purpose: 'Transactional & notification email', link: 'https://resend.com/legal/privacy-policy' },
   ],
 } as const

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { createCheckoutUrl, LEMONSQUEEZY_VARIANTS } from '@/lib/lemonsqueezy'
+import { createCheckoutUrl } from '@/lib/dodo'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,26 +16,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 })
     }
 
-    const variantId = LEMONSQUEEZY_VARIANTS[priceId as keyof typeof LEMONSQUEEZY_VARIANTS]
-    if (!variantId) {
-      return NextResponse.json(
-        { error: 'Variant not configured' },
-        { status: 500 }
-      )
-    }
-
     const checkoutUrl = await createCheckoutUrl(
-      variantId,
+      priceId,
       user.id,
       user.email,
-      user.name || undefined
+      user.name || undefined,
     )
 
     if (!checkoutUrl) {
-      return NextResponse.json(
-        { error: 'Failed to create checkout' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to create checkout' }, { status: 500 })
     }
 
     return NextResponse.json({ url: checkoutUrl })
@@ -43,7 +32,7 @@ export async function POST(request: NextRequest) {
     console.error('Checkout error:', error)
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

@@ -5,6 +5,8 @@ import type { StrokeData } from '@/store/journal'
 import type { EntryStyle } from '@/lib/entry-style'
 import { useDeskStore, type AutosaveStatus } from '@/store/desk'
 import { getClientTz } from '@/lib/entry-lock-client'
+import { parseLimitError } from '@/lib/billing/limit-error'
+import { useLimitPromptStore } from '@/store/limit-prompt'
 import { useE2EE } from './useE2EE'
 
 const DEBOUNCE_MS = 1500
@@ -229,6 +231,15 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
 
       // Lock-violation: don't retry, surface error.
       if (res.status === 403) {
+        inFlightRef.current = false
+        if (mountedRef.current) setStatus('error')
+        return
+      }
+
+      // Monthly quota reached: don't retry, pop the upgrade prompt.
+      if (res.status === 429) {
+        const limit = await parseLimitError(res)
+        if (limit) useLimitPromptStore.getState().show(limit)
         inFlightRef.current = false
         if (mountedRef.current) setStatus('error')
         return

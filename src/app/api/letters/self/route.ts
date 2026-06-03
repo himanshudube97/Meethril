@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
+import { checkQuota, quotaExceededResponse } from '@/lib/billing/quota'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,6 +50,12 @@ export async function POST(request: NextRequest) {
   if (scheduledFor.getTime() < Date.now() + oneHourMs - 60_000) {
     return NextResponse.json({ error: 'scheduledFor too soon (min 1 hour)' }, { status: 400 })
   }
+
+  // Monthly quota for sealed self-letters (free: 2/mo; paid: 10/mo). Promoting
+  // a draft seals it, so it counts the same as a fresh sealed letter.
+  const tz = request.headers.get('x-user-tz') ?? 'UTC'
+  const quota = await checkQuota(user.id, 'letterSelf', tz)
+  if (!quota.allowed) return quotaExceededResponse(quota)
 
   let letter: { id: string; scheduledFor: Date | null; createdAt: Date }
 

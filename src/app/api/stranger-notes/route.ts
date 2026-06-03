@@ -6,9 +6,10 @@ import {
   encryptServerTier,
   countTodaysNewNotes,
   hasWrittenJournalEntry,
-  DAILY_NEW_NOTE_LIMIT,
   safeIanaTz,
 } from '@/lib/stranger-notes'
+import { isPaidUser } from '@/lib/billing/is-paid-user'
+import { limitsFor } from '@/lib/billing/limits'
 import { pickRandomRecipient, deliverThreadToRecipient } from '@/lib/stranger-matcher'
 import { generateDisplayName } from '@/lib/stranger-names'
 import { moderateText } from '@/lib/moderation'
@@ -48,10 +49,15 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Daily limit
+  // Daily limit — tier-dependent (free: 1/day, paid: 5/day).
   const tz = safeIanaTz(req.headers.get('X-User-TZ'))
+  const dbUserForTier = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { subscriptionStatus: true, currentPeriodEnd: true },
+  })
+  const dailyLimit = limitsFor(dbUserForTier ? isPaidUser(dbUserForTier) : false).strangerNotesPerDay
   const todaysCount = await countTodaysNewNotes(user.id, tz)
-  if (todaysCount >= DAILY_NEW_NOTE_LIMIT) {
+  if (todaysCount >= dailyLimit) {
     return NextResponse.json(
       { error: 'Your lights are on their way. Come back tomorrow.' },
       { status: 429 }

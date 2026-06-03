@@ -13,6 +13,8 @@ import { useProfileStore } from '@/store/profile'
 import { useE2EEStore } from '@/store/e2ee'
 import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
+import { parseLimitError, limitMessage } from '@/lib/billing/limit-error'
+import { useLimitPromptStore } from '@/store/limit-prompt'
 import { buildSelfLetterPayload } from '@/lib/letters/self-letter-client'
 import { buildFriendLetterPayload } from '@/lib/letters/friend-letter-client'
 import { decryptLetterDraft, type LetterDraftWire } from '@/lib/letters/draft-decrypt'
@@ -271,6 +273,11 @@ export default function ComposeView() {
         body: JSON.stringify({ ...payload, draftLetterId }),
       })
       if (!res.ok) {
+        const limit = await parseLimitError(res)
+        if (limit) {
+          useLimitPromptStore.getState().show(limit)
+          throw new Error(limitMessage(limit))
+        }
         const json = await res.json().catch(() => ({}))
         throw new Error(json.error ?? 'Could not save self letter.')
       }
@@ -336,6 +343,11 @@ export default function ComposeView() {
         body: JSON.stringify({ ...payload, draftLetterId }),
       })
       if (!res.ok) {
+        const limit = await parseLimitError(res)
+        if (limit) {
+          useLimitPromptStore.getState().show(limit)
+          throw new Error(limitMessage(limit))
+        }
         const json = await res.json().catch(() => ({}))
         throw new Error(json.error ?? 'Could not send friend letter.')
       }

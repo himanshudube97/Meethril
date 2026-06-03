@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { sendFriendLetterEmail } from '@/lib/email'
+import { checkQuota, quotaExceededResponse } from '@/lib/billing/quota'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,6 +96,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invalid asset shape' }, { status: 400 })
     }
   }
+
+  // Monthly quota for sealed friend-letters (free: 10/mo; paid: 20/mo). Checked
+  // before we create rows or send the email so a blocked send costs nothing.
+  const tz = request.headers.get('x-user-tz') ?? 'UTC'
+  const quota = await checkQuota(user.id, 'letterFriend', tz)
+  if (!quota.allowed) return quotaExceededResponse(quota)
 
   // Derive senderName server-side. Prefer profile.nickname (the user-set
   // display name) and fall back to User.name. Never trust a client-supplied

@@ -63,7 +63,7 @@ export default function PrivacyPage() {
 
       <h3>Billing information</h3>
       <p>
-        Payments are processed by Lemon Squeezy, our Merchant of Record. We do not see
+        Payments are processed by Dodo Payments, our Merchant of Record. We do not see
         or store your full card details. We retain a subscription status and billing
         identifiers so we know whether your account is active.
       </p>

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { isPremium, LEMONSQUEEZY_VARIANTS } from '@/lib/lemonsqueezy'
+import { planFromProductId } from '@/lib/dodo'
+import { isPaidUser } from '@/lib/billing/is-paid-user'
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
       where: { id: user.id },
       select: {
         subscriptionStatus: true,
-        variantId: true,
+        dodoProductId: true,
         currentPeriodEnd: true,
       },
     })
@@ -23,15 +24,8 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const premium = isPremium(dbUser.subscriptionStatus, dbUser.currentPeriodEnd)
-
-    // Determine plan type from variantId
-    let plan: 'monthly' | 'yearly' | null = null
-    if (dbUser.variantId === LEMONSQUEEZY_VARIANTS.monthly) {
-      plan = 'monthly'
-    } else if (dbUser.variantId === LEMONSQUEEZY_VARIANTS.yearly) {
-      plan = 'yearly'
-    }
+    const premium = isPaidUser(dbUser)
+    const plan = planFromProductId(dbUser.dodoProductId)
 
     return NextResponse.json({
       isPremium: premium,
@@ -43,7 +37,7 @@ export async function GET() {
     console.error('Subscription status error:', error)
     return NextResponse.json(
       { error: 'Failed to get subscription status' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

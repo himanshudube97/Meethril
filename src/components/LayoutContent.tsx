@@ -8,6 +8,7 @@ import PageTransition from '@/components/PageTransition'
 import DeskSettingsPanel from '@/components/desk/DeskSettingsPanel'
 import AmbientSoundLayer from '@/components/AmbientSoundLayer'
 import { InstallPrompt } from '@/components/InstallPrompt'
+import LimitReachedModal from '@/components/billing/LimitReachedModal'
 import FullscreenButton from '@/components/FullscreenButton'
 import FullscreenPrompt from '@/components/FullscreenPrompt'
 import { useThemeStore } from '@/store/theme'
@@ -128,6 +129,7 @@ export default function LayoutContent({
         <FullscreenButton />
         <DeskSettingsPanel />
         <InstallPrompt />
+        <LimitReachedModal />
       </>
     )
   }

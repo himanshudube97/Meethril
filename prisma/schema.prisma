@@ -45,12 +45,26 @@ model User {
   strangerBlocksInitiated  StrangerBlock[]   @relation("StrangerBlocksInitiated")
   strangerBlocksReceived   StrangerBlock[]   @relation("StrangerBlocksReceived")
 
-  // Lemon Squeezy subscription fields
+  // Lemon Squeezy subscription fields (DEPRECATED — kept until a follow-up
+  // cleanup migration once Dodo is verified in production. Do not write these.)
   lemonSqueezyCustomerId String?   @unique
-  subscriptionId         String?   @unique
-  subscriptionStatus     String? // "active", "cancelled", "past_due", "on_trial", "paused"
-  variantId              String? // which variant/plan they subscribed to
-  currentPeriodEnd       DateTime? // when current billing period ends (renews_at)
+  subscriptionId         String?   @unique // legacy: stored LS sub IDs
+  variantId              String? // legacy: stored LS variant IDs
+
+  // Provider-agnostic subscription state. Reused across Lemon Squeezy → Dodo:
+  //  - subscriptionStatus now holds Dodo status strings:
+  //    "active" | "on_hold" | "cancelled" | "expired" | "pending"
+  //  - currentPeriodEnd now holds Dodo's `next_billing_date` (the forward
+  //    billing date). It is BOTH the access-expiry reference AND the source of
+  //    the monthly quota anchor day. Grace/leeway is applied in isPaidUser(),
+  //    never baked into this stored value.
+  subscriptionStatus     String?
+  currentPeriodEnd       DateTime?
+
+  // Dodo Payments subscription fields
+  dodoCustomerId     String? @unique // Dodo customer ID
+  dodoSubscriptionId String? @unique // Dodo subscription ID
+  dodoProductId      String? // Dodo product ID — identifies monthly vs yearly plan
 
   // E2EE fields
   e2eeEnabled                Boolean   @default(false)
@@ -63,6 +77,18 @@ model User {
   e2eeSetupAt                DateTime?
 
   @@map("users")
+}
+
+/// Webhook idempotency ledger. Dodo (Standard Webhooks) may retry up to 8× and
+/// deliver out of order, so every incoming webhook is recorded by its unique
+/// `webhook-id` header before we mutate subscription state. A duplicate insert
+/// fails the unique PK and the handler short-circuits with a 200.
+model ProcessedWebhook {
+  id          String   @id // the `webhook-id` header value
+  eventType   String? // e.g. "subscription.renewed" — for debugging only
+  processedAt DateTime @default(now())
+
+  @@map("processed_webhooks")
 }
 
 model JournalEntry {

@@ -10,7 +10,6 @@ const PUBLIC_PATHS = [
   '/api/auth',
   '/api/cron',
   '/api/webhooks',
-  '/api/webhooks/lemonsqueezy',
   '/api/letter',
   '/api/download',
   '/letter',

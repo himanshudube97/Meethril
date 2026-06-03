@@ -57,7 +57,7 @@ export default function TermsPage() {
 
       <h2>Subscriptions, billing &amp; refunds</h2>
       <p>
-        Some features require a paid subscription. Payments are processed by Lemon Squeezy,
+        Some features require a paid subscription. Payments are processed by Dodo Payments,
         our Merchant of Record, and are subject to their terms at checkout.
       </p>
       <ul>

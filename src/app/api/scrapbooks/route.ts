@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { checkQuota, quotaExceededResponse } from '@/lib/billing/quota'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -50,6 +51,11 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     )
   }
+
+  // Monthly quota (free: 10/mo; paid: 30/mo).
+  const tz = req.headers.get('x-user-tz') ?? 'UTC'
+  const quota = await checkQuota(user.id, 'scrapbook', tz)
+  if (!quota.allowed) return quotaExceededResponse(quota)
 
   const created = await prisma.scrapbook.create({
     data: {

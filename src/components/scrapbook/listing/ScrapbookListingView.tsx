@@ -22,6 +22,8 @@ import {
 import { makeDateItem } from '@/lib/scrapbook'
 import { useE2EEStore } from '@/store/e2ee'
 import { encryptString } from '@/lib/e2ee/crypto'
+import { parseLimitError } from '@/lib/billing/limit-error'
+import { useLimitPromptStore } from '@/store/limit-prompt'
 
 /**
  * Memory-chest listing scene for /scrapbook. Mirrors the Letters page
@@ -97,7 +99,15 @@ export default function ScrapbookListingView() {
           e2eeIVs: { items: itemsEnc.iv },
         }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const limit = await parseLimitError(res)
+        if (limit) {
+          useLimitPromptStore.getState().show(limit)
+          setCreating(false)
+          return
+        }
+        throw new Error(`HTTP ${res.status}`)
+      }
       const created = await res.json()
       router.push(`/scrapbook/${created.id}`)
     } catch (err) {

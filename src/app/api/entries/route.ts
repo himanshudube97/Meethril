@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { isEntryLocked, utcInstantForLocalDate, localDatePartsNow } from '@/lib/entry-lock'
 import { parseStyle } from '@/lib/entry-style'
+import { checkQuota, quotaExceededResponse } from '@/lib/billing/quota'
 
 // GET - Fetch entries with pagination and filters
 export async function GET(request: NextRequest) {
@@ -179,6 +180,10 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
+
+    // Monthly quota (free: 15/mo; paid: unlimited beyond the 1/day rule above).
+    const quota = await checkQuota(user.id, 'journal', userTz)
+    if (!quota.allowed) return quotaExceededResponse(quota)
 
     // All entries are E2EE: text and textPreview arrive as ciphertext from the client.
     // Store them as-is; the server never encrypts or decrypts entry content.

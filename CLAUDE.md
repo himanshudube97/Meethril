@@ -63,7 +63,7 @@ npm run lint     # ESLint check
 - **Editor**: TipTap rich text editor
 - **Animations**: Framer Motion v12
 - **State**: Zustand stores
-- **Payments**: Lemon Squeezy
+- **Payments**: Dodo Payments (Merchant of Record)
 - **Email**: Resend
 - **Auth**: Dev JWT (local) / Supabase OAuth (production)
 
@@ -81,13 +81,14 @@ src/
 │   ├── db.ts         # Prisma singleton
 │   ├── encryption.ts # AES-256-GCM encrypt/decrypt
 │   ├── themes.ts     # 10 themes with colors, particles, whispers
-│   ├── lemonsqueezy.ts
+│   ├── dodo.ts       # Dodo Payments client, checkout, portal, webhook verify
+│   ├── billing/      # is-paid-user, limits, quota (billing-anchored usage caps)
 │   └── email.ts      # HTML email templates
 └── store/            # Zustand: theme, auth, cursor, journal, profile
 ```
 
 ### Database Models (Prisma)
-- **User**: Auth, profile JSON, Lemon Squeezy subscription fields
+- **User**: Auth, profile JSON, Dodo subscription fields (`dodoCustomerId`, `dodoSubscriptionId`, `dodoProductId`, `subscriptionStatus`, `currentPeriodEnd`); legacy Lemon Squeezy columns retained but unused
 - **JournalEntry**: Core model with mood (0-4), entryType (normal/letter/unsent_letter/ephemeral), encryption fields, letter-specific fields (recipientEmail, unlockDate, isSealed, isDelivered)
 - **Doodle**: Strokes as JSON, linked to entries
 
@@ -194,12 +195,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 # Encryption
 ENCRYPTION_KEY=<64 hex chars: openssl rand -hex 32>
 
-# Payments
-LEMONSQUEEZY_API_KEY=...
-LEMONSQUEEZY_STORE_ID=...
-LEMONSQUEEZY_VARIANT_MONTHLY=...
-LEMONSQUEEZY_VARIANT_YEARLY=...
-LEMONSQUEEZY_WEBHOOK_SECRET=...
+# Payments — Dodo Payments
+DODO_API_KEY=...
+DODO_ENVIRONMENT=test_mode   # test_mode | live_mode
+DODO_PRODUCT_MONTHLY=...      # Dodo product id for the monthly plan
+DODO_PRODUCT_YEARLY=...       # Dodo product id for the yearly plan
+DODO_WEBHOOK_SECRET=...       # Standard Webhooks signing secret (whsec_...)
 
 # Email & Cron
 RESEND_API_KEY=...
