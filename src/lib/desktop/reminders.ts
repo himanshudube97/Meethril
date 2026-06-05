@@ -14,7 +14,7 @@ export async function enableDesktopReminders(): Promise<void> {
   const { token } = await res.json()
   if (!token || typeof token !== 'string') throw new Error('Desktop token missing')
   await invoke('save_desktop_token', { token })
-  await invoke('install_reminder_agent')
+  await invoke('install_reminder_agent', { baseUrl: window.location.origin })
 }
 
 export async function disableDesktopReminders(): Promise<void> {

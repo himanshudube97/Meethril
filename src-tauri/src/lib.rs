@@ -59,8 +59,8 @@ fn save_desktop_token(token: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn install_reminder_agent() -> Result<(), String> {
-  launchd::install()
+fn install_reminder_agent(base_url: String) -> Result<(), String> {
+  launchd::install(&base_url)
 }
 
 #[tauri::command]
