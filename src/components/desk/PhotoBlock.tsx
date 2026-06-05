@@ -155,7 +155,7 @@ const PhotoBlock = memo(function PhotoBlock({
         transition={{ delay: 0.1 }}
       >
         {/* Photo 1 — overlaps left in scattered mode; sits in a row otherwise */}
-        <div className="relative z-10" style={{ marginRight: isRow ? 0 : '-12px' }}>
+        <div className="relative z-10" style={{ marginRight: isRow ? 0 : '-8px' }}>
           <PhotoSlot
             photo={photo1}
             position={1}
@@ -170,7 +170,7 @@ const PhotoBlock = memo(function PhotoBlock({
         </div>
 
         {/* Photo 2 — overlaps right in scattered mode; sits in a row otherwise */}
-        <div className="relative z-0" style={{ marginLeft: isRow ? 0 : '-12px', marginTop: isRow ? 0 : '8px' }}>
+        <div className="relative z-0" style={{ marginLeft: isRow ? 0 : '-8px', marginTop: isRow ? 0 : '8px' }}>
           <PhotoSlot
             photo={photo2}
             position={2}
