@@ -23,6 +23,14 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return out
 }
 
+async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  await fetch('/api/me/profile-flags', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remindersEnabled: enabled }),
+  }).catch(() => {})
+}
+
 export function useReminders(): UseRemindersResult {
   const pushSupported = typeof window !== 'undefined'
     && 'serviceWorker' in navigator
@@ -103,6 +111,7 @@ export function useReminders(): UseRemindersResult {
     if (!res.ok) return { ok: false, error: 'server-error' }
 
     setSubscribed(true)
+    await setRemindersEnabled(true)
     return { ok: true }
   }, [pushSupported])
 
@@ -121,6 +130,7 @@ export function useReminders(): UseRemindersResult {
     }).catch(() => {})
     await sub.unsubscribe()
     setSubscribed(false)
+    await setRemindersEnabled(false)
   }, [pushSupported])
 
   const setReminderTime = useCallback(async (mode: ReminderTimeMode) => {

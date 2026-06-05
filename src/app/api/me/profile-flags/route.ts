@@ -7,6 +7,7 @@ const ALLOWED_KEYS = new Set([
   'reminderTime',
   'reminderOptInPromptShownAt',
   'lastComebackShownAt',
+  'remindersEnabled',
 ])
 
 export async function GET() {
