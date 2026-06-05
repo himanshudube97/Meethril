@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       isSealed: true,
       recipientEmail: null,
       unlockDate: { lte: now },
+      isViewed: false,
     },
     orderBy: { unlockDate: 'asc' },
   })
