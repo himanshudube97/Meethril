@@ -33,6 +33,7 @@ interface CompactDoodleCanvasProps {
   canvasBorder: string
   textColor: string
   mutedColor: string
+  readOnly?: boolean
 }
 
 const CompactDoodleCanvas = memo(function CompactDoodleCanvas({
@@ -43,6 +44,7 @@ const CompactDoodleCanvas = memo(function CompactDoodleCanvas({
   canvasBorder,
   textColor,
   mutedColor,
+  readOnly = false,
 }: CompactDoodleCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [localStrokes, setLocalStrokes] = useState<StrokeData[]>(strokes)
@@ -189,6 +191,7 @@ const CompactDoodleCanvas = memo(function CompactDoodleCanvas({
   return (
     <div className="flex flex-col h-full">
       {/* Compact Toolbar */}
+      {!readOnly && (
       <div className="flex items-center gap-1 mb-1">
         {brushes.map((brush, index) => (
           <button
@@ -249,6 +252,7 @@ const CompactDoodleCanvas = memo(function CompactDoodleCanvas({
           ×
         </button>
       </div>
+      )}
 
       {/* Canvas */}
       <div
@@ -257,19 +261,19 @@ const CompactDoodleCanvas = memo(function CompactDoodleCanvas({
         style={{
           background: canvasBackground,
           border: `1px solid ${canvasBorder}`,
-          cursor: isErasing ? 'cell' : 'crosshair',
+          cursor: readOnly ? 'default' : isErasing ? 'cell' : 'crosshair',
           minHeight: '100px',
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerDown={readOnly ? undefined : handlePointerDown}
+        onPointerMove={readOnly ? undefined : handlePointerMove}
+        onPointerUp={readOnly ? undefined : handlePointerUp}
+        onPointerLeave={readOnly ? undefined : handlePointerUp}
       >
         <svg className="absolute inset-0 w-full h-full">
           {localStrokes.map((stroke, index) => renderStroke(stroke, index))}
           {renderCurrentStroke()}
         </svg>
-        {localStrokes.length === 0 && !isDrawing && (
+        {localStrokes.length === 0 && !isDrawing && !readOnly && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <span className="text-sm italic" style={{ color: mutedColor, opacity: 0.65 }}>Draw here</span>
           </div>
