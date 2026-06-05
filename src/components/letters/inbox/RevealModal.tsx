@@ -1,9 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import type { InboxLetter } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
-import type { JournalEntry } from '@/store/journal'
+import { useThemeStore } from '@/store/theme'
+import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
+import { PostcardFront } from '../compose/PostcardFront'
+import { PostcardBack } from '../compose/PostcardBack'
+import type { Photo } from '@/components/desk/PhotoBlock'
+import type { StrokeData, JournalEntry } from '@/store/journal'
 
 interface Props {
   letter: InboxLetter | null
@@ -14,19 +20,69 @@ interface Props {
 
 type Phase = 'sealed' | 'breaking' | 'opening' | 'shown'
 
+interface LetterContent {
+  text: string
+  song: string | null
+  photos: Photo[]
+  doodleStrokes: StrokeData[]
+}
+
 export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
   const [phase, setPhase] = useState<Phase>('sealed')
-  const [body, setBody] = useState<string>('')
+  const [content, setContent] = useState<LetterContent>({
+    text: '', song: null, photos: [], doodleStrokes: [],
+  })
+  const [face, setFace] = useState<'front' | 'back'>('front')
   const { decryptEntryFromServer, isE2EEReady } = useE2EE()
+  const theme = useThemeStore((s) => s.theme)
+  const diaryColors = getGlassDiaryColors(theme)
 
   useEffect(() => {
     if (!letter) return
     setPhase(letter.isViewed ? 'shown' : 'sealed')
-    setBody('')
+    setFace('front')
+    setContent({ text: '', song: null, photos: [], doodleStrokes: [] })
 
-    // Prefer the ciphertext/text that is included inline in the inbox response
-    // (added in Phase 4). This avoids a /api/entries/[id] roundtrip that would
-    // 404 for native self-letters whose id is a Letter.id with no JournalEntry.
+    // Self letters (new flow) encrypt a JSON blob `{text, song, photos,
+    // doodleStrokes}`. Legacy / friend letters decrypt to a plain string and
+    // only fill `text`.
+    const apply = (raw: string) => {
+      if (raw.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(raw) as {
+            text?: unknown
+            song?: unknown
+            photos?: unknown
+            doodleStrokes?: unknown
+          }
+          setContent({
+            text: typeof parsed.text === 'string' ? parsed.text : '',
+            song: typeof parsed.song === 'string' ? parsed.song : null,
+            photos: Array.isArray(parsed.photos)
+              ? (parsed.photos as Array<Record<string, unknown>>)
+                  .filter((p) => p.position === 1 || p.position === 2)
+                  .map((p) => ({
+                    url: (p.url as string) ?? undefined,
+                    encryptedRef: (p.encryptedRef as string) ?? undefined,
+                    encryptedRefIV: (p.encryptedRefIV as string) ?? undefined,
+                    rotation: typeof p.rotation === 'number' ? p.rotation : 0,
+                    position: p.position as 1 | 2,
+                  }))
+              : [],
+            doodleStrokes: Array.isArray(parsed.doodleStrokes)
+              ? (parsed.doodleStrokes as StrokeData[])
+              : [],
+          })
+          return
+        } catch {
+          // not JSON — fall through to plain text
+        }
+      }
+      setContent({ text: raw, song: null, photos: [], doodleStrokes: [] })
+    }
+
+    // Prefer the ciphertext/text included inline in the inbox response — this
+    // avoids a /api/entries/[id] roundtrip that 404s for native self-letters.
     if (letter.text !== undefined) {
       const inlineEntry = {
         id: letter.id,
@@ -35,39 +91,21 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
         e2eeIVs: letter.e2eeIVs,
       } as unknown as JournalEntry
       decryptEntryFromServer(inlineEntry)
-        .then(decrypted => {
-          // Self-letters (new flow) encrypt a JSON blob `{text, song,
-          // photos, doodles}` as one string. After decrypt, the result IS
-          // that JSON. Parse it and surface the inner text. Legacy / friend
-          // letters whose body is plain text decrypt to a non-JSON string
-          // and skip the parse.
-          let body = (decrypted?.text || '').toString()
-          if (body.startsWith('{')) {
-            try {
-              const parsed = JSON.parse(body) as { text?: unknown }
-              if (typeof parsed.text === 'string') body = parsed.text
-            } catch {
-              // not JSON — fall through and show the raw decrypted string
-            }
-          }
-          setBody(body)
-        })
-        .catch(() => setBody(''))
+        .then((decrypted) => apply((decrypted?.text || '').toString()))
+        .catch(() => apply(''))
       return
     }
 
     // Legacy fallback: fetch from /api/entries/[id] for older letters that
-    // don't carry inline text. Only applies to JournalEntry-anchored rows
-    // (where letter.id is a JournalEntry.id).
+    // don't carry inline text.
     fetch(`/api/entries/${letter.id}`)
-      .then(r => r.json())
-      .then(async d => {
+      .then((r) => r.json())
+      .then(async (d) => {
         const entry = (d?.entry || d) as JournalEntry
-        // Decrypt E2EE entry client-side; non-e2ee passes through unchanged.
         const decrypted = await decryptEntryFromServer(entry)
-        setBody((decrypted?.text || '').toString())
+        apply((decrypted?.text || '').toString())
       })
-      .catch(() => setBody(''))
+      .catch(() => apply(''))
   }, [letter, decryptEntryFromServer, isE2EEReady])
 
   useEffect(() => {
@@ -104,39 +142,95 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
 
   const sealed = phase === 'sealed'
   const flapOpen = phase === 'opening' || phase === 'shown'
-  const letterShown = phase === 'shown'
+  const postcardShown = phase === 'shown'
+  const salutationName = (letter.recipientName ?? 'future me').replace(/^to /, '')
+  const cardRotateY = face === 'back' ? 180 : 0
 
   return (
     <div
       className="reveal-overlay open"
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <button className="reveal-close" onClick={onClose} aria-label="close">×</button>
 
-      <div className="reveal-stage">
-        <div className="reveal-meta">
-          a letter <span className="from">from past you</span> · sealed {sealedLabel(letter.sealedAt)}
-        </div>
+      {/* ENVELOPE STAGE — the sealed letter + seal-break gesture. Hidden once
+          the postcard is shown (the envelope "becomes" the letter). */}
+      {!postcardShown && (
+        <div className="reveal-stage">
+          <div className="reveal-meta">
+            a letter <span className="from">from past you</span> · sealed {sealedLabel(letter.sealedAt)}
+          </div>
 
-        <div className={`reveal-env phase-${phase}`} onClick={breakSeal}>
-          <div className="env-back" />
-          <div className={`env-letter${letterShown ? ' shown' : ''}`}>
-            <div className="letter-salutation">{salutationFor(letter)}</div>
-            <div className="letter-body">{body}</div>
-            <div className="letter-sig">
-              yours, <span style={{ textDecoration: 'underline dotted' }}>me</span>
+          <div className={`reveal-env phase-${phase}`} onClick={breakSeal}>
+            <div className="env-back" />
+            <div className={`env-flap${flapOpen ? ' opened' : ''}`} />
+            <div className={`env-seal${!sealed ? ' broken' : ''}`}>
+              <div className={`wax-half left${!sealed ? ' broken' : ''}`} />
+              <div className={`wax-half right${!sealed ? ' broken' : ''}`} />
+              <div className="seal-mark">✦</div>
             </div>
           </div>
-          <div className={`env-flap${flapOpen ? ' opened' : ''}`} />
-          <div className={`env-seal${!sealed ? ' broken' : ''}`}>
-            <div className={`wax-half left${!sealed ? ' broken' : ''}`} />
-            <div className={`wax-half right${!sealed ? ' broken' : ''}`} />
-            <div className="seal-mark">✦</div>
-          </div>
-        </div>
 
-        {sealed && <div className="reveal-prompt">tap to break the seal</div>}
-      </div>
+          {sealed && <div className="reveal-prompt">tap to break the seal</div>}
+        </div>
+      )}
+
+      {/* POSTCARD STAGE — the exact card the user wrote, read-only + flippable. */}
+      {postcardShown && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.2, 0.7, 0.2, 1] }}
+          style={{ perspective: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* Leather blotter — same theme cover token as the compose view. */}
+          <div
+            style={{
+              position: 'relative',
+              padding: '20px 26px',
+              borderRadius: 14,
+              backgroundColor: diaryColors.cover,
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 6px)',
+              border: `1px solid ${diaryColors.coverBorder}`,
+              boxShadow:
+                'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25), 0 35px 70px rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.28)',
+            }}
+          >
+            <motion.div
+              style={{
+                width: 'min(760px, calc(100vw - 48px))',
+                height: 'min(860px, calc(100vh - 104px))',
+                position: 'relative',
+                transformStyle: 'preserve-3d',
+              }}
+            >
+              <motion.div
+                animate={{ rotateY: cardRotateY }}
+                transition={{ duration: 0.85, ease: [0.45, 0.05, 0.15, 1] }}
+                style={{ width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d' }}
+              >
+                <PostcardFront
+                  readOnly
+                  active={face === 'front'}
+                  salutationName={salutationName}
+                  body={content.text}
+                  onTurnOver={() => setFace('back')}
+                  createdAt={new Date(letter.sealedAt)}
+                />
+                <PostcardBack
+                  readOnly
+                  active={face === 'back'}
+                  photos={content.photos}
+                  doodleStrokes={content.doodleStrokes}
+                  song={content.song}
+                  onTurnBack={() => setFace('front')}
+                />
+              </motion.div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
 
       <style jsx>{`
         .reveal-overlay {
@@ -310,52 +404,6 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
           100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.4); }
         }
 
-        .env-letter {
-          position: absolute;
-          left: 8%; right: 8%;
-          bottom: 8%;
-          height: 70%;
-          background:
-            repeating-linear-gradient(transparent, transparent 22px,
-              rgba(120,90,50,0.15) 22px, rgba(120,90,50,0.15) 23px),
-            var(--paper-cream, #f4ead0);
-          border-radius: 2px;
-          padding: 14px 16px 12px;
-          font-family: 'Caveat', cursive;
-          color: #1f2750;
-          text-align: left;
-          line-height: 23px;
-          overflow: hidden;
-          transform-origin: bottom center;
-          transform: translateY(0) scale(0.85);
-          opacity: 0;
-          box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
-          transition:
-            transform 1.1s cubic-bezier(.3, .8, .3, 1) 0.6s,
-            opacity 0.8s ease 0.6s,
-            width 0.6s ease 0.6s;
-          z-index: 2;
-        }
-        .env-letter.shown {
-          z-index: 10;
-          opacity: 1;
-          transform: translateY(-220px) scale(2.2);
-          pointer-events: auto;
-        }
-        .env-letter .letter-salutation {
-          font-size: 15px;
-          margin-bottom: 5px;
-        }
-        .env-letter .letter-body {
-          font-size: 11px;
-          line-height: 17px;
-        }
-        .env-letter .letter-sig {
-          margin-top: 8px;
-          font-size: 12px;
-          text-align: right;
-        }
-
         .reveal-prompt {
           color: rgba(255, 240, 210, 0.7);
           font-family: 'Cormorant Garamond', serif;
@@ -391,10 +439,4 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
 
 function sealedLabel(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function salutationFor(l: InboxLetter): string {
-  const r = l.recipientName ?? 'future me'
-  if (r.startsWith('to ')) return `Dear ${r.slice(3)},`
-  return r === 'future me' ? 'Dear future me,' : `Dear ${r},`
 }
