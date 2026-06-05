@@ -149,13 +149,13 @@ const PhotoBlock = memo(function PhotoBlock({
   return (
     <>
       <motion.div
-        className={`relative flex items-start justify-center ${isRow ? 'gap-8' : 'gap-4'} ${className}`}
+        className={`relative flex items-start justify-center ${isRow ? 'gap-8' : 'gap-2'} ${className}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
-        {/* Photo 1 — upright, side by side (no overlap, no tilt) */}
-        <div className="relative z-10">
+        {/* Photo 1 — overlaps left in scattered mode; sits in a row otherwise */}
+        <div className="relative z-10" style={{ marginRight: isRow ? 0 : '-12px' }}>
           <PhotoSlot
             photo={photo1}
             position={1}
@@ -169,8 +169,8 @@ const PhotoBlock = memo(function PhotoBlock({
           />
         </div>
 
-        {/* Photo 2 — upright, side by side (no overlap, no tilt) */}
-        <div className="relative z-0">
+        {/* Photo 2 — overlaps right in scattered mode; sits in a row otherwise */}
+        <div className="relative z-0" style={{ marginLeft: isRow ? 0 : '-12px', marginTop: isRow ? 0 : '8px' }}>
           <PhotoSlot
             photo={photo2}
             position={2}

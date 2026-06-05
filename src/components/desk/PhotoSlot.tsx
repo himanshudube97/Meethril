@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useRef, useCallback, useState } from 'react'
+import React, { memo, useRef, useCallback, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { usePhotoSrc } from '@/hooks/usePhotoSrc'
@@ -118,9 +118,15 @@ const PhotoSlot = memo(function PhotoSlot({
 
   const heartColor = theme.accent.warm
 
-  // Photos sit upright everywhere now — no tilt. (Previously a random ±7°
-  // scrapbook tilt; the journal + letters read cleaner with straight polaroids.)
-  const defaultRotation = 0
+  // Random tilt per mount so empty polaroids feel as natural as freshly-clicked ones
+  const defaultRotation = useMemo(() => {
+    const base = position === 1 ? -7 : 7
+    const jitter = (Math.random() - 0.5) * 6 // ±3°
+    return base + jitter
+  }, [position])
+
+  // Subtle wiggle target for hover (opposite direction = more "alive")
+  const hoverRotation = defaultRotation + (position === 1 ? 2 : -2)
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -169,7 +175,7 @@ const PhotoSlot = memo(function PhotoSlot({
 
   // If photo exists, show the polaroid
   if (photo) {
-    const filledRotation = 0
+    const filledRotation = photo.rotation || defaultRotation
     return (
       <motion.div
         className={`relative ${className}`}
@@ -178,7 +184,7 @@ const PhotoSlot = memo(function PhotoSlot({
         style={{ transformOrigin: 'center center' }}
         initial={{ opacity: 0, scale: 0.8, rotate: 0 }}
         animate={{ opacity: 1, scale: 1, rotate: filledRotation }}
-        whileHover={{ scale: 1.04 }}
+        whileHover={{ scale: 1.04, rotate: filledRotation + (position === 1 ? 2 : -2) }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       >
         <div
@@ -359,7 +365,7 @@ const PhotoSlot = memo(function PhotoSlot({
       style={{ transformOrigin: 'center center' }}
       initial={{ opacity: 0, scale: 0.9, rotate: 0 }}
       animate={{ opacity: 1, scale: 1, rotate: defaultRotation }}
-      whileHover={{ scale: 1.04 }}
+      whileHover={{ scale: 1.04, rotate: hoverRotation }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
     >
       <input
