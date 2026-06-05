@@ -192,9 +192,7 @@ const PhotoSlot = memo(function PhotoSlot({
           style={{
             background: '#f5efdc',
             padding: '8px 8px 22px',
-            // Dark hairline ring so the cream frame never blends into a light
-            // theme background. Theme-agnostic — barely visible on dark themes.
-            boxShadow: '0 6px 14px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(90,90,90,0.12)',
+            boxShadow: '0 6px 14px rgba(0,0,0,0.35)',
           }}
         >
           {/* Washi-tape strip */}
@@ -312,9 +310,7 @@ const PhotoSlot = memo(function PhotoSlot({
           style={{
             background: '#f5efdc',
             padding: '8px 8px 22px',
-            // Dark hairline ring so the cream frame never blends into a light
-            // theme background. Theme-agnostic — barely visible on dark themes.
-            boxShadow: '0 6px 14px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(90,90,90,0.12)',
+            boxShadow: '0 6px 14px rgba(0,0,0,0.35)',
           }}
         >
           {/* Washi-tape strip */}
@@ -385,9 +381,7 @@ const PhotoSlot = memo(function PhotoSlot({
           borderStyle: 'solid',
           borderColor: '#f5efdc',
           borderWidth: '8px 8px 22px 8px',
-          // Dark hairline ring so the cream frame never blends into a light
-          // theme background. Theme-agnostic — barely visible on dark themes.
-          boxShadow: '0 6px 14px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(90,90,90,0.12)',
+          boxShadow: '0 6px 14px rgba(0,0,0,0.35)',
         }}
       >
         {/* Washi-tape strip at the top (offset by border width to keep visual position) */}
