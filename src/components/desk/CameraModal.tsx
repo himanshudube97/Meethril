@@ -14,16 +14,145 @@ interface CameraModalProps {
 const MAX_WIDTH = 1200
 const POLAROID_ASPECT_RATIO = 4 / 5
 
-const FILTERS = [
-  { name: 'None', css: 'none' },
-  { name: 'B&W', css: 'grayscale(100%)' },
-  { name: 'Sepia', css: 'sepia(80%)' },
-  { name: 'Warm', css: 'saturate(1.4) hue-rotate(-10deg)' },
-  { name: 'Cool', css: 'saturate(0.9) hue-rotate(20deg) brightness(1.05)' },
-  { name: 'Vintage', css: 'sepia(40%) contrast(1.1) brightness(0.95)' },
-  { name: 'Vivid', css: 'saturate(1.8) contrast(1.1)' },
-  { name: 'Soft', css: 'brightness(1.1) contrast(0.9) saturate(0.9)' },
-] as const
+// An overlay layer that CSS `filter` can't produce on its own — what gives a
+// preset its "film" feel beyond a flat colour shift. Composited identically in
+// the live preview (CSS layers) and the capture (<canvas>), so WYSIWYG.
+interface FilterOverlay {
+  /** Edge darkening, 0..1. */
+  vignette?: number
+  /** Film-grain opacity, 0..1 (over the shared noise texture). */
+  grain?: number
+  /** Soft colour wash / light-leak. */
+  tint?: { color: string; opacity: number }
+}
+
+interface CameraFilter {
+  name: string
+  /** Colour grade — valid CSS filter string, applied to <video> + ctx.filter. */
+  css: string
+  overlay?: FilterOverlay
+}
+
+const FILTERS: CameraFilter[] = [
+  { name: 'Original', css: 'none' },
+  { name: 'Mono', css: 'grayscale(100%) contrast(1.06)', overlay: { vignette: 0.28, grain: 0.1 } },
+  { name: 'Sepia', css: 'sepia(70%) contrast(1.05) brightness(1.02)', overlay: { vignette: 0.22, grain: 0.07 } },
+  { name: 'Golden', css: 'saturate(1.35) contrast(1.04) brightness(1.03) hue-rotate(-8deg)', overlay: { vignette: 0.18, tint: { color: 'rgba(255,170,80,0.85)', opacity: 0.5 } } },
+  { name: 'Frost', css: 'saturate(0.92) brightness(1.05) contrast(1.02) hue-rotate(12deg)', overlay: { tint: { color: 'rgba(120,170,230,0.85)', opacity: 0.4 } } },
+  { name: 'Film', css: 'sepia(22%) contrast(1.12) saturate(1.05) brightness(0.98)', overlay: { vignette: 0.34, grain: 0.16 } },
+  { name: 'Faded', css: 'contrast(0.86) brightness(1.09) saturate(0.85)', overlay: { grain: 0.06, tint: { color: 'rgba(245,235,220,0.95)', opacity: 0.22 } } },
+  { name: 'Vivid', css: 'saturate(1.7) contrast(1.12)', overlay: { vignette: 0.16 } },
+  { name: 'Dreamy', css: 'brightness(1.12) contrast(0.92) saturate(1.08)', overlay: { vignette: 0.12, tint: { color: 'rgba(255,255,255,0.9)', opacity: 0.18 } } },
+  { name: 'Rose', css: 'saturate(1.2) brightness(1.03) hue-rotate(-12deg)', overlay: { vignette: 0.14, tint: { color: 'rgba(240,150,170,0.85)', opacity: 0.3 } } },
+]
+
+// One-time monochrome noise texture, reused as a CSS background (preview) and a
+// canvas pattern (capture) so the grain matches in both.
+function buildNoiseCanvas(size = 128): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = size
+  c.height = size
+  const cx = c.getContext('2d')
+  if (!cx) return null
+  const img = cx.createImageData(size, size)
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.floor(Math.random() * 256)
+    img.data[i] = v
+    img.data[i + 1] = v
+    img.data[i + 2] = v
+    img.data[i + 3] = 255
+  }
+  cx.putImageData(img, 0, 0)
+  return c
+}
+
+// Bakes the overlay layers onto the capture canvas, on top of the colour-graded
+// frame. Mirrors <FilterOverlays/> below. Runs in identity transform so the
+// front-camera mirror (applied for drawImage) doesn't skew the layers.
+function paintOverlays(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  overlay: FilterOverlay | undefined,
+  noise: HTMLCanvasElement | null,
+) {
+  if (!overlay) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.filter = 'none'
+
+  if (overlay.tint) {
+    ctx.globalCompositeOperation = 'soft-light'
+    ctx.globalAlpha = overlay.tint.opacity
+    const g = ctx.createLinearGradient(0, 0, w, h)
+    g.addColorStop(0, overlay.tint.color)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, w, h)
+  }
+
+  if (overlay.grain && noise) {
+    const pat = ctx.createPattern(noise, 'repeat')
+    if (pat) {
+      ctx.globalCompositeOperation = 'overlay'
+      ctx.globalAlpha = overlay.grain
+      ctx.fillStyle = pat
+      ctx.fillRect(0, 0, w, h)
+    }
+  }
+
+  if (overlay.vignette) {
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    const r = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.28, w / 2, h / 2, Math.max(w, h) * 0.7)
+    r.addColorStop(0, 'rgba(0,0,0,0)')
+    r.addColorStop(1, `rgba(0,0,0,${overlay.vignette})`)
+    ctx.fillStyle = r
+    ctx.fillRect(0, 0, w, h)
+  }
+
+  ctx.restore()
+}
+
+// Live-preview twin of paintOverlays — CSS layers over the <video>.
+function FilterOverlays({ overlay, grainUrl }: { overlay?: FilterOverlay; grainUrl: string | null }) {
+  if (!overlay) return null
+  return (
+    <>
+      {overlay.tint && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `linear-gradient(135deg, ${overlay.tint.color}, transparent)`,
+            mixBlendMode: 'soft-light',
+            opacity: overlay.tint.opacity,
+          }}
+        />
+      )}
+      {overlay.grain && grainUrl && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${grainUrl})`,
+            backgroundSize: '128px 128px',
+            backgroundRepeat: 'repeat',
+            mixBlendMode: 'overlay',
+            opacity: overlay.grain,
+          }}
+        />
+      )}
+      {overlay.vignette && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,${overlay.vignette}) 100%)`,
+          }}
+        />
+      )}
+    </>
+  )
+}
 
 const CameraModal = memo(function CameraModal({
   isOpen,
@@ -40,6 +169,17 @@ const CameraModal = memo(function CameraModal({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
   const [activeFilter, setActiveFilter] = useState(0)
   const [thumbnailSrc, setThumbnailSrc] = useState<string | null>(null)
+  // Shared film-grain texture: a <canvas> for baking into the capture and its
+  // data URL for the CSS preview layer. Built once.
+  const noiseCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [grainUrl, setGrainUrl] = useState<string | null>(null)
+  useEffect(() => {
+    const c = buildNoiseCanvas(128)
+    if (c) {
+      noiseCanvasRef.current = c
+      setGrainUrl(c.toDataURL())
+    }
+  }, [])
 
   const startCamera = useCallback(async () => {
     try {
@@ -137,6 +277,10 @@ const CameraModal = memo(function CameraModal({
 
     // Draw cropped video frame
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outputWidth, outputHeight)
+
+    // Bake the grain/vignette/tint overlay on top so the saved photo matches
+    // the live preview exactly.
+    paintOverlays(ctx, outputWidth, outputHeight, FILTERS[activeFilter].overlay, noiseCanvasRef.current)
 
     // Get data URL
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
@@ -258,8 +402,9 @@ const CameraModal = memo(function CameraModal({
             </button>
           </div>
 
-          {/* Camera view / Captured image */}
-          <div className="relative" style={{ aspectRatio: '4/5' }}>
+          {/* Camera view / Captured image. isolate scopes the filter blend
+              modes so they composite with the video, not the modal behind. */}
+          <div className="relative" style={{ aspectRatio: '4/5', isolation: 'isolate' }}>
             {error ? (
               <div
                 className="absolute inset-0 flex items-center justify-center p-8 text-center"
@@ -289,6 +434,9 @@ const CameraModal = memo(function CameraModal({
                     filter: FILTERS[activeFilter].css,
                   }}
                 />
+                {isStreaming && (
+                  <FilterOverlays overlay={FILTERS[activeFilter].overlay} grainUrl={grainUrl} />
+                )}
                 {!isStreaming && (
                   <div
                     className="absolute inset-0 flex items-center justify-center"
@@ -318,19 +466,22 @@ const CameraModal = memo(function CameraModal({
                   className="shrink-0 flex flex-col items-center gap-1"
                 >
                   <div
-                    className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all"
+                    className="relative isolate w-12 h-12 rounded-lg overflow-hidden border-2 transition-all"
                     style={{
                       borderColor: activeFilter === i ? theme.accent.warm : 'transparent',
                       opacity: activeFilter === i ? 1 : 0.7,
                     }}
                   >
                     {thumbnailSrc ? (
-                      <img
-                        src={thumbnailSrc}
-                        alt={f.name}
-                        className="w-full h-full object-cover"
-                        style={{ filter: f.css }}
-                      />
+                      <>
+                        <img
+                          src={thumbnailSrc}
+                          alt={f.name}
+                          className="w-full h-full object-cover"
+                          style={{ filter: f.css }}
+                        />
+                        <FilterOverlays overlay={f.overlay} grainUrl={grainUrl} />
+                      </>
                     ) : (
                       <div
                         className="w-full h-full"
