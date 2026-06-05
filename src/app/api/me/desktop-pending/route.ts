@@ -5,6 +5,7 @@ import { verifyDesktopToken } from '@/lib/desktop-token'
 import { localWallClockISO, localDateStr, startOfLocalDayUTC } from '@/lib/tz'
 import { targetTimeHHMM, isAtOrAfterTarget } from '@/lib/reminder-target'
 import { pickReminderLine, REMINDER_TITLE } from '@/lib/reminder-messages'
+import { listLettersForRead } from '@/lib/letters/dual-read'
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization') || ''
@@ -42,5 +43,24 @@ export async function GET(request: NextRequest) {
     reminder = { due, title: REMINDER_TITLE, body: pickReminderLine() }
   }
 
-  return NextResponse.json({ reminder, letters: [] }) // letters added in a later task
+  // Arrived letters: same "should be alerted about" query as
+  // /api/letters/arrived (self-letters, sealed, unlocked). We return only IDs
+  // + static display strings — never ciphertext or decrypted content.
+  const arrived = await listLettersForRead({
+    userId: verified.userId,
+    where: {
+      entryType: 'letter',
+      isSealed: true,
+      recipientEmail: null,
+      unlockDate: { lte: now },
+    },
+    orderBy: { unlockDate: 'asc' },
+  })
+  const letters = arrived.map((l) => ({
+    id: l.id,
+    title: 'a letter arrived ✨',
+    body: 'from past you',
+  }))
+
+  return NextResponse.json({ reminder, letters })
 }
