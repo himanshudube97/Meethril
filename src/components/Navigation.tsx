@@ -8,6 +8,7 @@ import { useThemeStore } from '@/store/theme'
 import { useAuthStore } from '@/store/auth'
 import { useProfileStore } from '@/store/profile'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
+import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 
 const tabs = [
   { href: '/write', label: 'Write', icon: '✎' },
@@ -40,6 +41,15 @@ export default function Navigation() {
   const nickname = profile.nickname
   const avatarLetter = nickname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'
 
+  // On the Memory page the opened diary drops a dark scrim over the scene, and
+  // the translucent glass pill reads as a floaty, mismatched chip on top. Give
+  // the navbar the diary's own opaque paper tone there so it belongs with the
+  // open journal. Derived from the theme, so it stays correct on every theme.
+  const isMemoryPage = pathname === '/memory'
+  const diaryColors = getGlassDiaryColors(theme)
+  const navBg = isMemoryPage ? diaryColors.pageBgSolid : theme.glass.bg
+  const navBorder = isMemoryPage ? diaryColors.pageBorder : theme.glass.border
+
   // Mobile: always-visible horizontal pill centered at top. Icon-only tabs
   // plus a divider + gear that triggers the shared DeskSettingsPanel store.
   // The panel component itself hides its own floating gear on mobile.
@@ -48,8 +58,8 @@ export default function Navigation() {
       <nav
         className="fixed top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 p-1 rounded-full"
         style={{
-          background: theme.glass.bg,
-          border: `1px solid ${theme.glass.border}`,
+          background: navBg,
+          border: `1px solid ${navBorder}`,
         }}
         aria-label="Primary navigation"
       >
@@ -117,8 +127,8 @@ export default function Navigation() {
       <div
         className="flex gap-1 p-1 rounded-full items-center"
         style={{
-          background: theme.glass.bg,
-          border: `1px solid ${theme.glass.border}`,
+          background: navBg,
+          border: `1px solid ${navBorder}`,
         }}
       >
         {tabs.map((tab) => {

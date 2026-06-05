@@ -9,6 +9,7 @@ import LeftPage from '@/components/desk/LeftPage'
 import RightPage from '@/components/desk/RightPage'
 import type { JournalEntry } from '@/store/journal'
 import { useShareableCapture } from '@/components/share/ShareableCapture'
+import { useMemoryViewStore } from '@/store/memoryView'
 import { formatTimeAgo } from './MemoryModal'
 
 const PAGE_W = 650
@@ -142,6 +143,14 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  // Fade the page chrome (nav, gear, fullscreen) out while a memory is open so
+  // the spread reads as the only thing on the desk. Cleared on unmount/close.
+  const setDiaryOpen = useMemoryViewStore((s) => s.setDiaryOpen)
+  useEffect(() => {
+    setDiaryOpen(true)
+    return () => setDiaryOpen(false)
+  }, [setDiaryOpen])
+
   // LeftPage/RightPage want a stricter Photo position type than JournalEntry uses.
   const entryForPages = useMemo(() => ({
     id: entry.id,
@@ -188,7 +197,6 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
 
       {/* Spread */}
       <motion.div
-        ref={spreadCaptureRef}
         initial={{ opacity: 0, scale: scale * 0.97, y: 18 }}
         animate={{ opacity: 1, scale, y: 0 }}
         exit={{ opacity: 0, scale: scale * 0.97, y: 18 }}
@@ -205,8 +213,108 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
         } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
-        <TwineBow />
-        {/* Date caption pinned above the spread */}
+        {/* Capture target — the twine bow + the two pages, as a STATICALLY
+            positioned block. The outer motion.div is `fixed` and centred via
+            left/top:50% + negative margins; html-to-image resolves those
+            percentages against its own capture canvas instead of the viewport,
+            which mis-placed and clipped the share image. Snapshotting this
+            inner static wrapper captures the spread cleanly. The date caption
+            and close button live OUTSIDE it so they're excluded from the share. */}
+        <div
+          ref={spreadCaptureRef}
+          style={{
+            // Padding gives the torn deckle edges + drop-shadow breathing room
+            // inside the share canvas so they aren't flush against (and clipped
+            // by) the polaroid frame. The matching negative margin cancels the
+            // padding's layout shift, so the on-screen spread stays put — only
+            // the captured bounds grow. content-box keeps the inner spread at
+            // its exact PAGE size regardless of the padding.
+            boxSizing: 'content-box',
+            position: 'relative',
+            width: `${PAGE_W * 2 + GAP}px`,
+            height: `${PAGE_H}px`,
+            padding: '20px 24px 40px',
+            margin: '-20px -24px -40px',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: `${PAGE_W * 2 + GAP}px`,
+              height: `${PAGE_H}px`,
+            }}
+          >
+            <TwineBow />
+
+            {/* Two pages, each torn around its rectangle. drop-shadow on the
+                wrapper picks up the clip-path edges, where box-shadow would be
+                clipped away. */}
+            <div
+              style={{
+                display: 'flex',
+                gap: `${GAP}px`,
+                width: '100%',
+                height: '100%',
+                filter:
+                  'drop-shadow(0 26px 44px rgba(0,0,0,0.42)) drop-shadow(0 6px 14px rgba(0,0,0,0.18))',
+              }}
+            >
+            {/* Left page */}
+            <div
+              style={{
+                width: `${PAGE_W}px`,
+                height: `${PAGE_H}px`,
+                backgroundColor: colors.pageBgSolid,
+                backgroundImage: `linear-gradient(${colors.pageBg}, ${colors.pageBg})`,
+                clipPath: tornLeft,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  padding: '20px 30px 20px 30px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <LeftPage entry={entryForPages} isNewEntry={false} />
+              </div>
+            </div>
+
+            {/* Right page */}
+            <div
+              style={{
+                width: `${PAGE_W}px`,
+                height: `${PAGE_H}px`,
+                backgroundColor: colors.pageBgSolid,
+                backgroundImage: `linear-gradient(${colors.pageBg}, ${colors.pageBg})`,
+                clipPath: tornRight,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  padding: '20px 30px 20px 30px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <RightPage
+                  entry={entryForPages}
+                  isNewEntry={false}
+                  photos={entryForPages.photos}
+                />
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Date caption pinned above the spread — outside the capture wrapper */}
         <div
           className="absolute left-0 right-0 text-center pointer-events-none"
           style={{
@@ -222,7 +330,7 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
           {format(new Date(entry.createdAt), 'EEEE · MMMM d, yyyy')}
         </div>
 
-        {/* Close button */}
+        {/* Close button — outside the capture wrapper */}
         <button
           onClick={onClose}
           aria-label="Close memory"
@@ -236,72 +344,6 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
         >
           ×
         </button>
-
-        {/* Two pages, each torn around its rectangle. drop-shadow on the
-            wrapper picks up the clip-path edges, where box-shadow would be
-            clipped away. */}
-        <div
-          style={{
-            display: 'flex',
-            gap: `${GAP}px`,
-            width: '100%',
-            height: '100%',
-            filter:
-              'drop-shadow(0 26px 44px rgba(0,0,0,0.42)) drop-shadow(0 6px 14px rgba(0,0,0,0.18))',
-          }}
-        >
-          {/* Left page */}
-          <div
-            style={{
-              width: `${PAGE_W}px`,
-              height: `${PAGE_H}px`,
-              backgroundColor: colors.pageBgSolid,
-              backgroundImage: `linear-gradient(${colors.pageBg}, ${colors.pageBg})`,
-              clipPath: tornLeft,
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                padding: '20px 30px 20px 30px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <LeftPage entry={entryForPages} isNewEntry={false} />
-            </div>
-          </div>
-
-          {/* Right page */}
-          <div
-            style={{
-              width: `${PAGE_W}px`,
-              height: `${PAGE_H}px`,
-              backgroundColor: colors.pageBgSolid,
-              backgroundImage: `linear-gradient(${colors.pageBg}, ${colors.pageBg})`,
-              clipPath: tornRight,
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                padding: '20px 30px 20px 30px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <RightPage
-                entry={entryForPages}
-                isNewEntry={false}
-                photos={entryForPages.photos}
-              />
-            </div>
-          </div>
-        </div>
       </motion.div>
 
       {/* Share camera — top-right of the screen, between fullscreen and gear.

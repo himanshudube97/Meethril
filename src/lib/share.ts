@@ -52,14 +52,23 @@ function getOverflowBounds(el: HTMLElement): { width: number; height: number; of
     if (r.bottom > bottom) bottom = r.bottom
   })
 
+  // getBoundingClientRect reflects any transform on an ANCESTOR (e.g. the
+  // memory spread is rendered inside a `scale()`d wrapper that fits it to the
+  // viewport). html-to-image, however, clones only `el` and renders it at its
+  // untransformed layout size. Divide the measured (post-transform) union back
+  // into layout space so the canvas dimensions match the clone. For untranslated
+  // surfaces (scale 1) these factors are 1, so behaviour is unchanged.
+  const scaleX = el.offsetWidth > 0 ? root.width / el.offsetWidth : 1
+  const scaleY = el.offsetHeight > 0 ? root.height / el.offsetHeight : 1
+
   return {
-    width: right - left,
-    height: bottom - top,
+    width: (right - left) / scaleX,
+    height: (bottom - top) / scaleY,
     // How much the union extends past the element's own rect on the
     // top/left — used to shift the element inside the larger canvas so
     // overflowing children land inside the visible area.
-    offsetX: root.left - left,
-    offsetY: root.top - top,
+    offsetX: (root.left - left) / scaleX,
+    offsetY: (root.top - top) / scaleY,
   }
 }
 
@@ -156,9 +165,15 @@ export async function wrapInPolaroid(
     const img = new Image()
     img.onload = () => {
       try {
-        const SIDE = Math.round(img.width * 0.04) // ~4% of width
+        // Even photo border on all sides (SIDE), with the caption sitting just
+        // below the photo in a slim strip — one SIDE-sized gap above the text
+        // and one below — so the framing reads as a balanced, centred polaroid
+        // rather than the old thick (16%-of-height) bottom strip that pushed
+        // the image up and looked top-heavy.
+        const SIDE = Math.round(img.width * 0.05)
+        const fontSize = Math.round(img.width * 0.032)
         const TOP = SIDE
-        const BOTTOM = Math.round(img.height * 0.16) // thicker bottom strip
+        const BOTTOM = SIDE * 2 + fontSize
         const W = img.width + SIDE * 2
         const H = img.height + TOP + BOTTOM
 
@@ -186,13 +201,13 @@ export async function wrapInPolaroid(
         // The captured diary image
         ctx.drawImage(img, SIDE, TOP)
 
-        // Caption in the bottom strip — caveat-style cursive feel via Georgia italic
-        const fontSize = Math.round(BOTTOM * 0.30)
+        // Caption centred in the slim strip below the photo — caveat-style
+        // cursive feel via Georgia italic. Sits one SIDE-gap under the image.
         ctx.fillStyle = '#5a4a3e'
         ctx.font = `italic ${fontSize}px "Caveat", "Georgia", serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        const captionY = TOP + img.height + BOTTOM / 2
+        const captionY = TOP + img.height + SIDE + fontSize / 2
         ctx.fillText(caption, W / 2, captionY)
 
         canvas.toBlob((blob) => {
