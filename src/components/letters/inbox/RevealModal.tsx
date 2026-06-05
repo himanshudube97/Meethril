@@ -31,7 +31,26 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
     text: '', song: null, photos: [], doodleStrokes: [],
   })
   const [face, setFace] = useState<'front' | 'back'>('front')
+  const [cardScale, setCardScale] = useState(1)
   const { decryptEntryFromServer, isE2EEReady } = useE2EE()
+
+  // Uniformly scale the postcard to fit the viewport (same approach as the
+  // journal / compose view) so its 760×860 aspect ratio never distorts.
+  useEffect(() => {
+    const DESIGN_W = 820
+    const DESIGN_H = 900
+    const MARGIN_X = 48
+    const MARGIN_Y = 110
+    const MAX_SCALE = 1.3
+    const calcScale = () => {
+      const availW = window.innerWidth - MARGIN_X
+      const availH = window.innerHeight - MARGIN_Y
+      setCardScale(Math.min(MAX_SCALE, availW / DESIGN_W, availH / DESIGN_H))
+    }
+    calcScale()
+    window.addEventListener('resize', calcScale)
+    return () => window.removeEventListener('resize', calcScale)
+  }, [])
 
   useEffect(() => {
     if (!letter) return
@@ -174,17 +193,18 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
       {/* POSTCARD STAGE — the exact card the user wrote, read-only + flippable. */}
       {postcardShown && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, scale: cardScale * 0.92 }}
+          animate={{ opacity: 1, scale: cardScale }}
           transition={{ duration: 0.5, ease: [0.2, 0.7, 0.2, 1] }}
           style={{ perspective: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           {/* No leather mat here — the reveal shows just the bare postcard.
-              The blotter lives on the compose/writing view only. */}
+              The blotter lives on the compose/writing view only. The card keeps
+              its fixed design size; the wrapper above scales it to fit. */}
           <motion.div
             style={{
-              width: 'min(760px, calc(100vw - 48px))',
-              height: 'min(860px, calc(100vh - 104px))',
+              width: 760,
+              height: 860,
               position: 'relative',
               transformStyle: 'preserve-3d',
             }}
