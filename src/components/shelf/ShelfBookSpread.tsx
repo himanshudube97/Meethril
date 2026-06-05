@@ -12,25 +12,25 @@ import EntrySelector from '@/components/desk/EntrySelector'
 import { RibbonBookmark } from '@/components/desk/interactive/RibbonBookmark'
 import RibbonTag from '@/components/desk/interactive/RibbonTag'
 import { JournalEntry } from '@/store/journal'
+import { useLayoutMode } from '@/hooks/useMediaQuery'
 import { monthLabel, toRoman } from './shelfPalette'
 import ShelfMobileBook from './ShelfMobileBook'
 
 const HTMLFlipBook = dynamic(() => import('react-pageflip'), { ssr: false })
 
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const mql = window.matchMedia('(max-width: 767px)')
-    const update = () => setIsMobile(mql.matches)
-    update()
-    mql.addEventListener('change', update)
-    return () => mql.removeEventListener('change', update)
-  }, [])
-  return isMobile
-}
-
 const PAGE_WIDTH = 650
 const PAGE_HEIGHT = 820
+
+// Design footprint of the open book used for the fit-to-viewport scale. Width
+// is the two pages (650 * 2) plus ~100px right-side bleed for the date pendant
+// + ribbon that hangs past the page edge — mirrors /write's BookSpread.
+const SPREAD_W = 1400
+const SPREAD_H = 820
+// Top-anchor the spread below the nav (≈60px) + the multi-entry EntrySelector
+// (top-20 + height) so the cover never bleeds up behind the navbar. The book
+// hangs from here and any extra height falls to the bottom — same as /write.
+const TOP_RESERVE = 120
+const BOTTOM_RESERVE = 32
 
 interface ShelfBookSpreadProps {
   year: number
@@ -110,10 +110,30 @@ export default function ShelfBookSpread({
 }: ShelfBookSpreadProps) {
   const { theme } = useThemeStore()
   const colors = getGlassDiaryColors(theme)
-  const isMobile = useIsMobile()
+  // Match /write: < 1024px gets the vertical mobile reader; tablet/desktop get
+  // the two-page flipbook scaled to fit (see fitScale below).
+  const layoutMode = useLayoutMode()
+  const isMobile = layoutMode === 'mobile'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const flipBookRef = useRef<any>(null)
   const diaryRootRef = useRef<HTMLDivElement>(null)
+
+  // Scale the fixed 1300×820 spread down so it always fits the viewport instead
+  // of clipping on narrower laptops/tablets. Capped at 1 — never grow past the
+  // design size. Mirrors DeskScene's calcScale on /write.
+  const [fitScale, setFitScale] = useState(1)
+  useEffect(() => {
+    if (isMobile) return
+    const MARGIN_X = 48
+    const calc = () => {
+      const availW = window.innerWidth - MARGIN_X
+      const availH = window.innerHeight - TOP_RESERVE - BOTTOM_RESERVE
+      setFitScale(Math.min(1, availW / SPREAD_W, availH / SPREAD_H))
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [isMobile])
 
   // One day per spread; multiple entries on the same day are switched via
   // EntrySelector. While entries is null (still fetching) we render no days
@@ -280,10 +300,16 @@ export default function ShelfBookSpread({
       {!isLoading && !isEmpty && (
       <div
         ref={diaryRootRef}
-        className="relative inline-block"
+        className="absolute left-1/2"
         style={{
+          // Top-anchored below the nav (not vertically centered) so the cover
+          // never rises into the navbar. Fit-to-viewport scale hangs from the
+          // top edge; the inner motion.div's entrance scale composes on top.
+          top: TOP_RESERVE,
           ['--book-cover-bg' as string]: colors.cover,
           ['--book-cover-border' as string]: colors.coverBorder,
+          transform: `translateX(-50%) scale(${fitScale})`,
+          transformOrigin: 'center top',
         } as React.CSSProperties}
       >
         <motion.div
