@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/onboarding',
   '/api/auth',
   '/api/cron',
+  '/api/me/desktop-pending',
   '/api/webhooks',
   '/api/webhooks/lemonsqueezy',
   '/api/letter',
