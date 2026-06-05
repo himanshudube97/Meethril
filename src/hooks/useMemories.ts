@@ -129,8 +129,9 @@ export function useMemories(): UseMemoriesResult {
                 tags: [],
                 doodles: [],
                 photos: (content.photos || []).map((p) => ({
-                  encryptedRef: p.encryptedRef,
-                  encryptedRefIV: p.encryptedRefIV,
+                  url: p.url ?? undefined,
+                  encryptedRef: p.encryptedRef ?? undefined,
+                  encryptedRefIV: p.encryptedRefIV ?? undefined,
                   rotation: p.rotation,
                   position: p.position,
                   spread: p.spread,

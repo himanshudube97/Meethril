@@ -258,8 +258,15 @@ export default function ComposeView() {
         draft: {
           text: combinedText,
           song,
-          photos: [],
-          doodles: [],
+          photos: photos.map((p) => ({
+            url: p.url ?? null,
+            encryptedRef: p.encryptedRef ?? null,
+            encryptedRefIV: p.encryptedRefIV ?? null,
+            position: p.position,
+            spread: 1,
+            rotation: p.rotation,
+          })),
+          doodleStrokes,
           letterLocation: null,
         },
         unlockDate,
