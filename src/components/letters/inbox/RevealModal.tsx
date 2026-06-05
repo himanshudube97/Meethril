@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { InboxLetter } from '../letterTypes'
 import { useE2EE } from '@/hooks/useE2EE'
-import { useThemeStore } from '@/store/theme'
-import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { PostcardFront } from '../compose/PostcardFront'
 import { PostcardBack } from '../compose/PostcardBack'
 import type { Photo } from '@/components/desk/PhotoBlock'
@@ -34,8 +32,6 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
   })
   const [face, setFace] = useState<'front' | 'back'>('front')
   const { decryptEntryFromServer, isE2EEReady } = useE2EE()
-  const theme = useThemeStore((s) => s.theme)
-  const diaryColors = getGlassDiaryColors(theme)
 
   useEffect(() => {
     if (!letter) return
@@ -183,52 +179,39 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
           transition={{ duration: 0.5, ease: [0.2, 0.7, 0.2, 1] }}
           style={{ perspective: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          {/* Leather blotter — same theme cover token as the compose view. */}
-          <div
+          {/* No leather mat here — the reveal shows just the bare postcard.
+              The blotter lives on the compose/writing view only. */}
+          <motion.div
             style={{
+              width: 'min(760px, calc(100vw - 48px))',
+              height: 'min(860px, calc(100vh - 104px))',
               position: 'relative',
-              padding: '20px 26px',
-              borderRadius: 14,
-              backgroundColor: diaryColors.cover,
-              backgroundImage:
-                'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 6px)',
-              border: `1px solid ${diaryColors.coverBorder}`,
-              boxShadow:
-                'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.25), 0 35px 70px rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.28)',
+              transformStyle: 'preserve-3d',
             }}
           >
             <motion.div
-              style={{
-                width: 'min(760px, calc(100vw - 48px))',
-                height: 'min(860px, calc(100vh - 104px))',
-                position: 'relative',
-                transformStyle: 'preserve-3d',
-              }}
+              animate={{ rotateY: cardRotateY }}
+              transition={{ duration: 0.85, ease: [0.45, 0.05, 0.15, 1] }}
+              style={{ width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d' }}
             >
-              <motion.div
-                animate={{ rotateY: cardRotateY }}
-                transition={{ duration: 0.85, ease: [0.45, 0.05, 0.15, 1] }}
-                style={{ width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d' }}
-              >
-                <PostcardFront
-                  readOnly
-                  active={face === 'front'}
-                  salutationName={salutationName}
-                  body={content.text}
-                  onTurnOver={() => setFace('back')}
-                  createdAt={new Date(letter.sealedAt)}
-                />
-                <PostcardBack
-                  readOnly
-                  active={face === 'back'}
-                  photos={content.photos}
-                  doodleStrokes={content.doodleStrokes}
-                  song={content.song}
-                  onTurnBack={() => setFace('front')}
-                />
-              </motion.div>
+              <PostcardFront
+                readOnly
+                active={face === 'front'}
+                salutationName={salutationName}
+                body={content.text}
+                onTurnOver={() => setFace('back')}
+                createdAt={new Date(letter.sealedAt)}
+              />
+              <PostcardBack
+                readOnly
+                active={face === 'back'}
+                photos={content.photos}
+                doodleStrokes={content.doodleStrokes}
+                song={content.song}
+                onTurnBack={() => setFace('front')}
+              />
             </motion.div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
 
