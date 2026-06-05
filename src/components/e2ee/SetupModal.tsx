@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
+import { PasswordToggle } from '@/components/PasswordToggle'
 import { useAuthStore } from '@/store/auth'
 import { useBackfill } from '@/hooks/useBackfill'
 import {
@@ -33,6 +34,8 @@ export default function SetupModal() {
   const [agreedIntro, setAgreedIntro] = useState(false)
   const [dailyKey, setDailyKey] = useState('')
   const [confirmDailyKey, setConfirmDailyKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [recoveryKey, setRecoveryKey] = useState('')
   const [savedRecovery, setSavedRecovery] = useState(false)
   const [error, setError] = useState('')
@@ -272,36 +275,44 @@ export default function SetupModal() {
                 <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                   Daily Key
                 </label>
-                <input
-                  type="password"
-                  value={dailyKey}
-                  onChange={(e) => { setDailyKey(e.target.value); setError('') }}
-                  placeholder="Enter your daily key..."
-                  className="w-full p-4 rounded-xl text-sm outline-none"
-                  style={{
-                    background: theme.glass.bg,
-                    border: `1px solid ${theme.glass.border}`,
-                    color: theme.text.primary,
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={dailyKey}
+                    onChange={(e) => { setDailyKey(e.target.value); setError('') }}
+                    placeholder="Enter your daily key..."
+                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    style={{
+                      background: theme.glass.bg,
+                      border: `1px solid ${theme.glass.border}`,
+                      color: theme.text.primary,
+                      paddingRight: '2.75rem',
+                    }}
+                  />
+                  <PasswordToggle shown={showKey} onToggle={() => setShowKey((v) => !v)} color={theme.text.muted} />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                   Confirm Daily Key
                 </label>
-                <input
-                  type="password"
-                  value={confirmDailyKey}
-                  onChange={(e) => { setConfirmDailyKey(e.target.value); setError('') }}
-                  placeholder="Confirm your daily key..."
-                  className="w-full p-4 rounded-xl text-sm outline-none"
-                  style={{
-                    background: theme.glass.bg,
-                    border: `1px solid ${dailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
-                    color: theme.text.primary,
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmDailyKey}
+                    onChange={(e) => { setConfirmDailyKey(e.target.value); setError('') }}
+                    placeholder="Confirm your daily key..."
+                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    style={{
+                      background: theme.glass.bg,
+                      border: `1px solid ${dailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
+                      color: theme.text.primary,
+                      paddingRight: '2.75rem',
+                    }}
+                  />
+                  <PasswordToggle shown={showConfirm} onToggle={() => setShowConfirm((v) => !v)} color={theme.text.muted} />
+                </div>
               </div>
 
               <p className="text-sm" style={{ color: theme.text.muted }}>

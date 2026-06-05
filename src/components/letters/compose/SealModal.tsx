@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
+import { PasswordToggle } from '@/components/PasswordToggle'
 
 // TEST-PILL: '1h' on both SelfPill and FriendPill is a staging-only shortcut
 // to smoke-test delivery end-to-end without waiting a week. The matching
@@ -96,6 +97,7 @@ export function SealModal({
   const [email, setEmail] = useState<string>('')
   const [question, setQuestion] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
+  const [showAnswer, setShowAnswer] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
 
   const [busy, setBusy] = useState(false)
@@ -280,18 +282,22 @@ export function SealModal({
                   >
                     The answer
                   </label>
-                  <input
-                    type="password"
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    placeholder="they'll type this to unlock"
-                    className="w-full px-4 py-3 mb-1 rounded-xl outline-none"
-                    style={{
-                      border: `1px solid ${theme.text.primary}33`,
-                      backgroundColor: `${theme.bg.primary}b3`,
-                      color: theme.text.primary,
-                    }}
-                  />
+                  <div className="relative mb-1">
+                    <input
+                      type={showAnswer ? 'text' : 'password'}
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      placeholder="they'll type this to unlock"
+                      className="w-full px-4 py-3 rounded-xl outline-none"
+                      style={{
+                        border: `1px solid ${theme.text.primary}33`,
+                        backgroundColor: `${theme.bg.primary}b3`,
+                        color: theme.text.primary,
+                        paddingRight: '2.75rem',
+                      }}
+                    />
+                    <PasswordToggle shown={showAnswer} onToggle={() => setShowAnswer((v) => !v)} color={theme.text.muted} />
+                  </div>
                   <p
                     className="text-sm italic mb-4"
                     style={{ color: theme.text.muted, opacity: 0.7 }}

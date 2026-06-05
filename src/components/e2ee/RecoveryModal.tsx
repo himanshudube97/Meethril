@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
+import { PasswordToggle } from '@/components/PasswordToggle'
 import { useAuthStore } from '@/store/auth'
 import {
   deriveKeyFromRecoveryKey,
@@ -34,6 +35,8 @@ export default function RecoveryModal() {
   const [recoveryKey, setRecoveryKey] = useState('')
   const [newDailyKey, setNewDailyKey] = useState('')
   const [confirmDailyKey, setConfirmDailyKey] = useState('')
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null)
@@ -265,36 +268,44 @@ export default function RecoveryModal() {
                 <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
                   New Daily Key (min 8 characters)
                 </label>
-                <input
-                  type="password"
-                  value={newDailyKey}
-                  onChange={(e) => setNewDailyKey(e.target.value)}
-                  placeholder="Enter new daily key..."
-                  className="w-full p-4 rounded-xl text-sm outline-none"
-                  style={{
-                    background: theme.glass.bg,
-                    border: `1px solid ${theme.glass.border}`,
-                    color: theme.text.primary,
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={newDailyKey}
+                    onChange={(e) => setNewDailyKey(e.target.value)}
+                    placeholder="Enter new daily key..."
+                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    style={{
+                      background: theme.glass.bg,
+                      border: `1px solid ${theme.glass.border}`,
+                      color: theme.text.primary,
+                      paddingRight: '2.75rem',
+                    }}
+                  />
+                  <PasswordToggle shown={showNew} onToggle={() => setShowNew((v) => !v)} color={theme.text.muted} />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
                   Confirm New Daily Key
                 </label>
-                <input
-                  type="password"
-                  value={confirmDailyKey}
-                  onChange={(e) => setConfirmDailyKey(e.target.value)}
-                  placeholder="Confirm new daily key..."
-                  className="w-full p-4 rounded-xl text-sm outline-none"
-                  style={{
-                    background: theme.glass.bg,
-                    border: `1px solid ${newDailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
-                    color: theme.text.primary,
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmDailyKey}
+                    onChange={(e) => setConfirmDailyKey(e.target.value)}
+                    placeholder="Confirm new daily key..."
+                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    style={{
+                      background: theme.glass.bg,
+                      border: `1px solid ${newDailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
+                      color: theme.text.primary,
+                      paddingRight: '2.75rem',
+                    }}
+                  />
+                  <PasswordToggle shown={showConfirm} onToggle={() => setShowConfirm((v) => !v)} color={theme.text.muted} />
+                </div>
               </div>
             </div>
 
