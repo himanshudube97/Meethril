@@ -94,12 +94,14 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
   return createPortal(
     <AnimatePresence>
       <motion.div
+        key="backdrop"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50"
         style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
         onClick={step === 'done' ? handleClose : undefined}
       />
       <motion.div
+        key="panel"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
