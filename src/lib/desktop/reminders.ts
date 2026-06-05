@@ -9,7 +9,10 @@ export async function enableDesktopReminders(): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ remindersEnabled: true }),
   }).catch(() => {})
-  const { token } = await fetch('/api/me/desktop-token', { method: 'POST' }).then((r) => r.json())
+  const res = await fetch('/api/me/desktop-token', { method: 'POST' })
+  if (!res.ok) throw new Error('Could not get desktop token')
+  const { token } = await res.json()
+  if (!token || typeof token !== 'string') throw new Error('Desktop token missing')
   await invoke('save_desktop_token', { token })
   await invoke('install_reminder_agent')
 }
