@@ -175,10 +175,10 @@ export function PostcardBack({
           <div style={labelStyle}>photos</div>
           <div
             style={{
-              transform: 'scale(1.3)',
+              transform: 'scale(1.1)',
               transformOrigin: 'top center',
-              marginTop: 18,
-              marginBottom: 56, // accommodate scale overflow below
+              marginTop: 16,
+              marginBottom: 40, // accommodate scale overflow below
             }}
           >
             <PhotoBlock
@@ -186,6 +186,7 @@ export function PostcardBack({
               onPhotoAdd={readOnly ? undefined : onPhotoAdd}
               onPhotoRemove={readOnly ? undefined : onPhotoRemove}
               disabled={readOnly}
+              layout="row"
             />
           </div>
         </div>

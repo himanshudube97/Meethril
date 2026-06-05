@@ -359,7 +359,8 @@ export function PostcardFront({
             editor={editor}
             style={{
               fontFamily: 'var(--font-caveat), Caveat, cursive',
-              fontSize: 19,
+              // Match the journal body text size (resolveFontSize base 21).
+              fontSize: 21,
               lineHeight: '36px',
             }}
           />
