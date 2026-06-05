@@ -75,7 +75,7 @@ export function InstallPrompt() {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed bottom-4 left-4 right-4 z-50 p-4 rounded-2xl"
+        className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-95 z-50 p-4 rounded-2xl"
         style={{
           background: theme.glass.bg,
           backdropFilter: `blur(${theme.glass.blur})`,
@@ -90,7 +90,7 @@ export function InstallPrompt() {
           <div className="text-3xl">✨</div>
           <div className="flex-1">
             <h3 className="font-medium mb-1" style={{ color: theme.text.primary }}>
-              Add Hearth to Home Screen
+              Add Meethril to Home Screen
             </h3>
             <p className="text-sm mb-3" style={{ color: theme.text.secondary }}>
               {isIOS
