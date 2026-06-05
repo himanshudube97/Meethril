@@ -71,6 +71,14 @@ export function useShareableCapture({ cardContent, captureTarget, surface, date,
     return () => window.removeEventListener('keydown', onKey)
   }, [phase])
 
+  // Auto-advance: the butterfly flies in, then opens the preview on its own
+  // once the capture is ready — the user shouldn't have to click to "catch it".
+  useEffect(() => {
+    if (phase !== 'butterfly' || !imageUrl) return
+    const t = setTimeout(() => setPhase('preview'), 1400)
+    return () => clearTimeout(t)
+  }, [phase, imageUrl])
+
   // Cleanup blob URL on close / unmount
   useEffect(() => {
     return () => {
@@ -275,22 +283,6 @@ export function useShareableCapture({ cardContent, captureTarget, surface, date,
                       <Plant name="butterfly" width={130} saturate={1.05} hueRotate={butterflyHue} opacity={0.98} />
                     </motion.div>
                   </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: imageUrl ? 0.85 : 0.45 }}
-                    transition={{ delay: 1.4, duration: 0.6 }}
-                    style={{
-                      marginTop: 14,
-                      textAlign: 'center',
-                      fontFamily: 'Georgia, serif',
-                      fontStyle: 'italic',
-                      fontSize: 13,
-                      letterSpacing: '0.08em',
-                      color: theme.text.muted,
-                    }}
-                  >
-                    {imageUrl ? 'catch it' : 'preparing…'}
-                  </motion.div>
                 </motion.button>
               )}
             </AnimatePresence>
@@ -403,5 +395,7 @@ export function useShareableCapture({ cardContent, captureTarget, surface, date,
     document.body,
   ) : null
 
-  return { CameraButton, Capture, isOpen: phase !== 'closed' }
+  // `open` is exposed so callers can drive the capture from a custom trigger
+  // (e.g. a wax-seal button in the diary action rail) instead of CameraButton.
+  return { CameraButton, Capture, open, isOpen: phase !== 'closed' }
 }

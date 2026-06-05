@@ -40,17 +40,31 @@ export default function DeskScene() {
   // bleed for the date pendant + ribbon that hangs outside the page edge.
   useEffect(() => {
     if (layoutMode === 'mobile') return
-    const SPREAD_W = 1400
-    const SPREAD_H = 820
-    const MARGIN_X = 64
+    // Footprint includes the hardcover bleed (.book-cover extends -48px each
+    // side, -28px top/bottom) plus the ribbon/date pendant hanging past the
+    // top-right edge — so the scale never lets the cover clip off-screen.
+    const SPREAD_W = 1440
+    const SPREAD_H = 900
+    // Small symmetric side margin (the action buttons now live in the top-right
+    // chrome, so no wide gutter to reserve). Keeps the book centered and fully
+    // on-screen.
+    const MARGIN_X = 72
     // Top reserves: navbar (16+48=64) + 24px gap + whisper (~24px) + 32px
-    // gap = 144px before the book starts. Bottom reserves footer (~96).
+    // gap = 144px before the book starts. Bottom is light now that pull-a-card
+    // moved off the footer into the top-right cluster.
     const MARGIN_Y_TOP = 144
-    const MARGIN_Y_BOTTOM = 96
+    // Small bottom margin — the diary grows to fill the space (actions now live
+    // on the cover's top-right edge, not a bottom bar).
+    const MARGIN_Y_BOTTOM = 32
+    // Allow the diary to grow past its design size on roomy screens
+    // (fullscreen / large monitors) so it fills the height instead of
+    // leaving a dead gap below. Still bounded by available width/height, so
+    // smaller windows shrink as before. Tunable — 1.35 lets it fill big screens.
+    const MAX_SCALE = 1.35
     const calcScale = () => {
       const availW = window.innerWidth - MARGIN_X
       const availH = window.innerHeight - MARGIN_Y_TOP - MARGIN_Y_BOTTOM
-      const s = Math.min(1, availW / SPREAD_W, availH / SPREAD_H)
+      const s = Math.min(MAX_SCALE, availW / SPREAD_W, availH / SPREAD_H)
       setSpreadScale(s)
     }
     calcScale()

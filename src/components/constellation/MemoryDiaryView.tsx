@@ -162,7 +162,7 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
   // because LeftPage/RightPage rely on parent contexts that don't exist in
   // the off-screen tree. The polaroid caption shows time-ago.
   const spreadCaptureRef = useRef<HTMLDivElement>(null)
-  const polaroidCaption = `a memory from ${formatTimeAgo(new Date(entry.createdAt))} · hearth`
+  const polaroidCaption = `a memory from ${formatTimeAgo(new Date(entry.createdAt))} · meethril`
   const { CameraButton: ShareCameraButton, Capture: ShareCapture } = useShareableCapture({
     captureTarget: () => spreadCaptureRef.current,
     surface: 'memory',

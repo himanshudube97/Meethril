@@ -115,7 +115,7 @@ export async function shareOrDownload(blob: Blob, filename: string): Promise<Sha
   // Web Share API path — iOS, Android, Mac Safari, recent desktop Chrome
   if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'A page from Hearth' })
+      await navigator.share({ files: [file], title: 'A page from Meethril' })
       return { method: 'share' }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return { method: 'cancelled' }

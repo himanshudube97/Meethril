@@ -73,7 +73,7 @@ export default function ShareCardFrame({ date, subtitle, children }: ShareCardFr
       >
         <div style={{ fontSize: 42, marginBottom: 6 }}>{stamp.icon}</div>
         <div style={{ fontSize: 11, fontWeight: 700, color: stamp.color, letterSpacing: 2 }}>
-          HEARTH
+          MEETHRIL
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export default function ShareCardFrame({ date, subtitle, children }: ShareCardFr
           <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.85 }}>{subtitle}</div>
         )}
         <div style={{ fontSize: 18 }}>
-          hearth · {format(date, 'MMMM d, yyyy')}
+          meethril · {format(date, 'MMMM d, yyyy')}
         </div>
       </div>
     </div>

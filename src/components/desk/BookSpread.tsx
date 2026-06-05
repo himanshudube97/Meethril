@@ -12,7 +12,7 @@ import RightPage, { type RightPageHandle } from './RightPage'
 import { RibbonBookmark } from './interactive/RibbonBookmark'
 import RibbonTag from './interactive/RibbonTag'
 import ThemeOrnament from './decorations/ThemeOrnament'
-import PromptCard from './PromptCard'
+import DiaryActionRail from './DiaryActionRail'
 import SpineOrnaments from './SpineOrnaments'
 import DateTabRail from './DateTabRail'
 import { StrokeData, useJournalStore } from '@/store/journal'
@@ -118,6 +118,7 @@ export default function BookSpread() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const flipBookRef = useRef<any>(null)
   const diaryRootRef = useRef<HTMLDivElement>(null)
+  const coverRef = useRef<HTMLDivElement>(null)
 
   const autosave = useAutosaveEntry()
   const autosaveRef = useRef(autosave)
@@ -507,13 +508,35 @@ export default function BookSpread() {
   // wooden book cover, the date-tab rail, and ribbon — the full diary,
   // not just the inner spread. The result is wrapped in a polaroid frame
   // (white border + caption strip) for a marketing-friendly share asset.
-  const polaroidCaption = `${spreadDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · hearth`
-  const { CameraButton: ShareCameraButton, Capture: ShareCapture } = useShareableCapture({
+  const polaroidCaption = `${spreadDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · meethril`
+  const { Capture: ShareCapture, open: openShare, isOpen: shareBusy } = useShareableCapture({
     captureTarget: () => diaryRootRef.current,
     surface: 'diary',
     date: spreadDate,
     polaroidCaption,
   })
+
+  // Pin the actions to the hardcover's top-right edge (measured live) so they
+  // ride the corner of the book on any screen size — the cover is scaled +
+  // centered by DeskScene, so a fixed viewport offset would drift off it.
+  const [actionAnchor, setActionAnchor] = useState<{ top: number; right: number } | null>(null)
+  useEffect(() => {
+    if (loading) return
+    const measure = () => {
+      const el = coverRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setActionAnchor({ top: r.top, right: window.innerWidth - r.right })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    // Re-measure across the entrance scale-in + layout settle.
+    const timers = [setTimeout(measure, 200), setTimeout(measure, 700), setTimeout(measure, 1300)]
+    return () => {
+      window.removeEventListener('resize', measure)
+      timers.forEach(clearTimeout)
+    }
+  }, [loading, bookReady])
 
   return (
     <div
@@ -578,6 +601,7 @@ export default function BookSpread() {
             inherits the same opacity fade-in — the cover and pages reveal
             together rather than the cover popping in first. */}
         <div
+          ref={coverRef}
           className="book-cover"
           style={{ left: '-48px' }}
         />
@@ -587,13 +611,6 @@ export default function BookSpread() {
           <RibbonTag date={spreadDate} colors={colors} />
         </RibbonBookmark>
 
-        {/* Whisper + ornaments below the spread */}
-        <div className="absolute -bottom-20 left-0 right-0 flex items-center justify-center gap-4 pointer-events-none z-10">
-          <ThemeOrnament themeName={themeName} color={colors.ribbon} size={28} flip />
-          <PromptCard color={colors.prompt} />
-          <ThemeOrnament themeName={themeName} color={colors.ribbon} size={28} />
-        </div>
-
         {/* Top flourish — chapter-opener ornament that adapts per theme.
             Replaces the date pill (date now lives on the bookmark hangtag). */}
         <div
@@ -602,21 +619,6 @@ export default function BookSpread() {
           <div style={{ width: '36px', height: '1px', background: colors.pageBorder }} />
           <ThemeOrnament themeName={themeName} color={colors.ribbon} size={20} />
           <div style={{ width: '36px', height: '1px', background: colors.pageBorder }} />
-        </div>
-
-        {/* Share camera — top-right of the screen, between fullscreen and gear.
-            Always visible; the underlying hook short-circuits gracefully when
-            there's no entry to capture yet. */}
-        <div
-          className="fixed top-6 right-20 z-50 w-12 h-12 rounded-full flex items-center justify-center pointer-events-auto"
-          style={{
-            background: theme.glass.bg,
-            backdropFilter: `blur(${theme.glass.blur})`,
-            WebkitBackdropFilter: `blur(${theme.glass.blur})`,
-            border: `1px solid ${theme.glass.border}`,
-          }}
-        >
-          {ShareCameraButton}
         </div>
 
         {/* Flipbook (only after entries are loaded so startPage is correct).
@@ -761,6 +763,18 @@ export default function BookSpread() {
       </motion.div>
       )}
       </div>
+
+      {/* Right-margin action rail (pull a card + share), in the empty gutter
+          beside the centered diary. Portals to body so it sits against the
+          viewport, not the scaled book. */}
+      {!loading && (
+        <DiaryActionRail
+          promptColor={colors.prompt}
+          onShare={openShare}
+          shareBusy={shareBusy}
+          anchor={actionAnchor}
+        />
+      )}
       {ShareCapture}
     </div>
   )
