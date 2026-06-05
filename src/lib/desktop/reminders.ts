@@ -1,0 +1,26 @@
+import { isTauri } from './isTauri'
+
+export async function enableDesktopReminders(): Promise<void> {
+  if (!isTauri()) return
+  const { invoke } = await import('@tauri-apps/api/core')
+  // Ensure the server flag is set even though the webview can't web-push.
+  await fetch('/api/me/profile-flags', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ remindersEnabled: true }),
+  }).catch(() => {})
+  const { token } = await fetch('/api/me/desktop-token', { method: 'POST' }).then((r) => r.json())
+  await invoke('save_desktop_token', { token })
+  await invoke('install_reminder_agent')
+}
+
+export async function disableDesktopReminders(): Promise<void> {
+  if (!isTauri()) return
+  const { invoke } = await import('@tauri-apps/api/core')
+  await fetch('/api/me/profile-flags', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ remindersEnabled: false }),
+  }).catch(() => {})
+  await invoke('remove_reminder_agent')
+}

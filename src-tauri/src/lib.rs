@@ -1,3 +1,4 @@
+mod launchd;
 mod remind_check;
 
 use tauri::{AppHandle, Manager, WindowEvent};
@@ -49,6 +50,27 @@ fn clear_badge(app: AppHandle) -> Result<(), String> {
   }
 }
 
+#[tauri::command]
+fn save_desktop_token(token: String) -> Result<(), String> {
+  keyring::Entry::new("app.hearth.desktop", "desktop-token")
+    .map_err(|e| e.to_string())?
+    .set_password(&token)
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn install_reminder_agent() -> Result<(), String> {
+  launchd::install()
+}
+
+#[tauri::command]
+fn remove_reminder_agent() -> Result<(), String> {
+  if let Ok(entry) = keyring::Entry::new("app.hearth.desktop", "desktop-token") {
+    let _ = entry.delete_credential();
+  }
+  launchd::remove()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Headless short-circuit: scheduled reminder check without spinning up a window.
@@ -72,7 +94,10 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       show_notification,
       set_badge,
-      clear_badge
+      clear_badge,
+      save_desktop_token,
+      install_reminder_agent,
+      remove_reminder_agent
     ])
     .on_window_event(|window, event| {
       if let WindowEvent::Focused(true) = event {
