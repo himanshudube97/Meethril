@@ -12,7 +12,6 @@ import SongEmbed from '@/components/SongEmbed'
 import SongPicker from '@/components/SongPicker'
 import PhotoBlock from './PhotoBlock'
 import CompactDoodleCanvas from './CompactDoodleCanvas'
-import EntrySelector from './EntrySelector'
 import { getClientTz, isEntryLocked } from '@/lib/entry-lock-client'
 import { useAutosaveEntry } from '@/hooks/useAutosaveEntry'
 import { useDeskStore, type AutosaveStatus } from '@/store/desk'
@@ -279,18 +278,12 @@ export default function MobileJournalEntry() {
               })}
             </span>
           </div>
-          {todayEntries.length > 0 && (
-            <div className="flex justify-center mb-4">
-              <EntrySelector entries={todayEntries} currentEntryId={currentEntryId}
-                onEntrySelect={handleEntrySelect} />
-            </div>
-          )}
           {currentEntry.song && (
             <div className="mb-4"><SongEmbed url={currentEntry.song} compact audioOnly /></div>
           )}
           <div className="whitespace-pre-wrap mb-4" style={{
             color: colors.bodyText, fontFamily: 'var(--font-caveat), Georgia, serif',
-            fontSize: '20px', lineHeight: '32px',
+            fontSize: `${JOURNAL.FONT_SIZE}px`, lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
           }}>
             {plainText || <span style={{ color: colors.prompt, fontStyle: 'italic' }}>No text</span>}
           </div>
@@ -314,16 +307,6 @@ export default function MobileJournalEntry() {
         </span>
         <AutosaveIndicator status={autosaveStatus} color={colors.prompt} />
       </div>
-
-      {todayEntries.length > 0 && (
-        <div className="flex justify-center px-4 pb-2 shrink-0">
-          <EntrySelector
-            entries={todayEntries}
-            currentEntryId={currentEntryId}
-            onEntrySelect={handleEntrySelect}
-          />
-        </div>
-      )}
 
       {/* Tab strip */}
       <div className="flex justify-center px-4 pb-3 shrink-0">

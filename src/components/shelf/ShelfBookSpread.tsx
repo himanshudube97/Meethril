@@ -8,7 +8,6 @@ import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import LeftPage from '@/components/desk/LeftPage'
 import RightPage from '@/components/desk/RightPage'
 import DateTabRail from '@/components/desk/DateTabRail'
-import EntrySelector from '@/components/desk/EntrySelector'
 import { RibbonBookmark } from '@/components/desk/interactive/RibbonBookmark'
 import RibbonTag from '@/components/desk/interactive/RibbonTag'
 import { JournalEntry } from '@/store/journal'
@@ -148,21 +147,9 @@ export default function ShelfBookSpread({
   const [visibleSpread, setVisibleSpread] = useState(0)
   const [bookReady, setBookReady] = useState(false)
 
-  // Per-day "currently selected entry" for multi-entry days. Defaults to the
-  // first (newest) entry of each day.
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Record<number, string>>({})
-
+  // One entry per spread now that journaling is one-per-day; the day's first
+  // (newest) entry represents the spread for the ribbon date tag.
   const currentDay = days[visibleSpread] ?? []
-  const currentEntryId =
-    selectedEntryIds[visibleSpread] ?? currentDay[0]?.id ?? null
-
-  const handleEntrySelect = useCallback(
-    (entryId: string | null) => {
-      if (!entryId) return
-      setSelectedEntryIds((prev) => ({ ...prev, [visibleSpread]: entryId }))
-    },
-    [visibleSpread],
-  )
 
   const handleFlip = useCallback((e: { data: number }) => {
     setVisibleSpread(Math.floor(e.data / 2))
@@ -285,17 +272,6 @@ export default function ShelfBookSpread({
         </p>
       )}
 
-      {/* Multi-entry-per-day selector floats above the open book */}
-      {!isLoading && !isEmpty && currentDay.length > 1 && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2">
-          <EntrySelector
-            entries={currentDay}
-            currentEntryId={currentEntryId}
-            onEntrySelect={handleEntrySelect}
-          />
-        </div>
-      )}
-
       {/* Book frame */}
       {!isLoading && !isEmpty && (
       <div
@@ -374,9 +350,8 @@ export default function ShelfBookSpread({
             showPageCorners={false}
             disableFlipByClick={true}
           >
-            {days.flatMap((day, idx) => {
-              const entry =
-                day.find((e) => e.id === (selectedEntryIds[idx] ?? day[0].id)) ?? day[0]
+            {days.flatMap((day) => {
+              const entry = day[0]
               // Narrow JournalEntry to the local Entry shapes that LeftPage and
               // RightPage expect (song must be string|null, not string|undefined;
               // photo position must be 1|2, not number; doodles only need strokes).

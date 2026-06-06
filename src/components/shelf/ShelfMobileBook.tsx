@@ -6,7 +6,6 @@ import { useThemeStore } from '@/store/theme'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import LeftPage from '@/components/desk/LeftPage'
 import RightPage from '@/components/desk/RightPage'
-import EntrySelector from '@/components/desk/EntrySelector'
 import { JournalEntry } from '@/store/journal'
 import { monthLabel, toRoman } from './shelfPalette'
 
@@ -53,15 +52,10 @@ export default function ShelfMobileBook({
   const isLoading = entries === null
   const isEmpty = entries !== null && entries.length === 0
   const [dayIdx, setDayIdx] = useState(0)
-  // Per-day selection map. Keying by dayIdx avoids needing a reset effect when
-  // dayIdx changes (which would trip react-hooks/set-state-in-effect).
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Record<number, string>>({})
 
+  // One entry per day now that journaling is one-per-day.
   const currentDay = days[dayIdx] ?? []
-  const currentEntry =
-    currentDay.find((e) => e.id === selectedEntryIds[dayIdx]) ??
-    currentDay[0] ??
-    null
+  const currentEntry = currentDay[0] ?? null
 
   // Esc closes the book.
   useEffect(() => {
@@ -149,20 +143,6 @@ export default function ShelfMobileBook({
           {monthLabel(monthIndex)} {toRoman(year)}
         </div>
       </div>
-
-      {/* Multi-entry-per-day selector */}
-      {currentDay.length > 1 && (
-        <div className="flex justify-center pb-2">
-          <EntrySelector
-            entries={currentDay}
-            currentEntryId={currentEntry.id}
-            onEntrySelect={(id) => {
-              if (!id) return
-              setSelectedEntryIds((prev) => ({ ...prev, [dayIdx]: id }))
-            }}
-          />
-        </div>
-      )}
 
       {/* Reader: stack the read-only branches of LeftPage and RightPage
           vertically. They already have isNewEntry={false} branches that
