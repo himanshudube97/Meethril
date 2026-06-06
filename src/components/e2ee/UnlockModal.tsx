@@ -102,14 +102,14 @@ export default function UnlockModal() {
                 <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                   Unlock Your Journal
                 </h2>
-                <p className="text-sm" style={{ color: theme.text.secondary }}>
+                <p className="text-base" style={{ color: theme.text.secondary }}>
                   Enter your daily key to decrypt your entries.
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
+                  <label className="block text-sm mb-2" style={{ color: theme.text.secondary }}>
                     Daily Key
                   </label>
                   <div className="relative">
@@ -122,7 +122,7 @@ export default function UnlockModal() {
                       }}
                       placeholder="Enter your daily key..."
                       autoFocus
-                      className="w-full p-4 rounded-xl text-sm outline-none"
+                      className="w-full p-4 rounded-xl text-base outline-none"
                       style={{
                         background: theme.glass.bg,
                         border: `1px solid ${theme.glass.border}`,
@@ -135,7 +135,7 @@ export default function UnlockModal() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
+                  <p className="text-base text-center" style={{ color: theme.accent.warm }}>
                     {error}
                   </p>
                 )}
@@ -144,7 +144,7 @@ export default function UnlockModal() {
               <button
                 onClick={handleUnlock}
                 disabled={loading || !dailyKey}
-                className="w-full py-3 rounded-xl text-sm font-medium"
+                className="w-full py-3 rounded-xl text-base font-medium"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -156,8 +156,8 @@ export default function UnlockModal() {
 
               <button
                 onClick={handleForgotKey}
-                className="w-full text-sm"
-                style={{ color: theme.text.muted }}
+                className="w-full text-base"
+                style={{ color: theme.text.secondary }}
               >
                 Forgot your daily key? Use recovery key
               </button>

@@ -11,13 +11,10 @@ export function RecoveryKeyStep({
   onComplete: (rk: string) => void
 }) {
   const { theme } = useThemeStore()
-  const [recoveryKey, setRecoveryKey] = useState<string | null>(null)
+  // Generate once on first client render (this modal is client-only).
+  const [recoveryKey] = useState<string | null>(() => generateRecoveryKey())
   const [acknowledged, setAcknowledged] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    setRecoveryKey(generateRecoveryKey())
-  }, [])
 
   useEffect(() => {
     if (!copied) return
@@ -33,9 +30,9 @@ export function RecoveryKeyStep({
 
   return (
     <div>
-      <h2 className="font-serif text-2xl mb-3">Save your recovery key.</h2>
+      <h2 className="font-serif text-3xl md:text-4xl mb-4">Save your recovery key.</h2>
       <p
-        className="text-sm mb-6 leading-relaxed"
+        className="text-lg mb-7 leading-relaxed"
         style={{ color: theme.text.secondary }}
       >
         This is your only way back in if you ever forget your phrase. Save
@@ -44,7 +41,7 @@ export function RecoveryKeyStep({
       </p>
 
       <div
-        className="font-mono text-lg p-6 border rounded-lg mb-4 break-all select-all"
+        className="font-mono text-2xl p-6 border rounded-lg mb-4 break-all select-all"
         style={{
           background: theme.glass.bg,
           borderColor: `${theme.text.primary}33`,
@@ -60,7 +57,7 @@ export function RecoveryKeyStep({
             navigator.clipboard.writeText(recoveryKey)
             setCopied(true)
           }}
-          className="px-4 py-2 border rounded-full text-sm transition-opacity hover:opacity-80"
+          className="px-5 py-2.5 border rounded-full text-lg transition-opacity hover:opacity-80"
           style={{
             borderColor: `${theme.text.primary}4d`,
             color: theme.text.primary,
@@ -70,7 +67,7 @@ export function RecoveryKeyStep({
         </button>
         <button
           onClick={() => downloadRecoveryKey(recoveryKey)}
-          className="px-4 py-2 border rounded-full text-sm transition-opacity hover:opacity-80"
+          className="px-5 py-2.5 border rounded-full text-lg transition-opacity hover:opacity-80"
           style={{
             borderColor: `${theme.text.primary}4d`,
             color: theme.text.primary,
@@ -91,7 +88,7 @@ export function RecoveryKeyStep({
           className="mt-1"
           style={{ accentColor: theme.accent.primary }}
         />
-        <span className="text-sm leading-relaxed">
+        <span className="text-lg leading-relaxed">
           I&apos;ve saved my recovery key somewhere I can find it again. I
           understand that if I lose both my phrase and this key, my data
           cannot be recovered.
@@ -101,7 +98,7 @@ export function RecoveryKeyStep({
       <button
         disabled={!acknowledged}
         onClick={() => onComplete(recoveryKey)}
-        className="px-6 py-3 rounded-full disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
+        className="px-7 py-3.5 rounded-full text-lg disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
         style={{
           background: theme.text.primary,
           color: theme.bg.primary,

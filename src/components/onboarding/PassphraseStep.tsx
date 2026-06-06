@@ -21,9 +21,9 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
 
   return (
     <div>
-      <h2 className="font-serif text-2xl mb-3">Choose your memorable phrase.</h2>
+      <h2 className="font-serif text-3xl md:text-4xl mb-4">Choose your memorable phrase.</h2>
       <p
-        className="text-sm mb-6 leading-relaxed"
+        className="text-lg mb-7 leading-relaxed"
         style={{ color: theme.text.secondary }}
       >
         This is your daily key. Pick something only you would write — a
@@ -32,8 +32,8 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
       </p>
 
       <label
-        className="block text-xs uppercase tracking-wider mb-2"
-        style={{ color: theme.text.muted }}
+        className="block text-base uppercase tracking-wider mb-2"
+        style={{ color: theme.text.secondary }}
       >
         Your phrase
       </label>
@@ -42,14 +42,14 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
         value={passphrase}
         onChange={(e) => setPassphrase(e.target.value)}
         placeholder="e.g. coffee with mira in the rain"
-        className="w-full px-4 py-3 mb-3 border rounded-lg"
+        className="w-full px-4 py-3.5 mb-3 border rounded-lg text-lg"
         style={inputStyle}
         autoFocus
       />
 
       <label
-        className="block text-xs uppercase tracking-wider mb-2"
-        style={{ color: theme.text.muted }}
+        className="block text-base uppercase tracking-wider mb-2"
+        style={{ color: theme.text.secondary }}
       >
         Type it again to be sure
       </label>
@@ -57,12 +57,12 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
         type={show ? 'text' : 'password'}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
-        className="w-full px-4 py-3 mb-3 border rounded-lg"
+        className="w-full px-4 py-3.5 mb-3 border rounded-lg text-lg"
         style={inputStyle}
       />
 
       <label
-        className="text-sm flex items-center gap-2 mb-6"
+        className="text-lg flex items-center gap-2 mb-6"
         style={{ color: theme.text.secondary }}
       >
         <input
@@ -75,29 +75,48 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
       </label>
 
       {tooShort && (
-        <p className="text-sm mb-3" style={{ color: theme.accent.warm }}>
+        <p className="text-lg font-medium mb-3" style={{ color: theme.text.primary }}>
           Just a little longer — 8 characters at minimum.
         </p>
       )}
       {mismatch && (
-        <p className="text-sm mb-3" style={{ color: theme.accent.warm }}>
+        <p className="text-lg font-medium mb-3" style={{ color: theme.text.primary }}>
           The two phrases don&apos;t match.
         </p>
       )}
 
-      <p
-        className="text-xs mb-6 italic leading-relaxed"
-        style={{ color: theme.text.muted }}
+      <div
+        className="flex items-start gap-3 mb-7 p-4 rounded-xl border border-l-4"
+        style={{
+          background: theme.glass.bg,
+          borderColor: theme.accent.warm,
+        }}
       >
-        Important: if you forget this phrase, we cannot reset it. Even we
-        don&apos;t know what it is — that&apos;s how this works. You&apos;ll get a
-        recovery key next as a backup.
-      </p>
+        <svg
+          className="w-6 h-6 shrink-0 mt-0.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={theme.accent.warm}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <p className="text-base leading-relaxed" style={{ color: theme.text.primary }}>
+          <strong style={{ color: theme.accent.warm }}>Important:</strong> if you forget
+          this phrase, we cannot reset it. Even we don&apos;t know what it is — that&apos;s
+          how this works. You&apos;ll get a recovery key next as a backup.
+        </p>
+      </div>
 
       <button
         disabled={!valid}
         onClick={() => onComplete(passphrase)}
-        className="px-6 py-3 rounded-full disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
+        className="px-7 py-3.5 rounded-full text-lg disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
         style={{
           background: theme.text.primary,
           color: theme.bg.primary,

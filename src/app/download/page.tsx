@@ -1,46 +1,86 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useThemeStore } from '@/store/theme'
 import type { Theme } from '@/lib/themes'
 
-type OS = 'mac' | 'windows' | 'linux' | 'unknown'
-
-const DOWNLOAD_LINKS: Record<Exclude<OS, 'unknown'>, string> = {
-  mac: '/api/download/mac-arm',
-  windows: '/api/download/windows',
-  linux: '/api/download/linux',
+/** Minimal shape of the Chromium-only beforeinstallprompt event. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-const OS_LABELS: Record<Exclude<OS, 'unknown'>, string> = {
-  mac: 'Mac',
-  windows: 'Windows',
-  linux: 'Linux',
+// Capture the install prompt at module load — it can fire before React mounts,
+// so listening only inside useEffect would miss it. We stash it and notify the
+// component via a custom event.
+let capturedPrompt: BeforeInstallPromptEvent | null = null
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault()
+    capturedPrompt = e as BeforeInstallPromptEvent
+    window.dispatchEvent(new Event('meethril:installable'))
+  })
 }
 
-function detectOS(): OS {
-  if (typeof navigator === 'undefined') return 'unknown'
+type Browser = 'safari' | 'chromium' | 'firefox' | 'other'
+
+function detectBrowser(): Browser {
+  if (typeof navigator === 'undefined') return 'other'
   const ua = navigator.userAgent.toLowerCase()
-  const platform = navigator.platform?.toLowerCase() ?? ''
-  if (ua.includes('mac') || platform.includes('mac')) return 'mac'
-  if (ua.includes('win') || platform.includes('win')) return 'windows'
-  if (ua.includes('linux') || platform.includes('linux')) return 'linux'
-  return 'unknown'
+  if (/firefox|fxios/.test(ua)) return 'firefox'
+  if (/edg|chrome|crios|brave/.test(ua)) return 'chromium'
+  if (/safari/.test(ua)) return 'safari'
+  return 'other'
 }
+
+const WHISPERS = [
+  'Opens straight to today.',
+  'Lives in your dock — no tabs, no noise.',
+  'Sealed before it ever leaves your hands.',
+]
 
 export default function DownloadPage() {
   const { theme } = useThemeStore()
-  const [detected, setDetected] = useState<OS>('unknown')
+
+  const [installed, setInstalled] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(display-mode: standalone)').matches
+  )
+  const [canPrompt, setCanPrompt] = useState(() => !!capturedPrompt)
+  const [showGuide, setShowGuide] = useState(false)
+  const [browser] = useState<Browser>(() => detectBrowser())
 
   useEffect(() => {
-    setDetected(detectOS())
+    const onInstallable = () => setCanPrompt(true)
+    const onInstalled = () => {
+      setInstalled(true)
+      setCanPrompt(false)
+      capturedPrompt = null
+    }
+    window.addEventListener('meethril:installable', onInstallable)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('meethril:installable', onInstallable)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
   }, [])
 
-  const otherOptions: Array<Exclude<OS, 'unknown'>> = (
-    ['mac', 'windows', 'linux'] as const
-  ).filter((o) => o !== detected)
+  const handleInstall = async () => {
+    if (capturedPrompt) {
+      await capturedPrompt.prompt()
+      const { outcome } = await capturedPrompt.userChoice
+      capturedPrompt = null
+      setCanPrompt(false)
+      if (outcome === 'dismissed') setShowGuide(true)
+      return
+    }
+    // No programmatic prompt (Safari/Firefox, or criteria not met) — show the
+    // step-by-step guide so manual install is obvious.
+    setShowGuide(true)
+  }
 
   return (
     <main
@@ -87,101 +127,165 @@ export default function DownloadPage() {
           A quiet little app for the corner of your screen.
         </p>
 
-        <PrimaryDownload os={detected} theme={theme} />
+        {installed ? (
+          <p className="text-base italic" style={{ color: theme.text.secondary }}>
+            You&apos;re all set — Meethril is already on your desktop. ✦
+          </p>
+        ) : (
+          <>
+            <button
+              onClick={handleInstall}
+              className="inline-flex items-center gap-3 px-9 py-4 rounded-full text-base font-medium transition-all hover:opacity-90"
+              style={{
+                background: theme.accent.primary,
+                color: theme.bg.primary,
+                boxShadow: `0 8px 30px ${theme.accent.primary}40`,
+                cursor: 'pointer',
+              }}
+            >
+              {canPrompt ? 'Add Meethril to your desktop' : 'Download for your desktop'}
+            </button>
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-3 text-sm">
-          {otherOptions.map((os) => (
-            <DownloadPill key={os} os={os} theme={theme} />
-          ))}
+            {!canPrompt && (
+              <button
+                onClick={() => setShowGuide((v) => !v)}
+                className="block mx-auto mt-5 text-sm underline underline-offset-4 opacity-80 hover:opacity-100 transition"
+                style={{ color: theme.text.secondary }}
+              >
+                How do I install it?
+              </button>
+            )}
+
+            <AnimatePresence>
+              {showGuide && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="overflow-hidden"
+                >
+                  <InstallGuide theme={theme} browser={browser} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+
+        {/* atmospheric filler */}
+        <div
+          className="mt-16 pt-10 border-t max-w-md mx-auto"
+          style={{ borderColor: `${theme.text.secondary}26` }}
+        >
+          <div className="space-y-3">
+            {WHISPERS.map((line, i) => (
+              <motion.p
+                key={line}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 + i * 0.15, ease: 'easeOut' }}
+                className="text-base"
+                style={{ color: theme.text.secondary }}
+              >
+                {line}
+              </motion.p>
+            ))}
+          </div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 1.1 }}
+            className="mt-10 text-sm italic"
+            style={{ color: theme.text.muted }}
+          >
+            It installs straight from your browser — nothing to update, nothing to
+            manage. Just a small warm light, always one click away.
+          </motion.p>
         </div>
-
-        <FirstLaunchNote theme={theme} />
       </motion.div>
     </main>
   )
 }
 
-function PrimaryDownload({
-  os,
-  theme,
-}: {
-  os: OS
-  theme: Theme
-}) {
-  if (os === 'unknown') {
-    return (
-      <p
-        className="text-sm italic"
-        style={{ color: theme.text.muted }}
-      >
-        Pick your platform below.
-      </p>
-    )
-  }
-  return (
-    <a
-      href={DOWNLOAD_LINKS[os]}
-      className="inline-flex items-center gap-3 px-8 py-4 rounded-full text-base font-medium transition-all"
-      style={{
-        background: theme.accent.primary,
-        color: theme.bg.primary,
-        boxShadow: `0 8px 30px ${theme.accent.primary}40`,
-        cursor: 'pointer',
-      }}
-    >
-      <span>Download for {OS_LABELS[os]}</span>
-    </a>
-  )
-}
+function InstallGuide({ theme, browser }: { theme: Theme; browser: Browser }) {
+  const safariSteps = [
+    <>Open the <strong style={{ color: theme.text.primary }}>File</strong> menu in the top bar (or the Share button).</>,
+    <>Choose <strong style={{ color: theme.text.primary }}>Add to Dock</strong>.</>,
+    <>Click <strong style={{ color: theme.text.primary }}>Add</strong> — Meethril now lives in your dock.</>,
+  ]
+  const chromiumSteps = [
+    <>Look for the install icon <span aria-hidden style={{ color: theme.text.primary }}>⊕▾</span> at the right edge of the address bar.</>,
+    <>Click it, then <strong style={{ color: theme.text.primary }}>Install</strong>.</>,
+    <>Meethril opens in its own window, ready to pin to your dock.</>,
+  ]
 
-function DownloadPill({
-  os,
-  theme,
-}: {
-  os: Exclude<OS, 'unknown'>
-  theme: Theme
-}) {
-  return (
-    <a
-      href={DOWNLOAD_LINKS[os]}
-      className="px-5 py-2.5 rounded-full border text-sm tracking-wide transition hover:opacity-80"
-      style={{
-        borderColor: `${theme.text.secondary}66`,
-        color: theme.text.secondary,
-      }}
-    >
-      {OS_LABELS[os]}
-    </a>
-  )
-}
+  // Lead with the user's browser; always show both so no one is stuck.
+  const primary =
+    browser === 'chromium'
+      ? { title: 'Chrome, Edge or Brave', steps: chromiumSteps }
+      : { title: 'Safari', steps: safariSteps }
+  const secondary =
+    browser === 'chromium'
+      ? { title: 'Safari', steps: safariSteps }
+      : { title: 'Chrome, Edge or Brave', steps: chromiumSteps }
 
-function FirstLaunchNote({
-  theme,
-}: {
-  theme: Theme
-}) {
   return (
     <div
-      className="mt-16 max-w-md mx-auto text-left text-sm leading-relaxed border-t pt-8"
+      className="mt-6 mx-auto max-w-md text-left rounded-2xl p-6 border"
       style={{
-        borderColor: `${theme.text.secondary}30`,
-        color: theme.text.secondary,
+        background: theme.glass.bg,
+        borderColor: `${theme.text.secondary}26`,
       }}
     >
-      <p className="mb-2 italic">First launch?</p>
-      <p className="mb-1">
-        <strong style={{ color: theme.text.primary }}>Mac:</strong>{' '}
-        right-click the app → Open → Open. macOS will remember after that.
+      <GuideBlock theme={theme} title={primary.title} steps={primary.steps} highlight />
+      <div className="my-5 h-px" style={{ background: `${theme.text.secondary}1f` }} />
+      <GuideBlock theme={theme} title={secondary.title} steps={secondary.steps} />
+    </div>
+  )
+}
+
+function GuideBlock({
+  theme,
+  title,
+  steps,
+  highlight,
+}: {
+  theme: Theme
+  title: string
+  steps: React.ReactNode[]
+  highlight?: boolean
+}) {
+  return (
+    <div>
+      <p
+        className="text-sm uppercase tracking-wider mb-3"
+        style={{ color: highlight ? theme.accent.primary : theme.text.secondary }}
+      >
+        {title}
+        {highlight && ' — you’re here'}
       </p>
-      <p className="mb-3">
-        <strong style={{ color: theme.text.primary }}>Windows:</strong>{' '}
-        click <em>More info</em> → <em>Run anyway</em> if SmartScreen warns
-        you.
-      </p>
-      <p className="opacity-90">
-        Mac build is for Apple Silicon (M1, M2, M3, M4). Intel Mac support
-        coming later.
-      </p>
+      <ol className="space-y-3">
+        {steps.map((step, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span
+              className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium"
+              style={{
+                background: `${theme.accent.primary}22`,
+                color: theme.text.primary,
+              }}
+            >
+              {i + 1}
+            </span>
+            <span
+              className="text-base leading-relaxed"
+              style={{ color: theme.text.primary }}
+            >
+              {step}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

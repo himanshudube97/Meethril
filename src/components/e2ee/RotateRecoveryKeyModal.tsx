@@ -118,17 +118,17 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Generate new recovery key
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Your current recovery key will stop working. Make sure you save the new one before closing this dialog.
               </p>
             </div>
             {error && (
-              <p className="text-sm text-center" style={{ color: theme.accent.warm }}>{error}</p>
+              <p className="text-base text-center" style={{ color: theme.accent.warm }}>{error}</p>
             )}
             <div className="flex gap-3">
               <button
                 onClick={handleClose}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -140,7 +140,7 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
               <button
                 onClick={handleConfirm}
                 disabled={loading}
-                className="flex-1 py-3 rounded-xl text-sm font-medium"
+                className="flex-1 py-3 rounded-xl text-base font-medium"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -158,12 +158,12 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Save your new recovery key
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
-                We'll only show this once. Save it now.
+              <p className="text-base" style={{ color: theme.text.secondary }}>
+                We&apos;ll only show this once. Save it now.
               </p>
             </div>
             <div
-              className="p-4 rounded-xl text-center font-mono tracking-wide select-all"
+              className="p-4 rounded-xl text-center font-mono tracking-wide select-all text-xl break-all"
               style={{
                 background: theme.glass.bg,
                 border: `1px solid ${theme.accent.primary}50`,
@@ -175,7 +175,7 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
             <div className="flex gap-3">
               <button
                 onClick={handleCopy}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -186,7 +186,7 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
               </button>
               <button
                 onClick={downloadKey}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -196,10 +196,10 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
                 Download
               </button>
             </div>
-            <p className="text-xs" style={{ color: theme.accent.warm }}>
+            <p className="text-sm" style={{ color: theme.accent.warm }}>
               ⚠ If you lose both your daily key and this recovery key, your journal cannot be recovered.
             </p>
-            <label className="flex items-center gap-3 cursor-pointer text-sm" style={{ color: theme.text.secondary }}>
+            <label className="flex items-center gap-3 cursor-pointer text-base" style={{ color: theme.text.secondary }}>
               <input
                 type="checkbox"
                 checked={savedAck}
@@ -207,12 +207,12 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
                 className="w-4 h-4 rounded"
                 style={{ accentColor: theme.accent.primary }}
               />
-              I've saved my new recovery key.
+              I&apos;ve saved my new recovery key.
             </label>
             <button
               onClick={() => setStep('done')}
               disabled={!savedAck}
-              className="w-full py-3 rounded-xl text-sm font-medium"
+              className="w-full py-3 rounded-xl text-base font-medium"
               style={{
                 background: theme.accent.primary,
                 color: '#fff',
@@ -228,12 +228,12 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
             <h2 className="text-xl font-light" style={{ color: theme.text.primary }}>
               Recovery key updated ✅
             </h2>
-            <p className="text-sm" style={{ color: theme.text.secondary }}>
+            <p className="text-base" style={{ color: theme.text.secondary }}>
               Your old recovery key is no longer valid.
             </p>
             <button
               onClick={handleClose}
-              className="w-full py-3 rounded-xl text-sm font-medium"
+              className="w-full py-3 rounded-xl text-base font-medium"
               style={{ background: theme.accent.primary, color: '#fff' }}
             >
               Close
