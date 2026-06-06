@@ -207,4 +207,29 @@ CRON_SECRET=...
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3111
+
+# Analytics & Monitoring
+NEXT_PUBLIC_SENTRY_DSN=...   # Sentry DSN (SDK is inert when unset — safe to leave blank in dev)
+SENTRY_ORG=...               # build-time source-map upload (CI/Vercel only)
+SENTRY_PROJECT=...
+SENTRY_AUTH_TOKEN=...
 ```
+
+### Analytics & Error Monitoring
+Two complementary tools, both privacy-tuned for an E2EE journal:
+
+- **Sentry** (`@sentry/nextjs`) — error + performance monitoring. Config lives in
+  `src/instrumentation.ts` (server/edge register + `onRequestError`),
+  `src/instrumentation-client.ts` (browser init + router tracing),
+  `src/sentry.server.config.ts`, `src/sentry.edge.config.ts`, and the
+  `withSentryConfig` wrapper in `next.config.ts`. **Privacy guards are
+  non-negotiable here:** `sendDefaultPii: false`, **no Session Replay** (it would
+  record decrypted journal text on screen), and a shared `beforeSend` scrubber
+  (`src/lib/sentry-scrub.ts`) that strips request bodies, query strings, cookies,
+  auth headers, and user email/IP from every event. When adding Sentry features,
+  never reintroduce replay or PII capture.
+- **Vercel Analytics + Speed Insights** (`@vercel/analytics`, `@vercel/speed-insights`)
+  — cookieless pageviews and Web Vitals, mounted in `src/app/layout.tsx`. No keys;
+  enable both in the Vercel dashboard. They no-op off Vercel, so dev is unaffected.
+
+Both are dormant without configuration, so local Docker dev runs exactly as before.

@@ -1,5 +1,8 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
+import { useEffect } from 'react'
+
 // Catches render errors that escape the root layout. Must include its own
 // <html> and <body> tags per Next.js App Router conventions. Without this,
 // an unhandled render throw (e.g. a TipTap exception, a malformed decryption
@@ -11,6 +14,11 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // Report the crash to Sentry (no-op when no DSN is configured).
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
   return (
     <html lang="en">
       <body
