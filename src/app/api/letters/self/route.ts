@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
+import { isAdminEmail } from '@/lib/auth/admin'
 import { checkQuota, quotaExceededResponse } from '@/lib/billing/quota'
 
 export const dynamic = 'force-dynamic'
@@ -40,15 +41,16 @@ export async function POST(request: NextRequest) {
   if (Number.isNaN(scheduledFor.valueOf())) {
     return NextResponse.json({ error: 'bad scheduledFor' }, { status: 400 })
   }
-  // TEST-PILL: minimum lead time relaxed to ~1 hour so SealModal's 1h test
-  // pill works end-to-end on staging. Tighten back to 7 days
-  //   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
-  //   if (scheduledFor.getTime() < Date.now() + sevenDaysMs - 60_000) ...
-  // before a real public launch. Grep for TEST-PILL to find every spot.
-  // No upper bound for self-letters.
-  const oneHourMs = 60 * 60 * 1000
-  if (scheduledFor.getTime() < Date.now() + oneHourMs - 60_000) {
-    return NextResponse.json({ error: 'scheduledFor too soon (min 1 hour)' }, { status: 400 })
+  // Minimum lead time: 7 days for everyone, ~1 minute for admins (ADMIN_EMAILS)
+  // so operators can smoke-test delivery without waiting a week. No upper bound
+  // for self-letters. The matching admin-only 5-min pill lives in SealModal.
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  const minLeadMs = isAdminEmail(user.email) ? 60_000 : sevenDaysMs
+  if (scheduledFor.getTime() < Date.now() + minLeadMs - 60_000) {
+    return NextResponse.json(
+      { error: isAdminEmail(user.email) ? 'scheduledFor too soon' : 'scheduledFor too soon (min 1 week)' },
+      { status: 400 },
+    )
   }
 
   // Monthly quota for sealed self-letters (free: 2/mo; paid: 10/mo). Promoting

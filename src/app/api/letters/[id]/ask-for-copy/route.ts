@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { isPaidUser } from '@/lib/billing/is-paid-user'
+import { isAdminEmail } from '@/lib/auth/admin'
 import { sendAskForCopyEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,7 @@ export async function POST(
     select: { name: true, subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
   if (!dbUser) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  if (!isPaidUser(dbUser)) {
+  if (!isPaidUser({ ...dbUser, isAdmin: isAdminEmail(user.email) })) {
     return NextResponse.json({ error: 'paid feature' }, { status: 402 })
   }
 

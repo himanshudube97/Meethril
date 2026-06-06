@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { planFromProductId } from '@/lib/dodo'
 import { isPaidUser } from '@/lib/billing/is-paid-user'
+import { isAdminEmail } from '@/lib/auth/admin'
 
 export async function GET() {
   try {
@@ -25,13 +26,18 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const premium = isPaidUser(dbUser)
+    const isAdmin = isAdminEmail(user.email)
+    const premium = isPaidUser({ ...dbUser, isAdmin })
     const plan = planFromProductId(dbUser.dodoProductId)
 
     return NextResponse.json({
       isPremium: premium,
       // Complimentary (friends & family) access: premium with no Dodo plan.
       complimentary: dbUser.complimentaryAccess,
+      // Operator/admin (ADMIN_EMAILS). The frontend mirrors this to show the
+      // $1 live-test button + the 5-min letter pill; every real gate re-checks
+      // server-side, so this flag is display-only.
+      isAdmin,
       plan,
       status: dbUser.complimentaryAccess ? 'complimentary' : dbUser.subscriptionStatus,
       currentPeriodEnd: dbUser.currentPeriodEnd,

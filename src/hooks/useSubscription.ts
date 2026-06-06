@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 
 interface SubscriptionData {
   isPremium: boolean
-  plan: 'monthly' | 'yearly' | null
+  plan: 'monthly' | 'yearly' | 'test' | null
   status: string | null
   currentPeriodEnd: string | null
+  // Operator/admin (ADMIN_EMAILS). Display-only — gates re-check server-side.
+  isAdmin: boolean
 }
 
 interface UseSubscriptionReturn extends SubscriptionData {
@@ -21,6 +23,7 @@ export function useSubscription(): UseSubscriptionReturn {
     plan: null,
     status: null,
     currentPeriodEnd: null,
+    isAdmin: false,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +43,7 @@ export function useSubscription(): UseSubscriptionReturn {
             plan: null,
             status: null,
             currentPeriodEnd: null,
+            isAdmin: false,
           })
           return
         }
@@ -52,6 +56,7 @@ export function useSubscription(): UseSubscriptionReturn {
         plan: result.plan,
         status: result.status,
         currentPeriodEnd: result.currentPeriodEnd,
+        isAdmin: Boolean(result.isAdmin),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -61,6 +66,8 @@ export function useSubscription(): UseSubscriptionReturn {
   }, [])
 
   useEffect(() => {
+    // Fetch-on-mount; setState fires inside the async callback, not synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSubscription()
   }, [fetchSubscription])
 
@@ -73,7 +80,7 @@ export function useSubscription(): UseSubscriptionReturn {
 }
 
 export async function createCheckoutSession(
-  priceId: 'monthly' | 'yearly'
+  priceId: 'monthly' | 'yearly' | 'test'
 ): Promise<string> {
   const response = await fetch('/api/checkout', {
     method: 'POST',

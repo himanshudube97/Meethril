@@ -21,7 +21,14 @@ export function isPaidUser(user: {
   currentPeriodEnd: Date | null
   // Friends & family / comps: full paid tier, no subscription, no expiry.
   complimentaryAccess?: boolean | null
+  // Operator/admin (ADMIN_EMAILS): auto-entitled to the full paid tier so we
+  // can dogfood paid features without a subscription. Computed by callers via
+  // isAdminEmail(email) — kept out of this pure function so it stays testable.
+  isAdmin?: boolean | null
 }): boolean {
+  // Admin trumps everything — operators always have the paid tier.
+  if (user.isAdmin) return true
+
   // Complimentary access trumps everything — entitled regardless of any
   // subscription state. There is no expiry; revoke by clearing the flag.
   if (user.complimentaryAccess) return true

@@ -12,14 +12,14 @@ const freeTier = {
   period: 'forever',
   description: 'Begin your journaling journey',
   features: [
-    { text: '10 journal entries per month', included: true },
-    { text: '3 beautiful themes', included: true },
-    { text: '1 custom cursor', included: true },
-    { text: '1 letter to your future self', included: true, note: 'lifetime' },
-    { text: '1 letter to a friend', included: true, note: 'lifetime' },
-    { text: '2 letter themes', included: true },
-    { text: 'Mood tracking & calendar', included: true },
-    { text: 'Basic search', included: true },
+    { text: '15 journal entries per month', included: true },
+    { text: 'Every theme & cursor', included: true },
+    { text: '2 letters to your future self / month', included: true },
+    { text: '10 letters to a friend / month', included: true },
+    { text: '10 scrapbook pages / month', included: true },
+    { text: '1 stranger note per day', included: true },
+    { text: 'Mood tracking, calendar & search', included: true },
+    { text: 'Constellation & garden views', included: true },
   ],
 }
 
@@ -30,37 +30,37 @@ const premiumTier = {
   yearlyPrice: '$40',
   yearlyOriginal: '$60',
   yearlyPeriod: '/year',
-  yearlySavings: 'Save 2 months',
-  description: 'Unlimited reflection & connection',
+  yearlySavings: 'Save 4 months',
+  description: 'More room to reflect & connect',
   features: [
     { text: 'Unlimited journal entries', included: true },
-    { text: 'All 11 immersive themes', included: true },
-    { text: 'All 8 custom cursors', included: true },
-    { text: 'Unlimited letters to yourself', included: true },
-    { text: 'Unlimited letters to friends', included: true },
-    { text: 'All letter themes (6+)', included: true },
-    { text: 'Mood constellation view', included: true },
-    { text: 'Advanced stats & insights', included: true },
+    { text: '10 letters to your future self / month', included: true },
+    { text: '20 letters to a friend / month', included: true },
+    { text: '30 scrapbook pages / month', included: true },
+    { text: '5 stranger notes per day', included: true },
+    { text: 'Ask friends to save a copy of their letter', included: true },
+    { text: 'Every theme, cursor & view — always', included: true },
   ],
 }
 
 export default function PricingPage() {
   const { theme } = useThemeStore()
-  const { isPremium, plan, isLoading } = useSubscription()
-  const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'yearly' | null>(null)
+  const { isPremium, plan, isLoading, isAdmin } = useSubscription()
+  const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'yearly' | 'test' | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
 
   // Check for success/canceled query params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('success') === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowSuccess(true)
       // Clean up URL
       window.history.replaceState({}, '', '/pricing')
     }
   }, [])
 
-  const handleCheckout = async (priceId: 'monthly' | 'yearly') => {
+  const handleCheckout = async (priceId: 'monthly' | 'yearly' | 'test') => {
     try {
       setCheckoutLoading(priceId)
       const url = await createCheckoutSession(priceId)
@@ -254,17 +254,6 @@ export default function PricingPage() {
                   <span style={{ color: theme.accent.primary }}>✓</span>
                   <span style={{ color: theme.text.secondary }}>
                     {feature.text}
-                    {feature.note && (
-                      <span
-                        className="ml-2 text-xs px-2 py-0.5 rounded-full"
-                        style={{
-                          background: `${theme.accent.warm}20`,
-                          color: theme.accent.warm,
-                        }}
-                      >
-                        {feature.note}
-                      </span>
-                    )}
                   </span>
                 </motion.li>
               ))}
@@ -472,75 +461,30 @@ export default function PricingPage() {
                   </motion.button>
                 </>
               )}
+
+              {/* Admin-only: smoke-test the live payment pipeline with a $1
+                  charge. Shows regardless of Premium status (admins are already
+                  Premium). The /api/checkout route re-checks isAdminEmail, so
+                  this button is just a convenience — not the security boundary. */}
+              {isAdmin && (
+                <motion.button
+                  className="w-full py-2.5 rounded-full text-sm font-medium transition-all disabled:opacity-50"
+                  style={{
+                    background: 'transparent',
+                    border: `1px dashed ${theme.accent.primary}80`,
+                    color: theme.accent.primary,
+                  }}
+                  whileHover={{ scale: checkoutLoading ? 1 : 1.02 }}
+                  whileTap={{ scale: checkoutLoading ? 1 : 0.98 }}
+                  onClick={() => handleCheckout('test')}
+                  disabled={checkoutLoading !== null || isLoading}
+                >
+                  {checkoutLoading === 'test' ? 'Loading...' : '⚡ Test live payment ($1) · admin'}
+                </motion.button>
+              )}
             </div>
           </motion.div>
         </div>
-
-        {/* Letter Themes Preview */}
-        <motion.div
-          className="mt-20 text-center"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-        >
-          <h3
-            className="text-2xl font-serif mb-4"
-            style={{ color: theme.text.primary }}
-          >
-            Letter Themes
-          </h3>
-          <p
-            className="mb-8 max-w-lg mx-auto"
-            style={{ color: theme.text.secondary }}
-          >
-            Make your letters feel like gifts with beautiful themes
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-4">
-            {[
-              { name: 'Classic Parchment', emoji: '📜', free: true },
-              { name: 'Minimalist', emoji: '◻️', free: true },
-              { name: 'Midnight Stars', emoji: '🌌', free: false },
-              { name: 'Soft Bloom', emoji: '🌸', free: false },
-              { name: 'Ocean Drift', emoji: '🌊', free: false },
-              { name: 'Golden Hour', emoji: '🌅', free: false },
-            ].map((letterTheme, i) => (
-              <motion.div
-                key={letterTheme.name}
-                className="relative px-4 py-3 rounded-xl flex items-center gap-2"
-                style={{
-                  background: theme.glass.bg,
-                  border: `1px solid ${letterTheme.free ? theme.glass.border : theme.accent.primary}40`,
-                }}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-              >
-                <span className="text-xl">{letterTheme.emoji}</span>
-                <span
-                  className="text-sm"
-                  style={{ color: theme.text.secondary }}
-                >
-                  {letterTheme.name}
-                </span>
-                {!letterTheme.free && (
-                  <span
-                    className="text-xs px-1.5 py-0.5 rounded"
-                    style={{
-                      background: `${theme.accent.primary}20`,
-                      color: theme.accent.primary,
-                    }}
-                  >
-                    Premium
-                  </span>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
 
         {/* FAQ Section */}
         <motion.div
@@ -561,15 +505,15 @@ export default function PricingPage() {
             {[
               {
                 q: 'What happens to my entries if I downgrade?',
-                a: "Your entries are always yours. If you exceed the free limit, you can still read all entries — you just can't create new ones until the next month.",
+                a: "Your entries are always yours. If you exceed the free limit, you can still read everything — you just can't create new ones until your next monthly window.",
               },
               {
-                q: 'Can I use my free letters anytime?',
-                a: 'Yes! Your 1 free letter to yourself and 1 to a friend never expire. Use them whenever you feel ready.',
+                q: 'How many letters can I send?',
+                a: 'Free includes 2 letters to your future self and 10 to friends each month. Premium raises that to 10 and 20 per month — and lets you ask a friend to save a copy of their letter.',
               },
               {
                 q: 'Is there a trial for Premium?',
-                a: "The free tier is your trial. Experience the core features, then upgrade when you want unlimited access.",
+                a: "The free tier is your trial. Experience the core features, then upgrade when you want more room.",
               },
             ].map((faq, i) => (
               <motion.div

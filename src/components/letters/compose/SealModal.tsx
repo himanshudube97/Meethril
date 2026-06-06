@@ -3,21 +3,21 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
+import { useSubscription } from '@/hooks/useSubscription'
 import { PasswordToggle } from '@/components/PasswordToggle'
 
-// TEST-PILL: '1h' on both SelfPill and FriendPill is a staging-only shortcut
+// '5min' is an ADMIN-ONLY pill (rendered only when useSubscription().isAdmin)
 // to smoke-test delivery end-to-end without waiting a week. The matching
-// server lead-time relaxations live in /api/letters/self/route.ts and
-// /api/letters/friend/route.ts (also marked TEST-PILL). Remove all three
-// before a real public launch — grep for TEST-PILL.
-type SelfPill = '1h' | '1w' | '1m' | '6m' | '1y' | 'custom'
-type FriendPill = '1h' | '1w' | '2w' | '30d' | 'custom'
+// server-side lead-time bypass lives in /api/letters/self/route.ts and
+// /api/letters/friend/route.ts (isAdminEmail). Non-admins get a 7-day floor.
+type SelfPill = '5min' | '1w' | '1m' | '6m' | '1y' | 'custom'
+type FriendPill = '5min' | '1w' | '2w' | '30d' | 'custom'
 
 function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
   const now = Date.now()
-  const hour = 60 * 60 * 1000
-  const day = 24 * hour
-  if (p === '1h') return new Date(now + hour)
+  const min = 60 * 1000
+  const day = 24 * 60 * min
+  if (p === '5min') return new Date(now + 5 * min)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '1m') return new Date(now + 30 * day)
   if (p === '6m') return new Date(now + 182 * day)
@@ -26,9 +26,9 @@ function dateForSelf(p: Exclude<SelfPill, 'custom'>): Date {
 
 function dateForFriend(p: Exclude<FriendPill, 'custom'>): Date {
   const now = Date.now()
-  const hour = 60 * 60 * 1000
-  const day = 24 * hour
-  if (p === '1h') return new Date(now + hour)
+  const min = 60 * 1000
+  const day = 24 * 60 * min
+  if (p === '5min') return new Date(now + 5 * min)
   if (p === '1w') return new Date(now + 7 * day)
   if (p === '2w') return new Date(now + 14 * day)
   return new Date(now + 30 * day)
@@ -46,8 +46,8 @@ function normalizeForLengthCheck(s: string): string {
 }
 
 function labelForSelf(p: SelfPill): string {
-  return p === '1h'
-    ? '1 hr (test)'
+  return p === '5min'
+    ? '5 min (admin)'
     : p === '1w'
     ? '1 week'
     : p === '1m'
@@ -60,8 +60,8 @@ function labelForSelf(p: SelfPill): string {
 }
 
 function labelForFriend(p: FriendPill): string {
-  return p === '1h'
-    ? '1 hr (test)'
+  return p === '5min'
+    ? '5 min (admin)'
     : p === '1w'
     ? '1 week'
     : p === '2w'
@@ -88,6 +88,9 @@ export function SealModal({
   }) => Promise<void>
 }) {
   const theme = useThemeStore((s) => s.theme)
+  // Admin (ADMIN_EMAILS) unlocks the 5-min test pill. Display-only — the server
+  // re-checks isAdminEmail before accepting a sub-7-day scheduledFor.
+  const { isAdmin } = useSubscription()
 
   const [selfPill, setSelfPill] = useState<SelfPill>('1m')
   const [selfCustom, setSelfCustom] = useState<string>('')
@@ -104,12 +107,14 @@ export function SealModal({
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'form' | 'folding' | 'sealed'>('form')
 
+  // eslint-disable-next-line react-hooks/purity
   const maxFriendDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   const maxFriendIso = maxFriendDate.toISOString().split('T')[0]
   // Both self and friend letters enforce a 1-week minimum — friend letters
   // additionally have a 30-day ceiling enforced separately. The seal API
   // accepts whatever the client sends, so this min= attribute is the only
   // client-side floor for custom dates.
+  // eslint-disable-next-line react-hooks/purity
   const minIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split('T')[0]
@@ -325,8 +330,8 @@ export function SealModal({
 
               <div className="flex flex-wrap gap-2 mb-3">
                 {recipient === 'self'
-                  // TEST-PILL: drop '1h' before a real public launch.
-                  ? (['1h', '1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
+                  // '5min' is admin-only; server enforces the 7-day floor for everyone else.
+                  ? ([...(isAdmin ? ['5min'] : []), '1w', '1m', '6m', '1y', 'custom'] as SelfPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"
@@ -345,8 +350,8 @@ export function SealModal({
                         {labelForSelf(p)}
                       </button>
                     ))
-                  // TEST-PILL: drop '1h' before a real public launch.
-                  : (['1h', '1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
+                  // '5min' is admin-only; server enforces the 7-day floor for everyone else.
+                  : ([...(isAdmin ? ['5min'] : []), '1w', '2w', '30d', 'custom'] as FriendPill[]).map((p) => (
                       <button
                         key={p}
                         type="button"

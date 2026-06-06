@@ -75,3 +75,6 @@ docker-compose.override.yml
 
 # serena tool cache/config (local)
 .serena/
+
+# local dev test credentials (login + e2ee daily key) — never commit
+.dev-creds.local

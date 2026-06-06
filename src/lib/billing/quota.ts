@@ -16,6 +16,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { isPaidUser } from '@/lib/billing/is-paid-user'
+import { isAdminEmail } from '@/lib/auth/admin'
 import { limitsFor, MONTHLY_LIMIT_KEY, type QuotaFeature } from '@/lib/billing/limits'
 import { utcInstantForLocalDate, localDatePartsNow } from '@/lib/entry-lock'
 
@@ -119,10 +120,10 @@ export async function checkQuota(
 ): Promise<QuotaResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
+    select: { email: true, subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
 
-  const isPaid = user ? isPaidUser(user) : false
+  const isPaid = user ? isPaidUser({ ...user, isAdmin: isAdminEmail(user.email) }) : false
   const limit = limitsFor(isPaid)[MONTHLY_LIMIT_KEY[feature]] as number
 
   const anchorDay = isPaid && user?.currentPeriodEnd ? dayOfMonthInTz(user.currentPeriodEnd, tz) : 1

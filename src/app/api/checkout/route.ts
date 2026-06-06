@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { createCheckoutUrl } from '@/lib/dodo'
+import { isAdminEmail } from '@/lib/auth/admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +13,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const priceId = body.priceId as string
 
-    if (priceId !== 'monthly' && priceId !== 'yearly') {
+    if (priceId !== 'monthly' && priceId !== 'yearly' && priceId !== 'test') {
       return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 })
+    }
+
+    // The $1 'test' product is an operator-only affordance for smoke-testing the
+    // live payment pipeline. Gate it server-side so a tampered client can't
+    // reach it. (monthly/yearly stay open to everyone.)
+    if (priceId === 'test' && !isAdminEmail(user.email)) {
+      return NextResponse.json({ error: 'Not allowed' }, { status: 403 })
     }
 
     const checkoutUrl = await createCheckoutUrl(

@@ -13,16 +13,23 @@ export function getDodoClient(): DodoPayments {
 }
 
 // Product IDs for each plan (set in .env from the Dodo dashboard).
+// `test` is a $1/month product used to smoke-test the live payment pipeline
+// (checkout → webhook → DB). Only admins (ADMIN_EMAILS) can check it out — the
+// gate lives in /api/checkout. Optional: unset in envs that don't need it.
 export const DODO_PRODUCTS = {
   monthly: process.env.DODO_PRODUCT_MONTHLY!,
   yearly: process.env.DODO_PRODUCT_YEARLY!,
+  test: process.env.DODO_PRODUCT_TEST ?? '',
 }
 
+export type DodoPlan = 'monthly' | 'yearly' | 'test'
+
 // Reverse map: product ID → plan name. Used by /api/subscription/status.
-export function planFromProductId(productId: string | null): 'monthly' | 'yearly' | null {
+export function planFromProductId(productId: string | null): DodoPlan | null {
   if (!productId) return null
   if (productId === DODO_PRODUCTS.monthly) return 'monthly'
   if (productId === DODO_PRODUCTS.yearly) return 'yearly'
+  if (DODO_PRODUCTS.test && productId === DODO_PRODUCTS.test) return 'test'
   return null
 }
 
@@ -32,7 +39,7 @@ export function planFromProductId(productId: string | null): 'monthly' | 'yearly
  * the customer record is linked.
  */
 export async function createCheckoutUrl(
-  plan: 'monthly' | 'yearly',
+  plan: DodoPlan,
   userId: string,
   userEmail: string,
   userName?: string,

@@ -98,6 +98,13 @@ src/
 - Dev mode (`USE_DEV_AUTH=true`): JWT in `hearth-auth-token` cookie
 - Production: Supabase OAuth with auto user creation
 
+### Manual Testing in the Running App
+When verifying changes in the live app (http://localhost:3112), **always log in with the local test account** — credentials live in the gitignored [`.dev-creds.local`](.dev-creds.local) file at the repo root:
+- **Email**: `DEV_TEST_EMAIL` (any password works in dev mode, but use `DEV_TEST_PASSWORD`)
+- **E2EE daily key**: `DEV_TEST_E2EE_DAILY_KEY` — required to unlock the journal so entries decrypt and render (without it, everything shows `[Encrypted — unlock to view]`).
+
+This account is the canonical one for visual/manual verification and already has seeded journal data. Read `.dev-creds.local` to get the current values; never hardcode or commit them.
+
 ### Encryption Pattern
 
 **Read [`docs/encryption-strategy.md`](docs/encryption-strategy.md) before touching any encryption code.** Hearth uses three tiers (E2EE under master key, server-encrypted under `ENCRYPTION_KEY`, plaintext) — which tier applies depends on the content type. The doc explains why and gives a decision heuristic for new content.

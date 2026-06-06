@@ -9,6 +9,7 @@ import {
   safeIanaTz,
 } from '@/lib/stranger-notes'
 import { isPaidUser } from '@/lib/billing/is-paid-user'
+import { isAdminEmail } from '@/lib/auth/admin'
 import { limitsFor } from '@/lib/billing/limits'
 import { pickRandomRecipient, deliverThreadToRecipient } from '@/lib/stranger-matcher'
 import { generateDisplayName } from '@/lib/stranger-names'
@@ -55,7 +56,9 @@ export async function POST(req: NextRequest) {
     where: { id: user.id },
     select: { subscriptionStatus: true, currentPeriodEnd: true, complimentaryAccess: true },
   })
-  const dailyLimit = limitsFor(dbUserForTier ? isPaidUser(dbUserForTier) : false).strangerNotesPerDay
+  const dailyLimit = limitsFor(
+    dbUserForTier ? isPaidUser({ ...dbUserForTier, isAdmin: isAdminEmail(user.email) }) : false
+  ).strangerNotesPerDay
   const todaysCount = await countTodaysNewNotes(user.id, tz)
   if (todaysCount >= dailyLimit) {
     return NextResponse.json(
