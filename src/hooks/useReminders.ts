@@ -23,6 +23,14 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return out
 }
 
+async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  await fetch('/api/me/profile-flags', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ remindersEnabled: enabled }),
+  }).catch(() => {})
+}
+
 export function useReminders(): UseRemindersResult {
   const pushSupported = typeof window !== 'undefined'
     && 'serviceWorker' in navigator
@@ -103,11 +111,15 @@ export function useReminders(): UseRemindersResult {
     if (!res.ok) return { ok: false, error: 'server-error' }
 
     setSubscribed(true)
+    await setRemindersEnabled(true)
     return { ok: true }
   }, [pushSupported])
 
   const unsubscribe = useCallback(async (): Promise<void> => {
     if (!pushSupported) return
+    // remindersEnabled is the desktop app's on/off signal — always clear it on
+    // disable, even when no live PushSubscription exists in this browser.
+    await setRemindersEnabled(false)
     const reg = await navigator.serviceWorker.ready
     const sub = await reg.pushManager.getSubscription()
     if (!sub) {

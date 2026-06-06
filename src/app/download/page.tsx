@@ -68,21 +68,21 @@ export default function DownloadPage() {
       >
         <Link
           href="/"
-          className="inline-block mb-10 text-xs tracking-[0.3em] opacity-60 hover:opacity-100 transition"
-          style={{ color: theme.text.muted }}
+          className="inline-block mb-10 text-sm tracking-[0.3em] opacity-80 hover:opacity-100 transition"
+          style={{ color: theme.text.secondary }}
         >
-          ← HEARTH
+          ← MEETHRIL
         </Link>
 
         <h1
-          className="text-4xl md:text-5xl font-light mb-4 tracking-tight"
+          className="text-5xl md:text-6xl font-light mb-5 tracking-tight"
           style={{ color: theme.text.primary }}
         >
-          Hearth, on your desktop.
+          Meethril, on your desktop.
         </h1>
         <p
-          className="text-base md:text-lg italic mb-12"
-          style={{ color: theme.text.muted }}
+          className="text-lg md:text-xl italic mb-12"
+          style={{ color: theme.text.secondary }}
         >
           A quiet little app for the corner of your screen.
         </p>
@@ -144,10 +144,10 @@ function DownloadPill({
   return (
     <a
       href={DOWNLOAD_LINKS[os]}
-      className="px-4 py-2 rounded-full border text-xs tracking-wide transition hover:opacity-80"
+      className="px-5 py-2.5 rounded-full border text-sm tracking-wide transition hover:opacity-80"
       style={{
-        borderColor: `${theme.text.muted}40`,
-        color: theme.text.muted,
+        borderColor: `${theme.text.secondary}66`,
+        color: theme.text.secondary,
       }}
     >
       {OS_LABELS[os]}
@@ -162,10 +162,10 @@ function FirstLaunchNote({
 }) {
   return (
     <div
-      className="mt-16 max-w-md mx-auto text-left text-xs leading-relaxed border-t pt-8"
+      className="mt-16 max-w-md mx-auto text-left text-sm leading-relaxed border-t pt-8"
       style={{
-        borderColor: `${theme.text.muted}20`,
-        color: theme.text.muted,
+        borderColor: `${theme.text.secondary}30`,
+        color: theme.text.secondary,
       }}
     >
       <p className="mb-2 italic">First launch?</p>
@@ -178,7 +178,7 @@ function FirstLaunchNote({
         click <em>More info</em> → <em>Run anyway</em> if SmartScreen warns
         you.
       </p>
-      <p className="opacity-70">
+      <p className="opacity-90">
         Mac build is for Apple Silicon (M1, M2, M3, M4). Intel Mac support
         coming later.
       </p>
