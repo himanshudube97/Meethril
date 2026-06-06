@@ -54,6 +54,7 @@ export function PostcardFront({
   onCancel,
   createdAt,
   active = true,
+  readOnly = false,
 }: {
   salutationName?: string
   body?: string
@@ -64,6 +65,8 @@ export function PostcardFront({
   // When false, the face is rotated away from the viewer — we must turn off
   // pointer-events so clicks don't leak through to the invisible face.
   active?: boolean
+  // Read-only reveal mode: no editing, no cancel button.
+  readOnly?: boolean
 }) {
   const theme = useThemeStore((s) => s.theme)
   const accent = theme.accent.primary
@@ -118,6 +121,7 @@ export function PostcardFront({
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !readOnly,
     extensions: [
       StarterKit.configure({ heading: false }),
       Placeholder.configure({ placeholder: '' }),
@@ -355,7 +359,8 @@ export function PostcardFront({
             editor={editor}
             style={{
               fontFamily: 'var(--font-caveat), Caveat, cursive',
-              fontSize: 19,
+              // Match the journal body text size (resolveFontSize base 21).
+              fontSize: 21,
               lineHeight: '36px',
             }}
           />
@@ -377,6 +382,7 @@ export function PostcardFront({
           zIndex: 2,
         }}
       >
+        {readOnly ? <span /> : (
         <button
           type="button"
           onClick={onCancel}
@@ -396,6 +402,7 @@ export function PostcardFront({
         >
           ← cancel
         </button>
+        )}
 
         <motion.button
           type="button"

@@ -65,9 +65,15 @@ const BUTTERFLY_HUES = [0, -55, 200, 280, 95]
 
 interface PromptCardProps {
   color: string
+  /**
+   * Optional custom trigger. The overlay (butterfly → note) always portals to
+   * document.body, so the trigger can live anywhere — e.g. the right-margin
+   * action rail. Falls back to the inline "✦ pull a card" text button.
+   */
+  trigger?: (api: { onClick: () => void; disabled: boolean }) => React.ReactNode
 }
 
-export default function PromptCard({ color }: PromptCardProps) {
+export default function PromptCard({ color, trigger }: PromptCardProps) {
   const [phase, setPhase] = useState<Phase>('closed')
   const [card, setCard] = useState<Card | null>(null)
   const [butterflyHue, setButterflyHue] = useState(0)
@@ -128,31 +134,43 @@ export default function PromptCard({ color }: PromptCardProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [phase])
 
+  // Auto-advance: the butterfly flies in, then unfolds the card on its own —
+  // the user shouldn't have to "catch it" with a click.
+  useEffect(() => {
+    if (phase !== 'butterfly') return
+    const t = setTimeout(() => setPhase('note'), 1700)
+    return () => clearTimeout(t)
+  }, [phase])
+
   return (
     <>
-      <button
-        type="button"
-        onClick={startPull}
-        className="pointer-events-auto"
-        style={{
-          background: 'transparent',
-          border: 'none',
-          padding: '6px 14px',
-          cursor: 'pointer',
-          fontFamily: 'Georgia, serif',
-          fontStyle: 'italic',
-          fontSize: '13px',
-          letterSpacing: '0.04em',
-          color,
-          opacity: 0.75,
-          transition: 'opacity 0.3s ease',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.75')}
-        aria-label="Pull a card"
-      >
-        ✦ pull a card
-      </button>
+      {trigger ? (
+        trigger({ onClick: startPull, disabled: phase !== 'closed' })
+      ) : (
+        <button
+          type="button"
+          onClick={startPull}
+          className="pointer-events-auto"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '6px 14px',
+            cursor: 'pointer',
+            fontFamily: 'Georgia, serif',
+            fontStyle: 'italic',
+            fontSize: '13px',
+            letterSpacing: '0.04em',
+            color,
+            opacity: 0.75,
+            transition: 'opacity 0.3s ease',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.75')}
+          aria-label="Pull a card"
+        >
+          ✦ pull a card
+        </button>
+      )}
 
       {mounted && createPortal(
       <AnimatePresence>
@@ -299,21 +317,6 @@ export default function PromptCard({ color }: PromptCardProps) {
                         opacity={0.98}
                       />
                     </motion.div>
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.85 }}
-                    transition={{ delay: 1.4, duration: 0.6 }}
-                    style={{
-                      marginTop: '14px',
-                      fontFamily: 'Georgia, serif',
-                      fontStyle: 'italic',
-                      fontSize: '13px',
-                      letterSpacing: '0.08em',
-                      color: theme.text.muted,
-                    }}
-                  >
-                    catch it
                   </motion.div>
                 </motion.button>
               )}

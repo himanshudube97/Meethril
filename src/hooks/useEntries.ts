@@ -79,6 +79,12 @@ export function useEntries(options: UseEntriesOptions = {}) {
   const cursorRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
   useEffect(() => {
+    // Reset to true on mount, not just rely on the ref's initial value: React
+    // StrictMode (dev) mounts → unmounts → remounts, and the simulated unmount's
+    // cleanup sets this false. Without re-setting it true here, the ref stays
+    // false for the component's whole life, so every resolved fetch bails before
+    // setEntries/setLoading(false) — leaving views stuck on their loading state.
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
     }

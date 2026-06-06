@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
 import { useAuthStore } from '@/store/auth'
@@ -88,16 +89,19 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
   }
 
   if (!open) return null
+  if (typeof document === 'undefined') return null
 
-  return (
-    <AnimatePresence>
+  return createPortal(
+    <>
       <motion.div
+        key="backdrop"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50"
         style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
         onClick={step === 'done' ? handleClose : undefined}
       />
       <motion.div
+        key="panel"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -237,6 +241,7 @@ export default function RotateRecoveryKeyModal({ open, onClose }: Props) {
           </div>
         )}
       </motion.div>
-    </AnimatePresence>
+    </>,
+    document.body,
   )
 }

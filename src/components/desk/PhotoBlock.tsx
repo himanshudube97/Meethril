@@ -69,6 +69,10 @@ interface PhotoBlockProps {
   disabled?: boolean
   className?: string
   dateCaption?: string
+  /** 'scattered' (default) keeps the overlapping tilted polaroids used by the
+   *  journal. 'row' lays the two side by side with a gap (used by the letter
+   *  back, which has full-width room). */
+  layout?: 'scattered' | 'row'
 }
 
 const PhotoBlock = memo(function PhotoBlock({
@@ -78,12 +82,17 @@ const PhotoBlock = memo(function PhotoBlock({
   disabled = false,
   className = '',
   dateCaption,
+  layout = 'scattered',
 }: PhotoBlockProps) {
   const [cameraModalOpen, setCameraModalOpen] = useState(false)
   const [activePosition, setActivePosition] = useState<1 | 2>(1)
 
   const photo1 = photos.find(p => p.position === 1)
   const photo2 = photos.find(p => p.position === 2)
+
+  const isRow = layout === 'row'
+  // Bigger polaroids in row mode — the letter back has full width to spare.
+  const slotWidth = isRow ? 'w-40' : 'w-28'
 
   const handlePhotoAdd = useCallback((position: 1 | 2) => {
     return async (file: File) => {
@@ -140,13 +149,13 @@ const PhotoBlock = memo(function PhotoBlock({
   return (
     <>
       <motion.div
-        className={`relative flex items-start justify-center gap-2 ${className}`}
+        className={`relative flex items-start justify-center ${isRow ? 'gap-8' : 'gap-2'} ${className}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
-        {/* Photo 1 - slightly overlapping to the left */}
-        <div className="relative z-10" style={{ marginRight: '-12px' }}>
+        {/* Photo 1 — overlaps left in scattered mode; sits in a row otherwise */}
+        <div className="relative z-10" style={{ marginRight: isRow ? 0 : '-2px' }}>
           <PhotoSlot
             photo={photo1}
             position={1}
@@ -155,13 +164,13 @@ const PhotoBlock = memo(function PhotoBlock({
             onCameraCapture={handleCameraOpen(1)}
             onRemove={onPhotoRemove ? () => onPhotoRemove(1) : undefined}
             disabled={disabled || !!photo1}
-            className="w-28"
+            className={slotWidth}
             dateCaption={dateCaption}
           />
         </div>
 
-        {/* Photo 2 - slightly overlapping to the right */}
-        <div className="relative z-0" style={{ marginLeft: '-12px', marginTop: '8px' }}>
+        {/* Photo 2 — overlaps right in scattered mode; sits in a row otherwise */}
+        <div className="relative z-0" style={{ marginLeft: isRow ? 0 : '-2px', marginTop: isRow ? 0 : '8px' }}>
           <PhotoSlot
             photo={photo2}
             position={2}
@@ -170,7 +179,7 @@ const PhotoBlock = memo(function PhotoBlock({
             onCameraCapture={handleCameraOpen(2)}
             onRemove={onPhotoRemove ? () => onPhotoRemove(2) : undefined}
             disabled={disabled || !!photo2}
-            className="w-28"
+            className={slotWidth}
             dateCaption={dateCaption}
           />
         </div>

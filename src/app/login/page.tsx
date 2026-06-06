@@ -8,6 +8,10 @@ import { useThemeStore } from '@/store/theme'
 
 const isDevAuth = process.env.NEXT_PUBLIC_USE_DEV_AUTH === 'true'
 
+// Email + password sign-in is hidden for now — Google-only. UI gate only; the
+// backend handlers stay intact, so flipping this back to true fully restores it.
+const PASSWORD_LOGIN_ENABLED: boolean = false
+
 type SupabaseStep = 'form' | 'otp'
 type AuthMode = 'login' | 'signup'
 
@@ -272,7 +276,10 @@ function LoginForm() {
           {/* ── Supabase auth ── */}
           {!isDevAuth && step === 'form' && (
             <div className="space-y-5">
-              {/* Email + password form */}
+              {/* Email + password sign-in — hidden for now (Google only).
+                  Flip PASSWORD_LOGIN_ENABLED to restore. */}
+              {PASSWORD_LOGIN_ENABLED && (
+              <>
               <form onSubmit={authMode === 'login' ? handleEmailLogin : handleEmailSignup} className="space-y-4">
                 <div>
                   <label htmlFor="email" className="block text-sm text-[var(--text-muted)] mb-2">Email</label>
@@ -327,6 +334,8 @@ function LoginForm() {
                 <span className="text-xs text-[var(--text-muted)]">or</span>
                 <div className="flex-1 h-px bg-[var(--card-border)]" />
               </div>
+              </>
+              )}
 
               {/* Google OAuth */}
               <button

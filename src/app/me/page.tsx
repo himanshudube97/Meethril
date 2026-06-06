@@ -254,7 +254,15 @@ const E2EESettings = memo(function E2EESettings() {
                   ? `Encrypted on ${new Date(keyData.e2eeSetupAt).toLocaleDateString()}.`
                   : 'Encrypted.'}
               </p>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p
+                className="text-sm"
+                style={{ color: theme.text.secondary }}
+                title={
+                  isUnlocked
+                    ? 'Your encryption key is loaded in this browser for this session, so your entries can be read and written. It is never sent to the server.'
+                    : 'Your encryption key is not loaded in this browser. Your entries stay encrypted and unreadable until you unlock with your daily key.'
+                }
+              >
                 {isUnlocked
                   ? 'Unlocked on this device (session only).'
                   : 'Locked.'}
@@ -262,6 +270,7 @@ const E2EESettings = memo(function E2EESettings() {
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   onClick={() => clearMasterKey()}
+                  title="Remove your encryption key from this browser. Nothing is deleted — your entries stay safely encrypted and can be reopened anytime by unlocking with your daily key. Handy on shared or public computers."
                   className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
@@ -273,6 +282,7 @@ const E2EESettings = memo(function E2EESettings() {
                 </button>
                 <button
                   onClick={() => setShowUnlockModal(true)}
+                  title="Change the daily key — the password you type to unlock day to day. Your entries and your recovery key are unaffected."
                   className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
@@ -285,6 +295,11 @@ const E2EESettings = memo(function E2EESettings() {
                 <button
                   onClick={() => setShowRotate(true)}
                   disabled={!isUnlocked}
+                  title={
+                    isUnlocked
+                      ? 'Create a fresh backup recovery key. Your old recovery key stops working; your daily key is unaffected. Save the new key somewhere safe.'
+                      : 'Unlock first (your key must be loaded in this browser) before you can generate a new recovery key.'
+                  }
                   className="px-3 py-1.5 rounded-lg text-sm"
                   style={{
                     background: theme.glass.bg,
@@ -297,6 +312,12 @@ const E2EESettings = memo(function E2EESettings() {
                   Generate new recovery key
                 </button>
               </div>
+              {/* Plain-language helper so the two key types aren't confusing. */}
+              <p className="text-xs leading-relaxed pt-1" style={{ color: theme.text.muted }}>
+                Two keys open the same vault: a <strong>daily key</strong> you type to unlock, and a{' '}
+                <strong>recovery key</strong> kept as a backup. Changing one never affects the other.
+                {!isUnlocked && ' Unlock first to generate a new recovery key.'}
+              </p>
             </>
           )}
 

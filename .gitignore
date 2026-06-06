@@ -72,3 +72,6 @@ docker-compose.override.yml
 
 # claude code worktrees
 .claude/worktrees/
+
+# serena tool cache/config (local)
+.serena/

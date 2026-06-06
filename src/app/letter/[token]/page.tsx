@@ -11,6 +11,7 @@ import {
 import DOMPurify from 'dompurify'
 import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
 import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
+import { PasswordToggle } from '@/components/PasswordToggle'
 
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
@@ -279,6 +280,7 @@ function SealedScene({
   onSubmit: (answer: string) => void
 }) {
   const [value, setValue] = useState('')
+  const [showAnswer, setShowAnswer] = useState(false)
 
   return (
     <div
@@ -334,26 +336,29 @@ function SealedScene({
             setValue('')
           }}
         >
-          <input
-            type="password"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="whisper the answer…"
-            autoFocus
-            disabled={state.attempting}
-            style={{
-              width: '100%',
-              padding: '12px 0',
-              fontSize: 18,
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px solid #3d342a55',
-              color: '#3d342a',
-              outline: 'none',
-              textAlign: 'center',
-              fontFamily: 'inherit',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showAnswer ? 'text' : 'password'}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="whisper the answer…"
+              autoFocus
+              disabled={state.attempting}
+              style={{
+                width: '100%',
+                padding: '12px 2.75rem',
+                fontSize: 18,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid #3d342a55',
+                color: '#3d342a',
+                outline: 'none',
+                textAlign: 'center',
+                fontFamily: 'inherit',
+              }}
+            />
+            <PasswordToggle shown={showAnswer} onToggle={() => setShowAnswer((v) => !v)} color="#3d342a" />
+          </div>
           <button
             type="submit"
             disabled={state.attempting || !value.trim()}

@@ -50,6 +50,7 @@ export default function ComposeView() {
   const [createdAt, setCreatedAt] = useState<Date>(() => new Date())
   const [showSeal, setShowSeal] = useState(false)
   const [loading, setLoading] = useState(Boolean(draftId))
+  const [cardScale, setCardScale] = useState(1)
   const hydratedRef = useRef(false)
 
   useEffect(() => {
@@ -70,6 +71,29 @@ export default function ComposeView() {
       html.style.overflowY = originalHtmlOverflow
       document.body.style.overflow = originalBodyOverflow
     }
+  }, [])
+
+  // Uniformly scale the whole postcard to fit the viewport — same approach as
+  // the journal's BookSpread (DeskScene). The card keeps its fixed 760×860
+  // design size so its aspect ratio and font sizes never distort; we just
+  // scale the painted result. DESIGN_W reserves room on both sides for the
+  // quill that bleeds past the card's right edge so it never clips. Capped at
+  // MAX_SCALE so it grows to fill big monitors but doesn't get cartoonishly
+  // large.
+  useEffect(() => {
+    const DESIGN_W = 1340 // 760 card + ~290 bleed each side (quill + blotter)
+    const DESIGN_H = 940 // 860 card + blotter padding + breathing room
+    const MARGIN_X = 40
+    const MARGIN_Y = 120 // navbar + gaps above the card
+    const MAX_SCALE = 1.3
+    const calcScale = () => {
+      const availW = window.innerWidth - MARGIN_X
+      const availH = window.innerHeight - MARGIN_Y
+      setCardScale(Math.min(MAX_SCALE, availW / DESIGN_W, availH / DESIGN_H))
+    }
+    calcScale()
+    window.addEventListener('resize', calcScale)
+    return () => window.removeEventListener('resize', calcScale)
   }, [])
 
   // Hydrate a resumed draft from the letters table. We have to wait for the
@@ -260,8 +284,15 @@ export default function ComposeView() {
         draft: {
           text: combinedText,
           song,
-          photos: [],
-          doodles: [],
+          photos: photos.map((p) => ({
+            url: p.url ?? null,
+            encryptedRef: p.encryptedRef ?? null,
+            encryptedRefIV: p.encryptedRefIV ?? null,
+            position: p.position,
+            spread: 1,
+            rotation: p.rotation,
+          })),
+          doodleStrokes,
           letterLocation: null,
         },
         unlockDate,
@@ -379,6 +410,14 @@ export default function ComposeView() {
         // same way it does behind a journal spread.
       }}
     >
+      {/* Uniform scaler — fits the whole postcard to the viewport without
+          distorting its aspect ratio (see the cardScale effect above). */}
+      <div
+        style={{
+          transform: `scale(${cardScale})`,
+          transformOrigin: 'center center',
+        }}
+      >
       {/* Leather desk blotter — hugs the postcard with a small even margin.
           The inkwell + quill sit OUTSIDE the blotter, on the bare desk, so
           the blotter reads as a leather mat just for the letter. Same
@@ -399,8 +438,8 @@ export default function ComposeView() {
           are unchanged, only the aspect ratio. */}
       <motion.div
         style={{
-          width: 'min(760px, calc(100vw - 48px))',
-          height: 'min(860px, calc(100vh - 104px))',
+          width: 760,
+          height: 860,
           position: 'relative',
           transformStyle: 'preserve-3d',
         }}
@@ -472,6 +511,7 @@ export default function ComposeView() {
           />
         </motion.div>
       </motion.div>
+      </div>
       </div>
 
       {showSeal && (

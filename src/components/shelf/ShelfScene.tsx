@@ -4,6 +4,7 @@
 import { useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEntries, useEntryStats } from '@/hooks/useEntries'
+import { localMonthKey } from '@/lib/entry-lock-client'
 import ShelfHeader from './ShelfHeader'
 import Shelf, { ShelfMonth } from './Shelf'
 import WaxSealTag from './WaxSealTag'
@@ -99,10 +100,16 @@ export default function ShelfScene() {
       ? { month: monthKey, includeDoodles: true }
       : { limit: 1 },
   )
+  // Guard against showing the previous month's entries during a fast
+  // month-switch: only mark the spread ready once the loaded entries actually
+  // belong to the open month. Compare in the user's *local* month (matching how
+  // the entries API buckets them) — a raw UTC-prefix check mis-rejects entries
+  // written just after local midnight on the 1st, whose UTC createdAt is still
+  // in the prior month, leaving the spread stuck on "turning to the page…".
   const spreadReady =
     !entriesLoading &&
     !!monthKey &&
-    (monthEntries.length === 0 || monthEntries[0].createdAt.startsWith(monthKey))
+    (monthEntries.length === 0 || localMonthKey(monthEntries[0].createdAt) === monthKey)
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">

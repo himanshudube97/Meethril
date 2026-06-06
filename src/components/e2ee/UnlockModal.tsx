@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
+import { PasswordToggle } from '@/components/PasswordToggle'
 import {
   deriveKeyFromPassphrase,
   parseSalt,
@@ -21,6 +22,7 @@ export default function UnlockModal() {
   } = useE2EEStore()
 
   const [dailyKey, setDailyKey] = useState('')
+  const [show, setShow] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -110,22 +112,26 @@ export default function UnlockModal() {
                   <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
                     Daily Key
                   </label>
-                  <input
-                    type="password"
-                    value={dailyKey}
-                    onChange={(e) => setDailyKey(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && dailyKey) handleUnlock()
-                    }}
-                    placeholder="Enter your daily key..."
-                    autoFocus
-                    className="w-full p-4 rounded-xl text-sm outline-none"
-                    style={{
-                      background: theme.glass.bg,
-                      border: `1px solid ${theme.glass.border}`,
-                      color: theme.text.primary,
-                    }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={show ? 'text' : 'password'}
+                      value={dailyKey}
+                      onChange={(e) => setDailyKey(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && dailyKey) handleUnlock()
+                      }}
+                      placeholder="Enter your daily key..."
+                      autoFocus
+                      className="w-full p-4 rounded-xl text-sm outline-none"
+                      style={{
+                        background: theme.glass.bg,
+                        border: `1px solid ${theme.glass.border}`,
+                        color: theme.text.primary,
+                        paddingRight: '2.75rem',
+                      }}
+                    />
+                    <PasswordToggle shown={show} onToggle={() => setShow((v) => !v)} color={theme.text.muted} />
+                  </div>
                 </div>
 
                 {error && (

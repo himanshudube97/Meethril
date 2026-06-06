@@ -45,6 +45,7 @@ export function PostcardBack({
   onSeal,
   canSeal,
   active = true,
+  readOnly = false,
 }: {
   photos?: Photo[]
   onPhotoAdd?: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
@@ -59,6 +60,8 @@ export function PostcardBack({
   // When false, the face is rotated away — turn off pointer-events so clicks
   // don't leak through to the invisible face.
   active?: boolean
+  // Read-only reveal mode: no editing, embed-only song, no seal button.
+  readOnly?: boolean
 }) {
   const theme = useThemeStore((s) => s.theme)
   // Same journal page tokens — solid theme bg + tinted overlay. Matches
@@ -126,7 +129,13 @@ export function PostcardBack({
             <SongEmbed> the moment a valid URL is detected. No "add" button. */}
         <div style={{ flexShrink: 0 }}>
           <div style={labelStyle}>a song</div>
-          {isEditingSong || !songInput ? (
+          {readOnly ? (
+            songInput ? (
+              <SongEmbed url={songInput} compact audioOnly />
+            ) : (
+              <div style={{ ...labelStyle, opacity: 0.4 }}>no song</div>
+            )
+          ) : isEditingSong || !songInput ? (
             <SongPicker
               value={songInput}
               onChange={(next) => handleSongChange(next ?? '')}
@@ -166,16 +175,18 @@ export function PostcardBack({
           <div style={labelStyle}>photos</div>
           <div
             style={{
-              transform: 'scale(1.3)',
+              transform: 'scale(1.1)',
               transformOrigin: 'top center',
-              marginTop: 18,
-              marginBottom: 56, // accommodate scale overflow below
+              marginTop: 16,
+              marginBottom: 40, // accommodate scale overflow below
             }}
           >
             <PhotoBlock
               photos={photos}
-              onPhotoAdd={onPhotoAdd}
-              onPhotoRemove={onPhotoRemove}
+              onPhotoAdd={readOnly ? undefined : onPhotoAdd}
+              onPhotoRemove={readOnly ? undefined : onPhotoRemove}
+              disabled={readOnly}
+              layout="row"
             />
           </div>
         </div>
@@ -194,6 +205,7 @@ export function PostcardBack({
               canvasBorder={DOODLE_BORDER}
               textColor={PAPER_INK}
               mutedColor="rgba(120, 90, 50, 0.5)"
+              readOnly={readOnly}
             />
           </div>
         </div>
@@ -285,6 +297,7 @@ export function PostcardBack({
           ← turn back
         </button>
 
+        {readOnly ? <span /> : (
         <button
           type="button"
           disabled={!sealEnabled}
@@ -305,6 +318,7 @@ export function PostcardBack({
         >
           fold and seal →
         </button>
+        )}
       </div>
     </div>
   )

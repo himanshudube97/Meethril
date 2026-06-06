@@ -54,8 +54,12 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
+            // camera=(self) so the in-app "Take Photo" capture (getUserMedia)
+            // works on our own origin — `camera=()` blocked it for everyone,
+            // surfacing as NotAllowedError even after the browser grants access.
+            // mic + geolocation stay disabled; the app doesn't use them.
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(), geolocation=()',
           },
           {
             key: 'Strict-Transport-Security',

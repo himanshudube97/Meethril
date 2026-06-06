@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
+import { useMemoryViewStore } from '@/store/memoryView'
 import Background from '@/components/Background'
 import Navigation from '@/components/Navigation'
 import PageTransition from '@/components/PageTransition'
@@ -44,6 +46,9 @@ export default function LayoutContent({
   const { theme } = useThemeStore()
   const setLayoutModeOnTheme = useThemeStore(s => s.setLayoutMode)
   const layoutMode = useLayoutMode()
+  // When an open memory diary is on screen (/memory), fade the page chrome
+  // (nav, gear, fullscreen) so the spread reads as the only thing on the desk.
+  const diaryOpen = useMemoryViewStore(s => s.diaryOpen)
 
   // Mobile has no settings UI — the theme store flips the effective theme
   // to sunset while in mobile mode without mutating the user's persisted
@@ -159,7 +164,6 @@ export default function LayoutContent({
     <>
       <Background />
       <AmbientSoundLayer />
-      <Navigation />
       <main className="relative z-10 min-h-screen pt-20 pb-8 px-4">
         <PageTransition>
           {children}
@@ -168,10 +172,21 @@ export default function LayoutContent({
       {/* Gear + fullscreen are rendered at the layout root so they're NOT
           inside <main> / <PageTransition> — those wrappers have transforms
           during the page-transition animation, which would otherwise become
-          the containing block for their `position: fixed`. */}
-      <TopChromeBackdrop />
-      <FullscreenButton />
-      <DeskSettingsPanel />
+          the containing block for their `position: fixed`.
+
+          Wrapped in a fade layer that drops to 0 while a memory diary is open
+          so reading a memory is uninterrupted by chrome. opacity (not transform)
+          keeps the fixed children positioned against the viewport. */}
+      <motion.div
+        animate={{ opacity: diaryOpen ? 0 : 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        style={{ pointerEvents: diaryOpen ? 'none' : undefined }}
+      >
+        <TopChromeBackdrop />
+        <FullscreenButton />
+        <DeskSettingsPanel />
+        <Navigation />
+      </motion.div>
       <InstallPrompt />
     </>
   )
