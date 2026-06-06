@@ -182,13 +182,13 @@ export default function RecoveryModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Recovery Mode
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Enter your recovery key to regain access.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+              <label className="block text-sm mb-2" style={{ color: theme.text.secondary }}>
                 Recovery Key
               </label>
               <input
@@ -197,7 +197,7 @@ export default function RecoveryModal() {
                 onChange={(e) => setRecoveryKey(e.target.value.toUpperCase())}
                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                 autoFocus
-                className="w-full p-4 rounded-xl text-sm font-mono tracking-wider outline-none uppercase text-center"
+                className="w-full p-4 rounded-xl text-base font-mono tracking-wider outline-none uppercase text-center"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -207,7 +207,7 @@ export default function RecoveryModal() {
             </div>
 
             {error && (
-              <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
+              <p className="text-base text-center" style={{ color: theme.accent.warm }}>
                 {error}
               </p>
             )}
@@ -215,7 +215,7 @@ export default function RecoveryModal() {
             <div className="flex gap-3">
               <button
                 onClick={handleBackToUnlock}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -227,7 +227,7 @@ export default function RecoveryModal() {
               <button
                 onClick={handleRecovery}
                 disabled={loading || recoveryKey.length < 20}
-                className="flex-1 py-3 rounded-xl text-sm font-medium"
+                className="flex-1 py-3 rounded-xl text-base font-medium"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -258,14 +258,14 @@ export default function RecoveryModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Recovery Successful
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Now set a new daily key for future access.
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-sm mb-2" style={{ color: theme.text.secondary }}>
                   New Daily Key (min 8 characters)
                 </label>
                 <div className="relative">
@@ -274,7 +274,7 @@ export default function RecoveryModal() {
                     value={newDailyKey}
                     onChange={(e) => setNewDailyKey(e.target.value)}
                     placeholder="Enter new daily key..."
-                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    className="w-full p-4 rounded-xl text-base outline-none"
                     style={{
                       background: theme.glass.bg,
                       border: `1px solid ${theme.glass.border}`,
@@ -287,7 +287,7 @@ export default function RecoveryModal() {
               </div>
 
               <div>
-                <label className="block text-xs mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-sm mb-2" style={{ color: theme.text.secondary }}>
                   Confirm New Daily Key
                 </label>
                 <div className="relative">
@@ -296,7 +296,7 @@ export default function RecoveryModal() {
                     value={confirmDailyKey}
                     onChange={(e) => setConfirmDailyKey(e.target.value)}
                     placeholder="Confirm new daily key..."
-                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    className="w-full p-4 rounded-xl text-base outline-none"
                     style={{
                       background: theme.glass.bg,
                       border: `1px solid ${newDailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
@@ -310,7 +310,7 @@ export default function RecoveryModal() {
             </div>
 
             {error && (
-              <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
+              <p className="text-base text-center" style={{ color: theme.accent.warm }}>
                 {error}
               </p>
             )}
@@ -318,7 +318,7 @@ export default function RecoveryModal() {
             <button
               onClick={handleSetNewDailyKey}
               disabled={loading || newDailyKey.length < 8 || newDailyKey !== confirmDailyKey}
-              className="w-full py-3 rounded-xl text-sm font-medium"
+              className="w-full py-3 rounded-xl text-base font-medium"
               style={{
                 background: theme.accent.primary,
                 color: '#fff',
@@ -336,7 +336,7 @@ export default function RecoveryModal() {
                   handleClose()
                 }
               }}
-              className="w-full text-sm"
+              className="w-full text-base"
               style={{ color: theme.text.muted }}
             >
               Skip for now
@@ -367,14 +367,14 @@ export default function RecoveryModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 All Set!
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Your new daily key has been set. Use it next time you need to unlock your journal.
               </p>
             </div>
 
             <button
               onClick={handleClose}
-              className="w-full py-3 rounded-xl text-sm font-medium"
+              className="w-full py-3 rounded-xl text-base font-medium"
               style={{
                 background: theme.accent.primary,
                 color: '#fff',

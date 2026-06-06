@@ -242,9 +242,11 @@ export default function LetterReveal() {
             <div
               className="p-6 prose prose-invert max-w-none"
               style={{
-                fontFamily: 'Georgia, Palatino, serif',
-                fontSize: '17px',
-                lineHeight: 2,
+                // Read the letter back in the same handwriting it was written
+                // in (Caveat) so what you wrote looks the same when it arrives.
+                fontFamily: 'var(--font-caveat), Georgia, serif',
+                fontSize: '21px',
+                lineHeight: '34px',
                 color: theme.text.primary,
               }}
               dangerouslySetInnerHTML={{ __html: sanitizeLetterClient(currentLetter.text) }}

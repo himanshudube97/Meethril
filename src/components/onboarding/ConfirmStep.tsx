@@ -90,9 +90,9 @@ export function ConfirmStep({
 
   return (
     <div>
-      <h2 className="font-serif text-2xl mb-3">One last check.</h2>
+      <h2 className="font-serif text-3xl md:text-4xl mb-4">One last check.</h2>
       <p
-        className="mb-6 leading-relaxed"
+        className="text-lg mb-7 leading-relaxed"
         style={{ color: theme.text.secondary }}
       >
         You&apos;re about to encrypt your account with the phrase you just set.
@@ -102,7 +102,7 @@ export function ConfirmStep({
 
       {error && (
         <p
-          className="text-sm mb-4 p-3 rounded"
+          className="text-base mb-4 p-3 rounded"
           style={{
             background: `${theme.accent.warm}22`,
             color: theme.accent.warm,
@@ -115,7 +115,7 @@ export function ConfirmStep({
       <button
         disabled={busy}
         onClick={finalize}
-        className="px-6 py-3 rounded-full disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
+        className="px-7 py-3.5 rounded-full text-lg disabled:opacity-30 transition-opacity hover:opacity-90 disabled:hover:opacity-30"
         style={{
           background: theme.text.primary,
           color: theme.bg.primary,

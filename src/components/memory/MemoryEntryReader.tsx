@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { htmlToPlainText } from '@/lib/text-utils'
+import { JOURNAL } from '@/lib/journal-constants'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
 import PhotoBlock from '@/components/desk/PhotoBlock'
@@ -90,8 +91,10 @@ export default function MemoryEntryReader({ entry, onClose }: Props) {
             style={{
               color: colors.bodyText,
               fontFamily: 'var(--font-caveat), Georgia, serif',
-              fontSize: '21px',
-              lineHeight: '34px',
+              // Match the diary book (write + shelf) exactly so an entry reads
+              // identically everywhere — same font size and line spacing.
+              fontSize: `${JOURNAL.FONT_SIZE}px`,
+              lineHeight: `${JOURNAL.LINE_HEIGHT}px`,
             }}
           >
             {plain || (

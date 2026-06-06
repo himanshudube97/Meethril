@@ -29,19 +29,19 @@ export function E2EEOnboardingModal({ userName }: { userName: string }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <h1 className="font-serif text-3xl mb-4">
+              <h1 className="font-serif text-4xl md:text-5xl mb-5">
                 Welcome to Hearth, {userName || 'friend'}.
               </h1>
-              <p className="mb-2 leading-relaxed">
+              <p className="mb-3 text-lg leading-relaxed">
                 Before you start writing, we need to set up encryption.
               </p>
-              <p className="mb-6 leading-relaxed">
+              <p className="mb-6 text-lg leading-relaxed">
                 Everything you write here — your diary, your letters, your
                 photos — should only be readable by you. Even we can&apos;t
                 see it. This is how we promise that.
               </p>
               <p
-                className="mb-6 text-sm leading-relaxed"
+                className="mb-8 text-lg leading-relaxed"
                 style={{ color: theme.text.secondary }}
               >
                 It takes about a minute. You&apos;ll set a memorable phrase
@@ -50,7 +50,7 @@ export function E2EEOnboardingModal({ userName }: { userName: string }) {
               </p>
               <button
                 onClick={() => setStep('passphrase')}
-                className="px-6 py-3 rounded-full transition-opacity hover:opacity-90"
+                className="px-7 py-3.5 rounded-full text-lg transition-opacity hover:opacity-90"
                 style={{
                   background: theme.text.primary,
                   color: theme.bg.primary,

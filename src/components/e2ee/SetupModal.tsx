@@ -180,14 +180,14 @@ export default function SetupModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 End-to-End Encryption
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Your entries will be encrypted with a key only you know.
                 Not even we can read them.
               </p>
             </div>
 
             <div
-              className="p-4 rounded-xl text-sm space-y-3"
+              className="p-4 rounded-xl text-base space-y-3"
               style={{ background: `${theme.accent.warm}15`, border: `1px solid ${theme.accent.warm}30` }}
             >
               <p style={{ color: theme.text.primary }}>
@@ -200,7 +200,7 @@ export default function SetupModal() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">❌</span>
-                  <span>You <strong>CANNOT</strong> recover your journal if you lose both keys. There is no "reset password" — by design.</span>
+                  <span>You <strong>CANNOT</strong> recover your journal if you lose both keys. There is no &quot;reset password&quot; — by design.</span>
                 </li>
               </ul>
             </div>
@@ -213,7 +213,7 @@ export default function SetupModal() {
                 className="mt-1 shrink-0 accent-current w-4 h-4 rounded"
                 style={{ accentColor: theme.accent.primary }}
               />
-              <span className="text-sm" style={{ color: theme.text.secondary }}>
+              <span className="text-base" style={{ color: theme.text.secondary }}>
                 I understand that if I lose both my daily key and recovery key, my journal cannot be recovered — not even by Hearth.
               </span>
             </label>
@@ -221,7 +221,7 @@ export default function SetupModal() {
             <div className="flex gap-3">
               <button
                 onClick={handleClose}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -233,7 +233,7 @@ export default function SetupModal() {
               <button
                 onClick={() => setStep('daily-key')}
                 disabled={!agreedIntro}
-                className="flex-1 py-3 rounded-xl text-sm font-medium transition-opacity"
+                className="flex-1 py-3 rounded-xl text-base font-medium transition-opacity"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -265,14 +265,14 @@ export default function SetupModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Create Your Daily Key
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
-                This is what you'll type to unlock your journal day-to-day.
+              <p className="text-base" style={{ color: theme.text.secondary }}>
+                This is what you&apos;ll type to unlock your journal day-to-day.
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-base mb-2" style={{ color: theme.text.secondary }}>
                   Daily Key
                 </label>
                 <div className="relative">
@@ -281,7 +281,7 @@ export default function SetupModal() {
                     value={dailyKey}
                     onChange={(e) => { setDailyKey(e.target.value); setError('') }}
                     placeholder="Enter your daily key..."
-                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    className="w-full p-4 rounded-xl text-base outline-none"
                     style={{
                       background: theme.glass.bg,
                       border: `1px solid ${theme.glass.border}`,
@@ -294,7 +294,7 @@ export default function SetupModal() {
               </div>
 
               <div>
-                <label className="block text-sm mb-2" style={{ color: theme.text.muted }}>
+                <label className="block text-base mb-2" style={{ color: theme.text.secondary }}>
                   Confirm Daily Key
                 </label>
                 <div className="relative">
@@ -303,7 +303,7 @@ export default function SetupModal() {
                     value={confirmDailyKey}
                     onChange={(e) => { setConfirmDailyKey(e.target.value); setError('') }}
                     placeholder="Confirm your daily key..."
-                    className="w-full p-4 rounded-xl text-sm outline-none"
+                    className="w-full p-4 rounded-xl text-base outline-none"
                     style={{
                       background: theme.glass.bg,
                       border: `1px solid ${dailyKey === confirmDailyKey && confirmDailyKey ? theme.accent.primary : theme.glass.border}`,
@@ -315,12 +315,12 @@ export default function SetupModal() {
                 </div>
               </div>
 
-              <p className="text-sm" style={{ color: theme.text.muted }}>
-                Minimum 8 characters. You'll re-enter this each time you reopen the app, or on a new device.
+              <p className="text-base" style={{ color: theme.text.secondary }}>
+                Minimum 8 characters. You&apos;ll re-enter this each time you reopen the app, or on a new device.
               </p>
 
               {error && (
-                <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
+                <p className="text-base text-center" style={{ color: theme.accent.warm }}>
                   {error}
                 </p>
               )}
@@ -329,7 +329,7 @@ export default function SetupModal() {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('intro')}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -345,7 +345,7 @@ export default function SetupModal() {
                   }
                 }}
                 disabled={loading || dailyKey.length < 8 || dailyKey !== confirmDailyKey}
-                className="flex-1 py-3 rounded-xl text-sm font-medium transition-opacity"
+                className="flex-1 py-3 rounded-xl text-base font-medium transition-opacity"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -377,8 +377,8 @@ export default function SetupModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Save Your Recovery Key
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
-                Write this down or save it somewhere safe. You'll need it if you forget your daily key.
+              <p className="text-base" style={{ color: theme.text.secondary }}>
+                Write this down or save it somewhere safe. You&apos;ll need it if you forget your daily key.
               </p>
             </div>
 
@@ -387,11 +387,11 @@ export default function SetupModal() {
               className="p-4 rounded-xl text-center"
               style={{ background: theme.glass.bg, border: `1px solid ${theme.accent.primary}50` }}
             >
-              <p className="text-sm mb-3" style={{ color: theme.text.muted }}>
+              <p className="text-base mb-3" style={{ color: theme.text.secondary }}>
                 Your Recovery Key
               </p>
               <p
-                className="text-lg font-mono tracking-wide select-all break-all"
+                className="text-xl font-mono tracking-wide select-all break-all"
                 style={{ color: theme.accent.primary }}
               >
                 {recoveryKey}
@@ -402,7 +402,7 @@ export default function SetupModal() {
             <div className="flex gap-3">
               <button
                 onClick={handleCopyRecoveryKey}
-                className="flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-xl text-base flex items-center justify-center gap-2"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -417,7 +417,7 @@ export default function SetupModal() {
               </button>
               <button
                 onClick={() => downloadRecoveryKeyFile(recoveryKey, email)}
-                className="flex-1 py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-xl text-base flex items-center justify-center gap-2"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -438,12 +438,12 @@ export default function SetupModal() {
               className="pt-4 border-t space-y-3"
               style={{ borderColor: `${theme.glass.border}` }}
             >
-              <p className="text-sm" style={{ color: theme.text.muted }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Want to also download your daily key as a file?
               </p>
               <button
                 onClick={() => downloadDailyKeyFile(dailyKey, email)}
-                className="w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl text-base flex items-center justify-center gap-2"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -457,13 +457,13 @@ export default function SetupModal() {
                 </svg>
                 Download daily key as file
               </button>
-              <p className="text-sm" style={{ color: theme.text.muted }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 (Optional — many users prefer to remember their daily key)
               </p>
             </div>
 
             {/* Warning */}
-            <p className="text-sm text-center" style={{ color: theme.accent.warm }}>
+            <p className="text-base text-center" style={{ color: theme.accent.warm }}>
               ⚠ If you lose both keys, your journal cannot be recovered.
             </p>
 
@@ -476,15 +476,15 @@ export default function SetupModal() {
                 className="mt-1 shrink-0 w-4 h-4 rounded"
                 style={{ accentColor: theme.accent.primary }}
               />
-              <span className="text-sm" style={{ color: theme.text.secondary }}>
-                I've saved my recovery key.
+              <span className="text-base" style={{ color: theme.text.secondary }}>
+                I&apos;ve saved my recovery key.
               </span>
             </label>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('daily-key')}
-                className="flex-1 py-3 rounded-xl text-sm"
+                className="flex-1 py-3 rounded-xl text-base"
                 style={{
                   background: theme.glass.bg,
                   border: `1px solid ${theme.glass.border}`,
@@ -499,7 +499,7 @@ export default function SetupModal() {
                   setStep('done')
                 }}
                 disabled={!savedRecovery}
-                className="flex-1 py-3 rounded-xl text-sm font-medium transition-opacity"
+                className="flex-1 py-3 rounded-xl text-base font-medium transition-opacity"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -536,24 +536,24 @@ export default function SetupModal() {
               <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
                 Your journal is now end-to-end encrypted ✅
               </h2>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 Migrating your existing entries… (this runs in the background)
               </p>
             </div>
 
             <div
-              className="p-4 rounded-xl text-sm"
+              className="p-4 rounded-xl text-base"
               style={{ background: `${theme.accent.primary}10`, border: `1px solid ${theme.accent.primary}25` }}
             >
               <p style={{ color: theme.text.secondary }}>
-                Remember: Keep your recovery key safe. It's the only way to access your entries
+                Remember: Keep your recovery key safe. It&apos;s the only way to access your entries
                 if you forget your daily key.
               </p>
             </div>
 
             <button
               onClick={handleClose}
-              className="w-full py-3 rounded-xl text-sm font-medium"
+              className="w-full py-3 rounded-xl text-base font-medium"
               style={{
                 background: theme.accent.primary,
                 color: '#fff',
