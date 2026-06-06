@@ -5,6 +5,8 @@ import {
   Patrick_Hand,
 } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import LayoutContent from "@/components/LayoutContent";
 import AuthGate from "@/components/AuthGate";
 import AuthProvider from "@/components/AuthProvider";
@@ -91,6 +93,10 @@ export default function RootLayout({
             </AuthGate>
           </E2EEProvider>
         </AuthProvider>
+        {/* Vercel privacy-friendly analytics: cookieless pageviews + Web Vitals.
+            No-ops outside Vercel hosting, so safe in local/Docker dev. */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

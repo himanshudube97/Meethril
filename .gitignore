@@ -78,3 +78,6 @@ docker-compose.override.yml
 
 # local dev test credentials (login + e2ee daily key) — never commit
 .dev-creds.local
+
+# Sentry Config File (build-plugin auth token)
+.env.sentry-build-plugin
