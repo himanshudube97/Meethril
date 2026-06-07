@@ -47,7 +47,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Meethril — a meditative journal that listens",
+  title: "Meethril — a hush at the end of the day, kept just for you",
   description: "Write freely, and over time, it gently shows you who you are.",
   manifest: "/manifest.json",
 
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "Meethril",
-    description: "A meditative journal that listens",
+    description: "A hush at the end of the day, kept just for you.",
     siteName: "Meethril",
     type: "website",
   },

@@ -585,7 +585,7 @@ export default function PricingPage() {
           whileInView={{ opacity: 0.6 }}
           viewport={{ once: true }}
         >
-          Meethril — a meditative journal that listens
+          Meethril — a hush at the end of the day, kept just for you
         </motion.p>
       </div>
     </main>

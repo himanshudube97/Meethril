@@ -111,7 +111,7 @@ export default function FooterCTA() {
               className="text-base"
               style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
             >
-              Meethril — a meditative journal that listens
+              Meethril — a hush at the end of the day, kept just for you
             </p>
             <div
               className="flex items-center gap-4 text-sm"

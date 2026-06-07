@@ -217,7 +217,7 @@ function LoginForm() {
           <h1 className="font-[var(--font-serif)] text-4xl text-[var(--text-primary)] mb-2">
             Welcome to Meethril
           </h1>
-          <p className="text-[var(--text-muted)]">A meditative journal that listens</p>
+          <p className="text-[var(--text-muted)]">A hush at the end of the day, kept just for you.</p>
         </div>
 
         <div className="bg-[var(--card-bg)] backdrop-blur-sm border border-[var(--card-border)] rounded-2xl p-8 shadow-lg">

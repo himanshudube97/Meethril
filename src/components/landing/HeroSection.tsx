@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useThemeStore } from '@/store/theme'
 import { whispers } from '@/lib/themes'
 
-const tagline = 'a meditative journal that listens'
+const tagline = 'A hush at the end of the day, kept just for you.'
 
 /**
  * Landing hero — stripped of the orbs, particles, typewriter, scroll
