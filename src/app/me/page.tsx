@@ -10,6 +10,7 @@ import { useE2EEStore } from '@/store/e2ee'
 import DatePicker from '@/components/DatePicker'
 import RotateRecoveryKeyModal from '@/components/e2ee/RotateRecoveryKeyModal'
 import ReminderControls from '@/components/reminders/ReminderControls'
+import DeleteAccountModal from '@/components/account/DeleteAccountModal'
 
 // Debounced save hook
 function useDebouncedSave(delay = 500) {
@@ -462,6 +463,7 @@ export default function MePage() {
   const { theme } = useThemeStore()
   const { user, logout } = useAuthStore()
   const { profile, loading, fetchProfile } = useProfileStore()
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -662,6 +664,21 @@ export default function MePage() {
           sign out
         </motion.button>
       </motion.div>
+
+      {/* Danger zone */}
+      <div className="text-center mt-10">
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="text-sm transition-colors"
+          style={{ color: theme.text.muted, opacity: 0.7 }}
+        >
+          delete my account
+        </button>
+      </div>
+
+      {showDeleteModal && user && (
+        <DeleteAccountModal userEmail={user.email} onClose={() => setShowDeleteModal(false)} />
+      )}
     </div>
   )
 }

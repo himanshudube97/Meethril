@@ -24,6 +24,7 @@ model User {
   pushSubscriptions PushSubscription[]
   letters           Letter[]
   feedback          Feedback[]
+  accountDeletionRequests AccountDeletionRequest[]
 
   // A Small Light counters & rate limit (anonymous notes to strangers)
   strangerNotesSent       Int       @default(0)
@@ -529,4 +530,24 @@ model StrangerBlock {
   @@unique([blockerId, blockedId])
   @@index([blockedId])
   @@map("stranger_blocks")
+}
+
+/// Manual account-deletion queue. A user requesting account deletion creates a
+/// row here; an operator processes it by hand after `purgeOn` (delete the user
+/// in-app/Studio + cancel any Dodo subscription), then marks status = "done".
+/// Deliberately manual at current scale — no automated purge cron. The row
+/// cascade-deletes with the user, so manual deletion cleans this up too.
+model AccountDeletionRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email       String // snapshot of the account email at request time
+  reason      String? // optional free-text "why are you leaving?"
+  requestedAt DateTime @default(now())
+  purgeOn     DateTime // requestedAt + 14d — earliest date an operator may purge
+  status      String   @default("pending") // "pending" | "done" | "cancelled"
+
+  @@index([status, purgeOn])
+  @@index([userId])
+  @@map("account_deletion_requests")
 }
