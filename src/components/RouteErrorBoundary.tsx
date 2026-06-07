@@ -29,7 +29,7 @@ export default function RouteErrorBoundary({
     >
       <div style={{ maxWidth: 420 }}>
         <h2 style={{ fontSize: 22, marginBottom: 12 }}>
-          This corner of Hearth wobbled.
+          This corner of Meethril wobbled.
         </h2>
         <p style={{ opacity: 0.7, marginBottom: 24, lineHeight: 1.6, fontSize: 15 }}>
           {context

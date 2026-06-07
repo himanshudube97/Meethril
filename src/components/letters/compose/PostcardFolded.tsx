@@ -217,7 +217,7 @@ export default function PostcardFolded({
               textAlign: 'center',
             }}
           >
-            HEARTH
+            MEETHRIL
           </span>
         </div>
       </motion.div>

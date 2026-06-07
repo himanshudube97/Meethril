@@ -214,7 +214,7 @@ export default function SetupModal() {
                 style={{ accentColor: theme.accent.primary }}
               />
               <span className="text-base" style={{ color: theme.text.secondary }}>
-                I understand that if I lose both my daily key and recovery key, my journal cannot be recovered — not even by Hearth.
+                I understand that if I lose both my daily key and recovery key, my journal cannot be recovered — not even by Meethril.
               </span>
             </label>
 

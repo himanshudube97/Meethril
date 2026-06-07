@@ -113,7 +113,7 @@ export function RecoveryKeyStep({
 function downloadRecoveryKey(key: string) {
   const blob = new Blob(
     [
-      `Your Hearth recovery key:\n\n${key}\n\nKeep this safe. Together with your phrase, it's the only way back into your encrypted data.\n`,
+      `Your Meethril recovery key:\n\n${key}\n\nKeep this safe. Together with your phrase, it's the only way back into your encrypted data.\n`,
     ],
     { type: 'text/plain' }
   )

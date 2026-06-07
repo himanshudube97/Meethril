@@ -10,7 +10,7 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('push', (event) => {
-  let payload = { title: 'hearth', body: '' }
+  let payload = { title: 'meethril', body: '' }
   try {
     payload = event.data.json()
   } catch (_) {
@@ -21,7 +21,7 @@ self.addEventListener('push', (event) => {
   // exist in public/, and on some browser+OS combos a missing icon silently
   // drops the whole notification. Re-add once real PNGs ship.
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'hearth', {
+    self.registration.showNotification(payload.title || 'meethril', {
       body: payload.body || '',
       tag: 'meethril-reminder',
       renotify: true,

@@ -168,7 +168,7 @@ export default function ScrapbookCanvas({ boardId, initialItems }: Props) {
   // because CanvasItemWrapper relies on the live canvasRef and other
   // contexts that don't reproduce cleanly in a hidden tree. The polaroid
   // caption shows today's date.
-  const polaroidCaption = `${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · hearth`
+  const polaroidCaption = `${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · meethril`
   const { CameraButton: ShareCameraButton, Capture: ShareCapture } = useShareableCapture({
     captureTarget: () => canvasRef.current,
     surface: 'scrapbook',

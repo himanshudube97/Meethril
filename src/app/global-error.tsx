@@ -38,7 +38,7 @@ export default function GlobalError({
         <div style={{ maxWidth: 440 }}>
           <h1 style={{ fontSize: 24, marginBottom: 12 }}>Something went quiet.</h1>
           <p style={{ opacity: 0.7, marginBottom: 24, lineHeight: 1.6 }}>
-            Hearth ran into an unexpected error. Your writing is safe — it lives on the server.
+            Meethril ran into an unexpected error. Your writing is safe — it lives on the server.
           </p>
           <button
             onClick={reset}

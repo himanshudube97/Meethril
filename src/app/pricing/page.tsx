@@ -154,7 +154,7 @@ export default function PricingPage() {
             style={{ color: theme.text.muted }}
             whileHover={{ x: -3 }}
           >
-            ← Back to Hearth
+            ← Back to Meethril
           </motion.span>
         </Link>
       </div>
@@ -585,7 +585,7 @@ export default function PricingPage() {
           whileInView={{ opacity: 0.6 }}
           viewport={{ once: true }}
         >
-          Hearth — a meditative journal that listens
+          Meethril — a meditative journal that listens
         </motion.p>
       </div>
     </main>

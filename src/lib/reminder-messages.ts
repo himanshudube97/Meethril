@@ -3,7 +3,7 @@
 // Author the rest of the pool over time; v1 ships with these 5.
 export const REMINDER_LINES: readonly string[] = [
   'the evening is quiet. write a line.',
-  'hearth is here. one small thing?',
+  'meethril is here. one small thing?',
   'before sleep, a sentence about today.',
   'no pressure. just a page that\'s waiting.',
   'the day\'s still warm. tell us how it felt.',

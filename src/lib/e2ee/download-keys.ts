@@ -67,5 +67,5 @@ the other on the same device while you're still unlocked.
 If you lose both your daily key and this recovery key,
 your encrypted journal cannot be recovered.
 `
-  triggerDownload(`hearth-recovery-key-${todaySuffix()}.txt`, body)
+  triggerDownload(`meethril-recovery-key-${todaySuffix()}.txt`, body)
 }

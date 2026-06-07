@@ -8,7 +8,7 @@ function configureVapid() {
   if (configured) return
   const pub = process.env.VAPID_PUBLIC_KEY
   const priv = process.env.VAPID_PRIVATE_KEY
-  const subj = process.env.VAPID_SUBJECT || 'mailto:support@hearth.app'
+  const subj = process.env.VAPID_SUBJECT || 'mailto:himanshu@meethril.com'
   if (!pub || !priv) throw new Error('VAPID keys not configured')
   webpush.setVapidDetails(subj, pub, priv)
   configured = true

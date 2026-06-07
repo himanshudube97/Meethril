@@ -274,7 +274,7 @@ export function PostcardBack({
               opacity: 0.5,
             }}
           >
-            — sealed by hearth —
+            — sealed by meethril —
           </div>
         </div>
       </div>

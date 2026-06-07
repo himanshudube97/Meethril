@@ -121,7 +121,7 @@ export default function Navigation() {
         className="fixed top-6 left-6 z-40 text-xs tracking-[0.3em] opacity-60 hover:opacity-100 transition"
         style={{ color: theme.text.muted }}
       >
-        ← HEARTH
+        ← MEETHRIL
       </Link>
       <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-40">
       <div

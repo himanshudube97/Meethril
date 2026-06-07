@@ -110,7 +110,7 @@ function EnvelopeCard({ title, subtitle, tilt, onClick, accent, delay }: Envelop
             color: 'rgba(120, 90, 50, 0.55)',
           }}
         >
-          HEARTH
+          MEETHRIL
         </span>
       </div>
 

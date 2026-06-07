@@ -593,7 +593,7 @@ export default function MePage() {
             className="text-lg font-medium mb-1"
             style={{ color: theme.text.primary }}
           >
-            Hearth on your desktop
+            Meethril on your desktop
           </h3>
           <p
             className="text-base"

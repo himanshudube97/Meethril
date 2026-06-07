@@ -43,7 +43,7 @@ export default function Stamp({ stamp, onClick }: Props) {
           <div className="denom">{denom}</div>
           <div className="icon">{v.icon}</div>
           <div>
-            <div className="country">hearth · evening post</div>
+            <div className="country">meethril · evening post</div>
             <div className="denom-bottom">{date}</div>
           </div>
         </div>

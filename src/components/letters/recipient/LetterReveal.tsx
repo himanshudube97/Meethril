@@ -284,7 +284,7 @@ export function LetterReveal({
               boxShadow: '0 0 12px rgba(240,176,106,0.55)',
             }}
           />
-          sent with hearth
+          sent with meethril
         </div>
       </footer>
     </div>

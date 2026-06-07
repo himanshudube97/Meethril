@@ -68,7 +68,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             animation: 'authgate-pulse 1.6s ease-in-out infinite',
           }}
         >
-          Hearth
+          Meethril
         </span>
         <style>{`@keyframes authgate-pulse { 0%, 100% { opacity: 0.25 } 50% { opacity: 0.6 } }`}</style>
       </div>

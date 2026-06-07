@@ -11,7 +11,7 @@ let configured = false
 function configureVapid() {
   if (configured) return
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:support@hearth.app',
+    process.env.VAPID_SUBJECT || 'mailto:himanshu@meethril.com',
     process.env.VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!,
   )

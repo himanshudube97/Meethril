@@ -30,7 +30,7 @@ export function E2EEOnboardingModal({ userName }: { userName: string }) {
               exit={{ opacity: 0, y: -10 }}
             >
               <h1 className="font-serif text-4xl md:text-5xl mb-5">
-                Welcome to Hearth, {userName || 'friend'}.
+                Welcome to Meethril, {userName || 'friend'}.
               </h1>
               <p className="mb-3 text-lg leading-relaxed">
                 Before you start writing, we need to set up encryption.

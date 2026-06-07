@@ -53,7 +53,7 @@ export default function ScrapbookDesktopOnly() {
             }}
           >
             Arranging photos, songs, and stickers needs a bigger canvas than
-            a phone can give it. Open Hearth on a laptop to keep building
+            a phone can give it. Open Meethril on a laptop to keep building
             your scrapbook — everything you&apos;ve already pinned is safe.
           </p>
           <Link

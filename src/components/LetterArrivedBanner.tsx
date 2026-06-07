@@ -276,7 +276,7 @@ function PostageStamp({ themeName }: { themeName: ThemeName }) {
           letterSpacing: 1,
         }}
       >
-        HEARTH
+        MEETHRIL
       </div>
       <div
         style={{
@@ -1033,7 +1033,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
                             }}
                           >
                             <span style={{ fontSize: '28px', marginBottom: '4px' }}>{themeStamps[themeName]?.icon || '🍃'}</span>
-                            <span style={{ fontSize: '8px', color: themeStamps[themeName]?.color || '#5E8B5A', fontWeight: 'bold', letterSpacing: '1px' }}>HEARTH</span>
+                            <span style={{ fontSize: '8px', color: themeStamps[themeName]?.color || '#5E8B5A', fontWeight: 'bold', letterSpacing: '1px' }}>MEETHRIL</span>
                             <span style={{ fontSize: '10px', color: '#8B7355', fontWeight: 'bold', marginTop: '2px' }}>₹ 5</span>
                           </div>
                         </div>
@@ -1128,7 +1128,7 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
                         }}
                       >
                         <span style={{ fontSize: '11px', color: 'rgba(139,115,85,0.5)', letterSpacing: '3px', fontWeight: '500' }}>
-                          HEARTH • A LETTER FROM THE PAST
+                          MEETHRIL • A LETTER FROM THE PAST
                         </span>
                       </div>
                     </div>

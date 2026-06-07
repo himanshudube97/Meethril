@@ -140,8 +140,8 @@ export default function ReminderControls() {
         <section id="reminders" className="space-y-2">
           {heading}
           <p className="text-base" style={{ color: theme.text.secondary }}>
-            To get reminders on iPhone, install Hearth as a PWA: tap Share → Add to Home Screen,
-            then open Hearth from your home screen and try again.
+            To get reminders on iPhone, install Meethril as a PWA: tap Share → Add to Home Screen,
+            then open Meethril from your home screen and try again.
           </p>
         </section>
       )
@@ -159,7 +159,7 @@ export default function ReminderControls() {
   async function handleEnable() {
     const result = await subscribe()
     if (!result.ok && result.error === 'denied') {
-      alert('Notifications are blocked. Open your browser settings → Site settings to allow notifications for Hearth.')
+      alert('Notifications are blocked. Open your browser settings → Site settings to allow notifications for Meethril.')
     }
   }
 
@@ -180,7 +180,7 @@ export default function ReminderControls() {
       {!subscribed && permission === 'denied' && (
         <div className="space-y-3">
           <p className="text-base" style={{ color: theme.text.secondary }}>
-            Notifications are blocked for Hearth in your browser.
+            Notifications are blocked for Meethril in your browser.
           </p>
           <details className="text-sm" style={{ color: theme.text.muted }}>
             <summary className="cursor-pointer select-none" style={{ color: theme.text.secondary }}>
@@ -192,7 +192,7 @@ export default function ReminderControls() {
               <li>Come back here and click the button below.</li>
             </ol>
             <p className="mt-2 italic">
-              On iPhone: install Hearth as a PWA (Share → Add to Home Screen), open it from the home screen, and grant notifications there.
+              On iPhone: install Meethril as a PWA (Share → Add to Home Screen), open it from the home screen, and grant notifications there.
             </p>
           </details>
           <button

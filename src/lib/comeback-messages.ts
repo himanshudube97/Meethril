@@ -7,7 +7,7 @@ export const COMEBACK_MESSAGES = {
   ],
   card: [
     'a few days have passed. glad you\'re here.',
-    'hearth missed you a little.',
+    'meethril missed you a little.',
   ],
   modal: [
     'it\'s been {gapDays} days. no judgment, just glad you\'re here.',

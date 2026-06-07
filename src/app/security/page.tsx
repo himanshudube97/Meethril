@@ -26,7 +26,7 @@ export default function SecurityPage() {
           className="text-3xl font-light"
           style={{ color: theme.text.primary }}
         >
-          How Hearth keeps your journal private
+          How Meethril keeps your journal private
         </h1>
 
         <BackfillRetryPanel />
@@ -40,7 +40,7 @@ export default function SecurityPage() {
             Server-side encryption (default)
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: theme.text.secondary }}>
-            Every Hearth account starts with server-side encryption. Your text, photos, doodles,
+            Every Meethril account starts with server-side encryption. Your text, photos, doodles,
             and letter contents are encrypted before being stored in our database. If our database
             leaks, the data is unreadable without our encryption key.
           </p>
@@ -56,7 +56,7 @@ export default function SecurityPage() {
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: theme.text.secondary }}>
             On your profile page you can enable end-to-end encryption. With it on, your journal is
-            encrypted with a key only you have — not even Hearth can read your entries, photos,
+            encrypted with a key only you have — not even Meethril can read your entries, photos,
             doodles, or scrapbook items.
           </p>
 
@@ -118,9 +118,9 @@ export default function SecurityPage() {
             Two keys, one job
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: theme.text.secondary }}>
-            When you enable E2EE, you'll set a{' '}
+            When you enable E2EE, you&apos;ll set a{' '}
             <strong style={{ color: theme.text.primary }}>daily key</strong>{' '}
-            (a passphrase you'll type often) and receive a{' '}
+            (a passphrase you&apos;ll type often) and receive a{' '}
             <strong style={{ color: theme.text.primary }}>recovery key</strong>{' '}
             (a long random string we ask you to save). Either one can unlock your journal — the
             daily key is for everyday use, the recovery key is your backup.
@@ -136,7 +136,7 @@ export default function SecurityPage() {
             What happens if you forget your daily key
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: theme.text.secondary }}>
-            Use your recovery key to unlock. You'll set a new daily key. Your journal continues
+            Use your recovery key to unlock. You&apos;ll set a new daily key. Your journal continues
             to work with all your existing entries.
           </p>
         </section>
