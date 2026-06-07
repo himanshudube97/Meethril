@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useSubscription } from '@/hooks/useSubscription'
 import { PasswordToggle } from '@/components/PasswordToggle'
+import { SealJourney } from './SealJourney'
 
 // '5min' is an ADMIN-ONLY pill (rendered only when useSubscription().isAdmin)
 // to smoke-test delivery end-to-end without waiting a week. The matching
@@ -174,10 +175,12 @@ export function SealModal({
         answer: recipient === 'friend' ? answer : undefined,
       })
       setPhase('folding')
+      // fold + wax-stamp (1.3s) → the letter drifts off into the universe (sealed)
       setTimeout(() => {
         setPhase('sealed')
-        setTimeout(() => onSealed(), 700)
-      }, 800)
+        // let the departure + caption breathe before we close out
+        setTimeout(() => onSealed(), 1900)
+      }, 1300)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.')
       setBusy(false)
@@ -440,14 +443,7 @@ export function SealModal({
           )}
 
           {phase !== 'form' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-12 text-center font-serif italic text-lg"
-              style={{ color: theme.text.primary }}
-            >
-              {phase === 'folding' ? 'folding...' : 'sealed.'}
-            </motion.div>
+            <SealJourney recipient={recipient} phase={phase} theme={theme} />
           )}
         </motion.div>
       </motion.div>

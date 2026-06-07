@@ -13,6 +13,7 @@ import SongEmbed from '@/components/SongEmbed'
 import SongPicker from '@/components/SongPicker'
 import PhotoBlock from '@/components/desk/PhotoBlock'
 import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
+import { SealJourney } from './compose/SealJourney'
 import { JOURNAL } from '@/lib/journal-constants'
 
 const LETTER_BODY_MAX = 800
@@ -76,6 +77,8 @@ export default function MobileLetterCompose() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Drives the fold-and-seal departure overlay after a successful seal.
+  const [sealPhase, setSealPhase] = useState<'idle' | 'folding' | 'sealed'>('idle')
 
   const handlePhotoAdd = useCallback((position: 1 | 2, photoData: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => {
     const rotation = position === 1
@@ -214,7 +217,12 @@ export default function MobileLetterCompose() {
         }
       }
       resetCurrentEntry()
-      router.push('/letters')
+      // play the fold-and-seal departure, then drift over to the letters list
+      setSealPhase('folding')
+      setTimeout(() => {
+        setSealPhase('sealed')
+        setTimeout(() => router.push('/letters'), 1900)
+      }, 1300)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.')
       setSubmitting(false)
@@ -253,6 +261,17 @@ export default function MobileLetterCompose() {
   // -----------------------------------------------------------------
   // Steps 1–3 — shared shell
   // -----------------------------------------------------------------
+  if (sealPhase !== 'idle') {
+    return (
+      <div
+        className="fixed inset-0 z-40 flex items-center justify-center"
+        style={{ backgroundColor: theme.bg.primary, color: theme.text.primary }}
+      >
+        <SealJourney recipient={recipient} phase={sealPhase} theme={theme} />
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex flex-col" style={{ color: theme.text.primary }}>
       <div className="pt-20 px-4 shrink-0">
