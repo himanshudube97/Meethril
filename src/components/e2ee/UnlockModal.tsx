@@ -47,8 +47,8 @@ export default function UnlockModal() {
         keyData.masterKeyIV
       )
 
-      // Store master key (sessionStorage — cleared when the tab closes) and
-      // close the modal. We keep the key for the session only; no device-trust.
+      // Store master key (localStorage with a 1h TTL — see crypto.ts) and
+      // close the modal. The key auto-expires after 1h or on explicit lock/logout.
       await storeMasterKey(masterKey)
       setShowUnlockModal(false)
       setDailyKey('')
@@ -104,6 +104,9 @@ export default function UnlockModal() {
                 </h2>
                 <p className="text-base" style={{ color: theme.text.secondary }}>
                   Enter your daily key to decrypt your entries.
+                </p>
+                <p className="text-sm mt-2" style={{ color: theme.text.muted }}>
+                  This device stays unlocked for up to 1 hour.
                 </p>
               </div>
 

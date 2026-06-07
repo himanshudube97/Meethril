@@ -43,8 +43,9 @@ interface E2EEState {
   setBackfillProgress: (patch: Partial<E2EEState['backfillProgress']>) => void
 
   // Async actions
-  // Note: the master key is stored in sessionStorage (cleared on tab close).
-  // `ttlDays` is retained for caller-compat but ignored.
+  // Note: the master key is stored in localStorage with a fixed 1h TTL (see
+  // crypto.ts). `ttlDays` is retained for caller-compat but ignored — the TTL
+  // is a single policy in crypto.ts, not per-caller.
   storeMasterKey: (key: CryptoKey, ttlDays?: number) => Promise<void>
   loadMasterKey: () => Promise<CryptoKey | null>
   clearMasterKey: () => void
@@ -86,8 +87,8 @@ export const useE2EEStore = create<E2EEState>((set, get) => ({
       return { backfillProgress: next }
     }),
 
-  // Store master key in sessionStorage (cleared on tab close).
-  // ttlDays is accepted but ignored — sessionStorage has no TTL.
+  // Store master key in localStorage with a 1h TTL (see crypto.ts).
+  // ttlDays is accepted but ignored — the TTL is a fixed policy in crypto.ts.
   storeMasterKey: async (key, _ttlDays) => {
     await storeMasterKeyLocally(key)
     set({ masterKey: key, isUnlocked: true })

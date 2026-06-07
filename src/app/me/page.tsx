@@ -179,8 +179,9 @@ const E2EESettings = memo(function E2EESettings() {
   } = useE2EEStore()
 
   const [showRotate, setShowRotate] = useState(false)
-  // The master key now lives in sessionStorage and always clears on tab
-  // close — no TTL state to track. Kept the "session only" copy below.
+  // The master key lives in localStorage with a 1h TTL (see crypto.ts), so it
+  // survives app-switching on mobile/tablet but auto-expires. We don't surface
+  // the exact remaining time here — the copy below just says up to 1 hour.
 
   return (
     <motion.div
@@ -262,12 +263,12 @@ const E2EESettings = memo(function E2EESettings() {
                 style={{ color: theme.text.secondary }}
                 title={
                   isUnlocked
-                    ? 'Your encryption key is loaded in this browser for this session, so your entries can be read and written. It is never sent to the server.'
+                    ? 'Your encryption key is loaded in this browser for up to 1 hour, so your entries can be read and written. It is never sent to the server.'
                     : 'Your encryption key is not loaded in this browser. Your entries stay encrypted and unreadable until you unlock with your daily key.'
                 }
               >
                 {isUnlocked
-                  ? 'Unlocked on this device (session only).'
+                  ? 'Unlocked on this device (up to 1 hour).'
                   : 'Locked.'}
               </p>
               <div className="flex flex-wrap gap-2 pt-1">

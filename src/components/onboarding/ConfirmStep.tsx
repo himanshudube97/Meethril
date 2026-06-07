@@ -75,8 +75,9 @@ export function ConfirmStep({
         throw new Error(body.error ?? `Setup failed (${res.status})`)
       }
 
-      // 7. Push the master key into the in-memory store (7-day TTL) so the
-      //    user is already unlocked when they land on /me — no second prompt.
+      // 7. Push the master key into the in-memory store (persisted to
+      //    localStorage with a 1h TTL — see crypto.ts; the numeric arg is
+      //    ignored) so the user is already unlocked when they land on /me.
       await storeMasterKey(masterKey, 7)
       setEnabled(true)
       await fetchKeyData()
