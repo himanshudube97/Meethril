@@ -85,32 +85,55 @@ export function PassphraseStep({ onComplete }: { onComplete: (pp: string) => voi
         </p>
       )}
 
+      {/*
+        Theme-independent loss warning. Uses FIXED red/yellow colors (not theme
+        tokens) on purpose so it stays loud and legible on every theme —
+        including dark ones like rivendell where theme.accent.warm is too subtle.
+        This must actually get read; it's the one irreversible decision here.
+      */}
       <div
-        className="flex items-start gap-3 mb-7 p-4 rounded-xl border border-l-4"
+        className="mb-7 rounded-xl overflow-hidden"
         style={{
-          background: theme.glass.bg,
-          borderColor: theme.accent.warm,
+          background: '#FEF08A', // bright yellow
+          border: '3px solid #DC2626', // red
+          boxShadow: '0 0 0 3px rgba(220,38,38,0.30)',
         }}
       >
-        <svg
-          className="w-6 h-6 shrink-0 mt-0.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={theme.accent.warm}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+        <div
+          className="px-4 py-2 flex items-center gap-2"
+          style={{ background: '#DC2626' }}
         >
-          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <p className="text-base leading-relaxed" style={{ color: theme.text.primary }}>
-          <strong style={{ color: theme.accent.warm }}>Important:</strong> if you forget
-          this phrase, we cannot reset it. Even we don&apos;t know what it is — that&apos;s
-          how this works. You&apos;ll get a recovery key next as a backup.
-        </p>
+          <svg
+            className="w-5 h-5 shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span
+            className="text-sm font-bold uppercase"
+            style={{ color: '#FFFFFF', letterSpacing: '0.08em' }}
+          >
+            Read this — it cannot be undone
+          </span>
+        </div>
+        <div className="px-4 py-3 space-y-1.5">
+          <p className="text-base font-bold leading-snug" style={{ color: '#7F1D1D' }}>
+            If you forget this phrase, your journal is gone forever.
+          </p>
+          <p className="text-sm font-medium leading-relaxed" style={{ color: '#7F1D1D' }}>
+            We cannot reset it. There is no password recovery and no backdoor —
+            not even for us. That&apos;s what keeps it private. Write your phrase
+            down somewhere safe. You&apos;ll get a recovery key next as a backup.
+          </p>
+        </div>
       </div>
 
       <button
