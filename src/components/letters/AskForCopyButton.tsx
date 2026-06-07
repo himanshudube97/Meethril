@@ -17,7 +17,9 @@ export function AskForCopyButton({
     const res = await fetch(`/api/letters/${letterId}/ask-for-copy`, { method: 'POST' })
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
-      setErr(j.error ?? 'Could not send.')
+      // 402 = this is a premium-only action. Show a human message, not the raw code.
+      const msg = res.status === 402 ? 'A premium feature — upgrade to ask for a copy.' : (j.error ?? 'Could not send.')
+      setErr(msg)
       setState('error')
       return
     }

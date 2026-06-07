@@ -15,6 +15,8 @@ import PhotoBlock from '@/components/desk/PhotoBlock'
 import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import { SealJourney } from './compose/SealJourney'
 import { JOURNAL } from '@/lib/journal-constants'
+import { parseLimitError } from '@/lib/billing/limit-error'
+import { useLimitPromptStore } from '@/store/limit-prompt'
 
 const LETTER_BODY_MAX = 800
 
@@ -173,6 +175,8 @@ export default function MobileLetterCompose() {
           body: JSON.stringify(payload),
         })
         if (!res.ok) {
+          const limit = await parseLimitError(res)
+          if (limit) { useLimitPromptStore.getState().show(limit); setSubmitting(false); return }
           const j = await res.json().catch(() => ({}))
           throw new Error(j.error || 'Could not seal letter.')
         }
@@ -212,6 +216,8 @@ export default function MobileLetterCompose() {
           body: JSON.stringify(payload),
         })
         if (!res.ok) {
+          const limit = await parseLimitError(res)
+          if (limit) { useLimitPromptStore.getState().show(limit); setSubmitting(false); return }
           const j = await res.json().catch(() => ({}))
           throw new Error(j.error || 'Could not send letter.')
         }
