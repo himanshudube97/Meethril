@@ -34,20 +34,6 @@ interface Props {
   keepBusy: boolean
 }
 
-/** Escape HTML, then rebuild the writer's paragraph structure from newlines so
- *  TipTap renders the same line breaks the sender saw (and the same height, so
- *  the fit guarantee holds). */
-function toLetterHtml(text: string): string {
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  return escaped
-    .split('\n')
-    .map((line) => (line.trim() === '' ? '<p></p>' : `<p>${line}</p>`))
-    .join('')
-}
-
 function useCountdown(expiresAt: Date): { h: number; m: number } | null {
   const [remaining, setRemaining] = useState<number | null>(null)
   useEffect(() => {
@@ -128,7 +114,7 @@ export function LetterReveal({
       active
       themeOverride={linenTheme}
       salutationName={recipientName}
-      body={toLetterHtml(body)}
+      body={body}
       createdAt={createdAt}
       onTurnOver={() => {}}
     />,

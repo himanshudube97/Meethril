@@ -10,6 +10,7 @@ import { useThemeStore } from '@/store/theme'
 import type { Theme } from '@/lib/themes'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { findLargestFittingPrefix } from '@/lib/text-fit'
+import { letterBodyToHtml } from '@/lib/letters/letter-body-html'
 import { PostcardFrame } from './PostcardFrame'
 
 // The portrait postcard puts the WHOLE letter on the front, so the writing
@@ -140,7 +141,9 @@ export function PostcardFront({
       Placeholder.configure({ placeholder: '' }),
       CharacterCount.configure({ limit: FRONT_CHAR_LIMIT }),
     ],
-    content: body,
+    // Rebuild paragraphs from the stored plain text so breaks render (a bare
+    // string would collapse them). See letterBodyToHtml.
+    content: letterBodyToHtml(body),
     onUpdate({ editor }) {
       if (trimmingRef.current) return
 
@@ -152,11 +155,11 @@ export function PostcardFront({
         try {
           const fullText = editor.getText()
           const fits = (prefix: string): boolean => {
-            editor.commands.setContent(prefix, { emitUpdate: false })
+            editor.commands.setContent(letterBodyToHtml(prefix), { emitUpdate: false })
             return editorDom.offsetHeight <= maxHeight + 2
           }
           const fittingLen = findLargestFittingPrefix(fullText, fits)
-          editor.commands.setContent(fullText.slice(0, fittingLen), { emitUpdate: false })
+          editor.commands.setContent(letterBodyToHtml(fullText.slice(0, fittingLen)), { emitUpdate: false })
           editor.commands.focus('end')
         } finally {
           trimmingRef.current = false
@@ -193,7 +196,10 @@ export function PostcardFront({
     if (!editor) return
     if (editor.isFocused) return
     if (lastSeededRef.current === body) return
-    editor.commands.setContent(body)
+    // emitUpdate:false — seeding mustn't re-trigger the overflow trim (the
+    // reconstructed height equals what was authored, so it fits) or echo back
+    // through onBodyChange.
+    editor.commands.setContent(letterBodyToHtml(body), { emitUpdate: false })
     lastSeededRef.current = body
   }, [body, editor])
 

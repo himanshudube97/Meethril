@@ -89,6 +89,16 @@ textarea,
   line-height: 36px;
 }
 
+/* A paragraph break in the letter body renders as exactly one blank ruled line,
+   matching the delivered email. We use a 36px bottom margin (one ruling) rather
+   than an empty <p>: the margin keeps every text line on the 36px grid AND
+   round-trips cleanly through editor.getText() (an empty <p> would inflate the
+   stored "\n\n" on every save). offsetHeight includes the margin, so the
+   visual-cap guard adapts automatically. */
+.letter-front-editor p:not(:last-child) {
+  margin-bottom: 36px;
+}
+
 /* Stranger-note inputs use the journal hand (Caveat). The browser-default
    placeholder opacity reads as washed grey on the pale note paper, so set a
    legible, theme-aware placeholder ink instead. opacity:1 overrides Firefox's
