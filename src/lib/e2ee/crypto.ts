@@ -355,16 +355,6 @@ export function parseSalt(saltBase64: string): Uint8Array {
 
 const MASTER_KEY_STORAGE_KEY = 'meethril-e2ee-master-key'
 
-// How long the unlocked master key persists before the user must re-enter
-// their daily key. Stored in localStorage (not sessionStorage) so it survives
-// mobile/tablet background-tab eviction: when the OS discards a backgrounded
-// tab to reclaim memory it wipes sessionStorage, which forced a re-unlock on
-// every app switch. The web can't tell "user closed the app" from "OS
-// backgrounded the tab" (the same unload events fire for both), so there's no
-// clean wipe-on-close — instead we bound exposure with an absolute TTL and a
-// manual "Lock diary" button for when the user wants to clear it deliberately.
-const MASTER_KEY_TTL_MS = 24 * 60 * 60 * 1000 // 1 day
-
 /** Export master key to base64. */
 export async function exportMasterKey(masterKey: CryptoKey): Promise<string> {
   const exported = await crypto.subtle.exportKey('raw', masterKey)
@@ -384,58 +374,56 @@ export async function importMasterKey(keyBase64: string): Promise<CryptoKey> {
 }
 
 interface StoredKey {
-  key: string         // base64
-  expiresAt: number   // ms epoch; key is treated as absent once Date.now() passes it
+  key: string // base64-encoded raw AES-256 master key
 }
 
 /**
- * Persist the unlocked master key in localStorage with a 1-day TTL.
+ * Persist the unlocked master key in sessionStorage. It lives only for the
+ * current tab session: the browser wipes it when the tab closes, and on mobile
+ * when the OS discards the backgrounded tab. So the user re-enters their daily
+ * key once per session rather than once per day, in exchange for a tighter
+ * exposure window — the raw AES key never persists to disk across sessions.
  *
- * Why localStorage (not sessionStorage): on mobile/tablet the OS evicts
- * backgrounded tabs to reclaim memory, which wipes sessionStorage — so users
- * were forced to re-enter their daily key every time they switched apps and
- * came back, seeing "[Encrypted — unlock to view]" in the meantime. The web
- * can't distinguish a real close from a background, so we bound exposure with
- * an absolute TTL instead: the key is valid for `MASTER_KEY_TTL_MS` from
- * unlock, after which `loadMasterKeyLocally`/`hasMasterKeyLocally` treat it as
- * absent and the unlock modal reappears.
- *
- * Trade-off: the raw AES key sits in localStorage for up to the TTL window,
- * readable by XSS/extensions (the same in-session exposure sessionStorage had,
- * just persisted to disk and time-boxed). It is cleared immediately on logout
- * and via the "Lock on this device" button.
- *
- * `ttlMs` overrides the window; defaults to MASTER_KEY_TTL_MS.
+ * Earlier builds used localStorage with a TTL (7-day, then 1-day) so the key
+ * survived mobile tab eviction. We moved back to sessionStorage for the tighter
+ * security once the placeholder-overwrite corruption — the real cause of the
+ * stuck "[Encrypted — unlock to view]" entries — was fixed independently of
+ * where the key is stored. The key is also cleared on logout and via "Lock
+ * diary".
  */
-export async function storeMasterKeyLocally(
-  masterKey: CryptoKey,
-  ttlMs: number = MASTER_KEY_TTL_MS
-): Promise<void> {
+export async function storeMasterKeyLocally(masterKey: CryptoKey): Promise<void> {
   const exported = await exportMasterKey(masterKey)
-  const expiresAt = Date.now() + ttlMs
   try {
-    localStorage.setItem(MASTER_KEY_STORAGE_KEY, JSON.stringify({ key: exported, expiresAt }))
+    sessionStorage.setItem(MASTER_KEY_STORAGE_KEY, JSON.stringify({ key: exported }))
   } catch {
-    /* localStorage may be disabled (private mode) — key stays in-memory only */
+    /* sessionStorage may be disabled — key stays in memory only this session */
   }
-  // Sweep any session-era key left by the previous (sessionStorage) build so
-  // we never carry two copies around.
+  // Sweep any key left in localStorage by the previous (TTL) build so the
+  // long-lived plaintext copy doesn't linger now that we're session-only.
   try {
-    sessionStorage.removeItem(MASTER_KEY_STORAGE_KEY)
+    localStorage.removeItem(MASTER_KEY_STORAGE_KEY)
   } catch {
-    /* sessionStorage may be disabled */
+    /* localStorage may be disabled */
   }
 }
 
 /**
- * Read and validate the stored key record from localStorage. Returns null if
- * it's absent, malformed, or past its TTL. Expired/corrupt records are cleared
- * so a stale entry never lingers. Shared by load + has so both honor expiry.
+ * Load the master key from sessionStorage. Returns null if absent (fresh
+ * session, tab was closed, or logged out) or unreadable — in which case the
+ * caller shows the unlock modal.
  */
-function readValidStoredKey(): StoredKey | null {
+export async function loadMasterKeyLocally(): Promise<CryptoKey | null> {
+  // Sweep any stale localStorage key from the previous (TTL) build on every
+  // load so an upgrading user doesn't carry the long-lived copy around.
+  try {
+    localStorage.removeItem(MASTER_KEY_STORAGE_KEY)
+  } catch {
+    /* localStorage may be disabled */
+  }
+
   let raw: string | null
   try {
-    raw = localStorage.getItem(MASTER_KEY_STORAGE_KEY)
+    raw = sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
   } catch {
     return null
   }
@@ -449,24 +437,6 @@ function readValidStoredKey(): StoredKey | null {
     return null
   }
 
-  if (typeof parsed.expiresAt !== 'number' || Date.now() > parsed.expiresAt) {
-    // TTL elapsed (or a legacy record with no usable expiry) — force re-unlock.
-    clearMasterKeyLocally()
-    return null
-  }
-
-  return parsed
-}
-
-/**
- * Load the master key from localStorage. Returns null if absent, expired
- * (past the 1-day TTL), or unreadable — in which case the caller shows the
- * unlock modal.
- */
-export async function loadMasterKeyLocally(): Promise<CryptoKey | null> {
-  const parsed = readValidStoredKey()
-  if (!parsed) return null
-
   try {
     return await importMasterKey(parsed.key)
   } catch {
@@ -477,14 +447,18 @@ export async function loadMasterKeyLocally(): Promise<CryptoKey | null> {
 
 /** Remove the master key from both storages. */
 export function clearMasterKeyLocally(): void {
-  try { localStorage.removeItem(MASTER_KEY_STORAGE_KEY) } catch { /* disabled */ }
   try { sessionStorage.removeItem(MASTER_KEY_STORAGE_KEY) } catch { /* disabled */ }
+  try { localStorage.removeItem(MASTER_KEY_STORAGE_KEY) } catch { /* disabled */ }
 }
 
-/**
- * True if a non-expired master key is stored. Mirrors loadMasterKeyLocally's
- * expiry check so the init flow never tries to load an already-dead key.
- */
+/** True if a master key is stored for the current session. */
 export function hasMasterKeyLocally(): boolean {
-  return readValidStoredKey() !== null
+  try {
+    const raw = sessionStorage.getItem(MASTER_KEY_STORAGE_KEY)
+    if (!raw) return false
+    JSON.parse(raw) as StoredKey
+    return true
+  } catch {
+    return false
+  }
 }

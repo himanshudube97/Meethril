@@ -134,8 +134,8 @@ export default function SetupModal() {
         throw new Error(data.error || 'Failed to setup E2EE')
       }
 
-      // Store master key locally (localStorage, 1-day TTL — see crypto.ts; the
-      // numeric arg is ignored) and update state
+      // Store master key locally (sessionStorage — cleared on tab close, see
+      // crypto.ts; the numeric arg is ignored) and update state
       await storeMasterKey(masterKey, 7)
       setEnabled(true)
       await fetchKeyData()
