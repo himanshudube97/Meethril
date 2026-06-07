@@ -72,3 +72,10 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, summary })
 }
+
+// cron-job.org issues GET requests by default; without this it 405s and the
+// job auto-disables. Mirror the GET→POST delegation used by the other cron
+// routes (send-reminders, sweep-orphaned-blobs).
+export async function GET(req: NextRequest) {
+  return POST(req)
+}
