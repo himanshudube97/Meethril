@@ -94,6 +94,27 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
   performSaveRef.current = async (retryCount = 0) => {
     const draft = draftRef.current
     if (!draft) return
+
+    // Hard stop against the corruption where the decrypt layer's placeholder
+    // text — "[Encrypted — unlock to view]" / "[Decryption failed]", injected
+    // when the master key isn't available — lands in the editor draft and then
+    // gets encrypted + saved OVER the real entry (the save runs while unlocked,
+    // so the E2EE guards below don't catch it). This text is never legitimate
+    // user content, so refuse to persist it. Match on the WHOLE stripped draft
+    // (not a substring) so a user who genuinely types one of these phrases
+    // inside a real entry is unaffected. Last line of defense; BookSpread also
+    // avoids hydrating these strings into the editor.
+    const draftPlain = (draft.text || '').replace(/<[^>]*>/g, '').trim()
+    if (
+      draftPlain === '[Encrypted — unlock to view]' ||
+      draftPlain === '[Encrypted]' ||
+      draftPlain === '[Decryption failed]'
+    ) {
+      console.warn('[hearth] autosave refused: draft is the decrypt placeholder, not saving')
+      setStatus('idle')
+      return
+    }
+
     if (isDraftEmpty(draft) && !entryIdRef.current) {
       // Nothing to save and no entry yet — stay idle.
       return
