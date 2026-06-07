@@ -25,10 +25,16 @@ export function isPublicRoute(pathname: string): boolean {
  * route. They must never appear over the pre-auth pages (login, landing,
  * pricing, password reset, onboarding) — that's the "daily-key modal pops up
  * before login" bug. The one public exception is the friend-letter save flow
- * (`/letter/[token]/save`), which authenticates in-page via OTP and
- * legitimately drives SetupModal to mint the recipient's master key.
+ * (`/letter/[token]/save`), which authenticates in-page and legitimately
+ * drives SetupModal to mint the recipient's master key.
+ *
+ * The bare letter VIEW (`/letter/[token]`) must NOT surface them: a recipient
+ * who happens to be logged in (with a locked journal) would otherwise get the
+ * daily-key unlock modal dropped on top of someone else's letter. The letter
+ * decrypts with its own answer-derived letterKey — the viewer's journal master
+ * key is never needed to read it.
  */
 export function allowsE2EEModals(pathname: string): boolean {
-  if (pathname.startsWith('/letter/')) return true
+  if (pathname.startsWith('/letter/')) return pathname.endsWith('/save')
   return !isPublicRoute(pathname)
 }

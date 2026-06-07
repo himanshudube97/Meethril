@@ -12,6 +12,7 @@ import DOMPurify from 'dompurify'
 import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
 import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
 import { PasswordToggle } from '@/components/PasswordToggle'
+import SongEmbed from '@/components/SongEmbed'
 
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
@@ -22,14 +23,6 @@ const SANITIZE_CONFIG = {
 function sanitizeLetter(html: string): string {
   if (typeof window === 'undefined') return ''
   return DOMPurify.sanitize(html, SANITIZE_CONFIG) as unknown as string
-}
-
-// Reject javascript:/data:/vbscript: hrefs. Returns null when the URL is not
-// a plain http(s)/mailto link — caller should skip rendering the <a> instead.
-function safeHref(raw: string): string | null {
-  const trimmed = raw.trim()
-  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed
-  return null
 }
 
 type LetterContent = {
@@ -254,10 +247,11 @@ export default function LetterPage() {
           style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 18 }}
           dangerouslySetInnerHTML={{ __html: sanitizeLetter(state.data.text) }}
         />
-        {state.data.song && safeHref(state.data.song) && (
-          <p style={{ marginTop: 32, fontSize: 14, opacity: 0.7 }}>
-            Song they sent: <a href={safeHref(state.data.song)!} rel="noopener noreferrer" target="_blank">{state.data.song}</a>
-          </p>
+        {state.data.song && (
+          <div style={{ marginTop: 32 }}>
+            <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 10 }}>A song they sent</p>
+            <SongEmbed url={state.data.song} />
+          </div>
         )}
         <LetterPhotos
           token={params.token}
@@ -326,6 +320,12 @@ function SealedScene({
           }}
         >
           {state.meta.question}
+        </p>
+
+        <p style={{ fontSize: 13, lineHeight: 1.65, opacity: 0.55, marginBottom: 28 }}>
+          Sealed end-to-end — even we can&apos;t read it.{' '}
+          {state.meta.senderName ?? 'They'} locked it with something only the two of you would
+          know. Your answer is the only key that opens it.
         </p>
 
         <form
@@ -427,12 +427,16 @@ function CenteredMessage({ title, sub }: { title: string; sub?: string }) {
 }
 
 function Countdown({ expiresAt }: { expiresAt: Date }) {
-  const [remaining, setRemaining] = useState(expiresAt.getTime() - Date.now())
+  // Start null and compute in the effect — Date.now() can't be called during
+  // render (react-hooks/purity). The first tick runs synchronously on mount.
+  const [remaining, setRemaining] = useState<number | null>(null)
   useEffect(() => {
-    const id = setInterval(() => setRemaining(expiresAt.getTime() - Date.now()), 1000)
+    const tick = () => setRemaining(expiresAt.getTime() - Date.now())
+    tick()
+    const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [expiresAt])
-  if (remaining <= 0) return null
+  if (remaining === null || remaining <= 0) return null
   const h = Math.floor(remaining / 3_600_000)
   const m = Math.floor((remaining % 3_600_000) / 60_000)
   return (
