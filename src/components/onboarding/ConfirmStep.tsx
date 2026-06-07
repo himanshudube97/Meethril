@@ -76,7 +76,7 @@ export function ConfirmStep({
       }
 
       // 7. Push the master key into the in-memory store (persisted to
-      //    localStorage with a 1h TTL — see crypto.ts; the numeric arg is
+      //    localStorage with a 1-day TTL — see crypto.ts; the numeric arg is
       //    ignored) so the user is already unlocked when they land on /me.
       await storeMasterKey(masterKey, 7)
       setEnabled(true)

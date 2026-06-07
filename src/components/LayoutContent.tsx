@@ -12,6 +12,7 @@ import AmbientSoundLayer from '@/components/AmbientSoundLayer'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import LimitReachedModal from '@/components/billing/LimitReachedModal'
 import FullscreenButton from '@/components/FullscreenButton'
+import LockDiaryButton from '@/components/LockDiaryButton'
 import FullscreenPrompt from '@/components/FullscreenPrompt'
 import { useThemeStore } from '@/store/theme'
 import { useApplyCursorStyles } from '@/hooks/useApplyCursorStyles'
@@ -132,6 +133,7 @@ export default function LayoutContent({
         {children}
         <TopChromeBackdrop />
         <Navigation />
+        <LockDiaryButton />
         <FullscreenButton />
         <DeskSettingsPanel />
         <InstallPrompt />
@@ -184,6 +186,7 @@ export default function LayoutContent({
         style={{ pointerEvents: diaryOpen ? 'none' : undefined }}
       >
         <TopChromeBackdrop />
+        <LockDiaryButton />
         <FullscreenButton />
         <DeskSettingsPanel />
         <Navigation />

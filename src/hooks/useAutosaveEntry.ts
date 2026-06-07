@@ -112,12 +112,22 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
       return
     }
 
-    // E2EE is enabled but the master key isn't loaded yet (e.g. user hasn't
-    // unlocked, or page just mounted). Saving now would push plaintext to a
-    // server that thinks the entry is E2EE — corrupting the row beyond
-    // recovery. Defer until the next trigger, by which point the user has
-    // hopefully unlocked.
-    if (isE2EEEnabledRef.current && !isE2EEReadyRef.current) {
+    // The master key isn't loaded (user hasn't unlocked, page just mounted, or
+    // the key expired). Saving now would push plaintext/empty content to a
+    // server that thinks the entry is E2EE — corrupting or wiping the row.
+    //
+    // The original guard keyed only on `isE2EEEnabled`. But that flag comes
+    // from the server's `e2eeEnabled` column, which has been observed reading
+    // `false` even for accounts that clearly have E2EE (wrapped key present) —
+    // and when it's false this guard failed open, letting an autosave overwrite
+    // a real encrypted entry with blank text. Since every entry is E2EE, treat
+    // "key not ready" as "do not write" whenever the flag says enabled OR we'd
+    // be touching an already-saved row (entryId set). New non-E2EE rows (no id,
+    // flag false) are the only thing still allowed through.
+    if (
+      !isE2EEReadyRef.current &&
+      (isE2EEEnabledRef.current || entryIdRef.current !== null)
+    ) {
       setStatus('idle')
       return
     }

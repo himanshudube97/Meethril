@@ -221,10 +221,18 @@ export default function BookSpread() {
             !Array.isArray(firstDoodleStrokes)
           const isE2EEPlaceholder = placeholderText || doodleStillEncrypted
           if (isE2EEPlaceholder) {
-            // Bind autosave to this id so any future edits target the right
-            // row, but don't touch the draft / song / doodle / photo state.
-            // The effect re-runs when isE2EEReady flips, at which point the
-            // proper plaintext will be available and we hydrate normally.
+            // The active entry can't be decrypted right now (locked / key not
+            // ready). Blank the editor so we never (a) leave stale plaintext on
+            // screen after a manual "Lock diary", or (b) feed an "[Encrypted …]"
+            // placeholder back into the editor where the next autosave could
+            // persist it. Bind autosave to the id LAST so its reset() cancels
+            // any debounced save these clears might have scheduled; the effect
+            // re-runs when isE2EEReady flips true and hydrates the real content.
+            useDeskStore.getState().setDrafts('', '')
+            useDeskStore.getState().setEntryStyleDraft(parseStyle(null))
+            setCurrentSong('')
+            setDoodleStrokes([])
+            setPendingPhotos([])
             autosaveRef.current.reset(active.id)
           } else {
           // Hydrate active state from the entry. Uses the persisted page-break

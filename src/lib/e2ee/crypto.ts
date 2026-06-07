@@ -361,8 +361,9 @@ const MASTER_KEY_STORAGE_KEY = 'meethril-e2ee-master-key'
 // tab to reclaim memory it wipes sessionStorage, which forced a re-unlock on
 // every app switch. The web can't tell "user closed the app" from "OS
 // backgrounded the tab" (the same unload events fire for both), so there's no
-// clean wipe-on-close — instead we bound exposure with an absolute TTL.
-const MASTER_KEY_TTL_MS = 60 * 60 * 1000 // 1 hour
+// clean wipe-on-close — instead we bound exposure with an absolute TTL and a
+// manual "Lock diary" button for when the user wants to clear it deliberately.
+const MASTER_KEY_TTL_MS = 24 * 60 * 60 * 1000 // 1 day
 
 /** Export master key to base64. */
 export async function exportMasterKey(masterKey: CryptoKey): Promise<string> {
@@ -388,7 +389,7 @@ interface StoredKey {
 }
 
 /**
- * Persist the unlocked master key in localStorage with a 1-hour TTL.
+ * Persist the unlocked master key in localStorage with a 1-day TTL.
  *
  * Why localStorage (not sessionStorage): on mobile/tablet the OS evicts
  * backgrounded tabs to reclaim memory, which wipes sessionStorage — so users
@@ -459,7 +460,7 @@ function readValidStoredKey(): StoredKey | null {
 
 /**
  * Load the master key from localStorage. Returns null if absent, expired
- * (past the 1h TTL), or unreadable — in which case the caller shows the
+ * (past the 1-day TTL), or unreadable — in which case the caller shows the
  * unlock modal.
  */
 export async function loadMasterKeyLocally(): Promise<CryptoKey | null> {
