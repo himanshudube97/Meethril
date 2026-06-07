@@ -27,6 +27,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const theme = useThemeStore(s => s.theme)
   const [mounted, setMounted] = useState(false)
 
+  // One-time mount flag for hydration gating; setState-on-mount is intentional.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), [])
 
   const isPublic = isPublicRoute(pathname)

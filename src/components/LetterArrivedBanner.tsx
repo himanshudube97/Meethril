@@ -7,11 +7,11 @@ import { format } from 'date-fns'
 // Pulled in dynamically inside the handler so it doesn't ship in the main
 // bundle for every user who ever opens an arrived letter modal.
 import { useThemeStore } from '@/store/theme'
-import { themes, ThemeName } from '@/lib/themes'
+import { ThemeName } from '@/lib/themes'
 import DoodlePreview from '@/components/DoodlePreview'
 import SongEmbed, { isMusicUrl } from '@/components/SongEmbed'
 import { useE2EE } from '@/hooks/useE2EE'
-import type { JournalEntry } from '@/store/journal'
+import type { JournalEntry, StrokeData } from '@/store/journal'
 import { sanitizeLetterClient } from '@/lib/sanitize-letter-client'
 
 interface ArrivedLetter {
@@ -22,7 +22,7 @@ interface ArrivedLetter {
   letterLocation: string | null
   song?: string | null
   photos?: { url: string; position: number; spread: number; rotation: number }[]
-  doodles?: { strokes: any[]; positionInEntry: number; spread: number }[]
+  doodles?: { strokes: StrokeData[]; positionInEntry: number; spread: number }[]
   encryptionType?: string
   e2eeIVs?: unknown
 }
@@ -61,7 +61,8 @@ const themeStamps: Record<ThemeName, { icon: string; color: string }> = {
 // Floating sparkle particles for reading phase
 function FloatingSparkle({ delay, index }: { delay: number; index: number }) {
   const angle = (index / 12) * Math.PI * 2
-  const distance = 150 + Math.random() * 100
+  // Random offset chosen once per instance (lazy init keeps render pure).
+  const [distance] = useState(() => 150 + Math.random() * 100)
   const x = Math.cos(angle) * distance
   const y = Math.sin(angle) * distance
 
@@ -95,8 +96,18 @@ function FloatingSparkle({ delay, index }: { delay: number; index: number }) {
 
 // Magic particle for envelope opening
 function MagicParticle({ delay, x }: { delay: number; x: number }) {
-  const colors = ['#FFD700', '#FFF8DC', '#FFFACD', '#F0E68C']
-  const color = colors[Math.floor(Math.random() * colors.length)]
+  // All randomness chosen once per instance (lazy init keeps render pure).
+  const [p] = useState(() => {
+    const colors = ['#FFD700', '#FFF8DC', '#FFFACD', '#F0E68C']
+    return {
+      color: colors[Math.floor(Math.random() * colors.length)],
+      w: 4 + Math.random() * 4,
+      h: 4 + Math.random() * 4,
+      yEnd: -200 - Math.random() * 200,
+      xEnd: (Math.random() - 0.5) * 100,
+      dur: 2 + Math.random() * 2,
+    }
+  })
 
   return (
     <motion.div
@@ -104,19 +115,19 @@ function MagicParticle({ delay, x }: { delay: number; x: number }) {
       style={{
         left: `${x}%`,
         bottom: '30%',
-        width: 4 + Math.random() * 4,
-        height: 4 + Math.random() * 4,
-        background: color,
-        boxShadow: `0 0 10px ${color}`,
+        width: p.w,
+        height: p.h,
+        background: p.color,
+        boxShadow: `0 0 10px ${p.color}`,
       }}
       initial={{ y: 0, opacity: 0 }}
       animate={{
-        y: -200 - Math.random() * 200,
+        y: p.yEnd,
         opacity: [0, 1, 1, 0],
-        x: (Math.random() - 0.5) * 100,
+        x: p.xEnd,
       }}
       transition={{
-        duration: 2 + Math.random() * 2,
+        duration: p.dur,
         delay,
         ease: 'easeOut',
       }}
@@ -346,6 +357,8 @@ export default function LetterArrivedBanner({ nickname }: LetterArrivedBannerPro
 
   useEffect(() => {
     if (!hasChecked) {
+      // Fetch-on-mount; the setState inside happens async after the request.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       checkForLetters()
     }
   }, [checkForLetters, hasChecked, isE2EEReady])
