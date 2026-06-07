@@ -7,6 +7,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
+import type { Theme } from '@/lib/themes'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import { findLargestFittingPrefix } from '@/lib/text-fit'
 import { PostcardFrame } from './PostcardFrame'
@@ -53,6 +54,8 @@ export function PostcardFront({
   createdAt,
   active = true,
   readOnly = false,
+  hideFooter = false,
+  themeOverride,
 }: {
   salutationName?: string
   body?: string
@@ -65,8 +68,15 @@ export function PostcardFront({
   active?: boolean
   // Read-only reveal mode: no editing, no cancel button.
   readOnly?: boolean
+  // Spread/reveal mode: drop the footer band (cancel / turn-over) entirely.
+  // The recipient spread shows both faces at once, so there's nothing to turn.
+  hideFooter?: boolean
+  // Fixed paper palette for the public recipient reveal — pins a warm cream
+  // letter regardless of the (possibly cool/dark) viewer theme.
+  themeOverride?: Theme
 }) {
-  const theme = useThemeStore((s) => s.theme)
+  const storeTheme = useThemeStore((s) => s.theme)
+  const theme = themeOverride ?? storeTheme
   const accent = theme.accent.primary
   // Match the journal pages exactly: solid theme colour as the page base,
   // a tinted overlay on top. Same tokens (pageBg / pageBgSolid) from the
@@ -372,7 +382,8 @@ export function PostcardFront({
 
       {/* FOOTER BAND — cancel left, turn-over right. The "turn over" button
           pulses (below) once the front is full, which replaces the old floret
-          + hint that used to sit above it. */}
+          + hint that used to sit above it. Hidden in spread/reveal mode. */}
+      {!hideFooter && (
       <div
         style={{
           height: 84,
@@ -434,6 +445,7 @@ export function PostcardFront({
           turn over →
         </motion.button>
       </div>
+      )}
     </div>
   )
 }

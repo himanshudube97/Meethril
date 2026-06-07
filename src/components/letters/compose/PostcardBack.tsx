@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties } from 'react'
 import { useThemeStore } from '@/store/theme'
+import type { Theme } from '@/lib/themes'
 import { getGlassDiaryColors } from '@/lib/glassDiaryColors'
 import SongEmbed from '@/components/SongEmbed'
 import SongPicker from '@/components/SongPicker'
@@ -32,6 +33,9 @@ export function PostcardBack({
   canSeal,
   active = true,
   readOnly = false,
+  flat = false,
+  hideFooter = false,
+  themeOverride,
 }: {
   photos?: Photo[]
   onPhotoAdd?: (position: 1 | 2, photo: Pick<Photo, 'url' | 'encryptedRef' | 'encryptedRefIV'>) => void
@@ -48,8 +52,16 @@ export function PostcardBack({
   active?: boolean
   // Read-only reveal mode: no editing, embed-only song, no seal button.
   readOnly?: boolean
+  // Spread mode: this face is shown side-by-side (not as the back of a flip
+  // card), so drop the baked-in 180° rotation that would otherwise mirror it.
+  flat?: boolean
+  // Spread/reveal mode: drop the footer band (turn-back / seal) entirely.
+  hideFooter?: boolean
+  // Fixed paper palette for the public recipient reveal (warm cream).
+  themeOverride?: Theme
 }) {
-  const theme = useThemeStore((s) => s.theme)
+  const storeTheme = useThemeStore((s) => s.theme)
+  const theme = themeOverride ?? storeTheme
   // Same journal page tokens — solid theme bg + tinted overlay. Matches
   // .diary-page exactly.
   const diaryColors = getGlassDiaryColors(theme)
@@ -96,11 +108,11 @@ export function PostcardBack({
         flexDirection: 'column',
         height: '100%',
         boxSizing: 'border-box',
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: flat ? 'visible' : 'hidden',
+        WebkitBackfaceVisibility: flat ? 'visible' : 'hidden',
         position: 'absolute',
         inset: 0,
-        transform: 'rotateY(180deg)',
+        transform: flat ? 'none' : 'rotateY(180deg)',
         backgroundColor: diaryColors.pageBgSolid,
         backgroundImage: `linear-gradient(${diaryColors.pageBg}, ${diaryColors.pageBg})`,
         borderRadius: 8,
@@ -267,7 +279,9 @@ export function PostcardBack({
         </div>
       </div>
 
-      {/* ── FOOTER BAND — matches PostcardFront's 84px height */}
+      {/* ── FOOTER BAND — matches PostcardFront's 84px height. Hidden in the
+          spread/reveal where there's nothing to turn back to or seal. */}
+      {!hideFooter && (
       <div
         style={{
           flexShrink: 0,
@@ -324,6 +338,7 @@ export function PostcardBack({
         </button>
         )}
       </div>
+      )}
     </div>
   )
 }

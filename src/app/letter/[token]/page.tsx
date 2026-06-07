@@ -8,22 +8,10 @@ import {
   decryptWithLetterKey,
   rawKeyToBase64,
 } from '@/lib/letters/answer-crypto'
-import DOMPurify from 'dompurify'
-import { LetterPhotos } from '@/components/letters/recipient/LetterPhotos'
-import { LetterDoodles } from '@/components/letters/recipient/LetterDoodles'
 import { PasswordToggle } from '@/components/PasswordToggle'
-import SongEmbed from '@/components/SongEmbed'
-
-const SANITIZE_CONFIG = {
-  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'a', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'ul', 'ol', 'li', 'span', 'div'],
-  ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
-  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):)/i,
-}
-
-function sanitizeLetter(html: string): string {
-  if (typeof window === 'undefined') return ''
-  return DOMPurify.sanitize(html, SANITIZE_CONFIG) as unknown as string
-}
+import { LetterReveal } from '@/components/letters/recipient/LetterReveal'
+import { useResolvedLetterPhotos } from '@/components/letters/recipient/useResolvedLetterPhotos'
+import type { StrokeData } from '@/store/journal'
 
 type LetterContent = {
   text: string
@@ -228,41 +216,49 @@ export default function LetterPage() {
     return <SealedScene state={state} onSubmit={tryUnlock} />
   }
 
+  return <UnlockedLetter token={params.token} state={state} router={router} />
+}
+
+function UnlockedLetter({
+  token,
+  state,
+  router,
+}: {
+  token: string
+  state: Extract<State, { kind: 'unlocked' }>
+  router: ReturnType<typeof useRouter>
+}) {
+  const { photos } = useResolvedLetterPhotos(
+    token,
+    state.meta.assets ?? [],
+    state.letterKey,
+    state.cachedAssets,
+  )
+  const [keepBusy, setKeepBusy] = useState(false)
+
+  async function onKeepForever() {
+    setKeepBusy(true)
+    try {
+      const meRes = await fetch('/api/auth/me')
+      router.push(meRes.ok ? `/letter/${token}/save?logged_in=1` : `/letter/${token}/save`)
+    } catch {
+      setKeepBusy(false)
+    }
+  }
+
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        background: '#f6efe2',
-        color: '#3d342a',
-        padding: '40px 24px',
-        fontFamily: 'Georgia, serif',
-      }}
-    >
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        <div style={{ opacity: 0.6, fontSize: 14, marginBottom: 24 }}>
-          From <strong>{state.meta.senderName ?? 'Someone special'}</strong> · For <strong>{state.meta.recipientName ?? 'Friend'}</strong>
-        </div>
-        <Countdown expiresAt={state.expiresAt} />
-        <article
-          style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 18 }}
-          dangerouslySetInnerHTML={{ __html: sanitizeLetter(state.data.text) }}
-        />
-        {state.data.song && (
-          <div style={{ marginTop: 32 }}>
-            <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 10 }}>A song they sent</p>
-            <SongEmbed url={state.data.song} />
-          </div>
-        )}
-        <LetterPhotos
-          token={params.token}
-          assets={state.meta.assets ?? []}
-          letterKey={state.letterKey}
-          cachedAssets={state.cachedAssets}
-        />
-        <LetterDoodles doodles={state.data.doodles as never} />
-        <KeepForeverCTA token={params.token} router={router} />
-      </div>
-    </div>
+    <LetterReveal
+      senderName={state.meta.senderName ?? 'Someone special'}
+      recipientName={state.meta.recipientName ?? 'Friend'}
+      body={state.data.text}
+      song={state.data.song}
+      doodleStrokes={(state.data.doodles?.[0]?.strokes as StrokeData[]) ?? []}
+      photos={photos}
+      createdAt={state.meta.scheduledFor ? new Date(state.meta.scheduledFor) : new Date()}
+      expiresAt={state.expiresAt}
+      onKeepForever={onKeepForever}
+      keepBusy={keepBusy}
+    />
   )
 }
 
@@ -422,67 +418,6 @@ function CenteredMessage({ title, sub }: { title: string; sub?: string }) {
         <h1 style={{ fontSize: 28, marginBottom: 12 }}>{title}</h1>
         {sub && <p style={{ opacity: 0.7 }}>{sub}</p>}
       </div>
-    </div>
-  )
-}
-
-function Countdown({ expiresAt }: { expiresAt: Date }) {
-  // Start null and compute in the effect — Date.now() can't be called during
-  // render (react-hooks/purity). The first tick runs synchronously on mount.
-  const [remaining, setRemaining] = useState<number | null>(null)
-  useEffect(() => {
-    const tick = () => setRemaining(expiresAt.getTime() - Date.now())
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [expiresAt])
-  if (remaining === null || remaining <= 0) return null
-  const h = Math.floor(remaining / 3_600_000)
-  const m = Math.floor((remaining % 3_600_000) / 60_000)
-  return (
-    <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 24 }}>
-      This letter fades in {h}h {m}m.
-    </p>
-  )
-}
-
-function KeepForeverCTA({ token, router }: { token: string; router: ReturnType<typeof useRouter> }) {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  async function onSave() {
-    setBusy(true); setErr(null)
-    try {
-      const meRes = await fetch('/api/auth/me')
-      if (meRes.ok) {
-        router.push(`/letter/${token}/save?logged_in=1`)
-      } else {
-        router.push(`/letter/${token}/save`)
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'unknown error')
-      setBusy(false)
-    }
-  }
-  return (
-    <div style={{ marginTop: 48 }}>
-      <button
-        disabled={busy}
-        onClick={onSave}
-        style={{
-          padding: '12px 24px',
-          background: '#3d342a',
-          color: '#f6efe2',
-          border: 'none',
-          borderRadius: 999,
-          fontFamily: 'inherit',
-          fontSize: 15,
-          cursor: 'pointer',
-          opacity: busy ? 0.5 : 1,
-        }}
-      >
-        {busy ? 'Just a moment...' : 'Keep this letter forever'}
-      </button>
-      {err && <p style={{ color: '#a00', marginTop: 12 }}>{err}</p>}
     </div>
   )
 }
