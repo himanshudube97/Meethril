@@ -217,8 +217,15 @@ export default function ShelfBookSpread({
   }, [entries])
 
   // Build the rail's entry list: one representative entry per day (first).
+  // DateTabRail's contract is newest-first (it maps spread N -> entries[len-1-N],
+  // mirroring /write where the flipbook reverses a newest-first list). `days` is
+  // oldest-first here, so reverse it — otherwise the rail highlights the wrong
+  // day relative to the visible spread (issue #57).
   const railEntries = useMemo(
-    () => days.map((day) => ({ id: day[0].id, createdAt: day[0].createdAt })),
+    () =>
+      [...days]
+        .reverse()
+        .map((day) => ({ id: day[0].id, createdAt: day[0].createdAt })),
     [days],
   )
 
