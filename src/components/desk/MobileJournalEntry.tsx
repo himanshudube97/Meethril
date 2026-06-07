@@ -134,6 +134,30 @@ export default function MobileJournalEntry() {
       lastHydratedIdRef.current = currentEntry.id
       return
     }
+    // Guard: if this entry can't be decrypted right now (locked / key not
+    // ready), its text is the "[Encrypted — unlock to view]" placeholder and
+    // any doodle strokes are still the encrypted object. Hydrating that would
+    // (a) show the placeholder as if it were real content and (b) let the next
+    // autosave encrypt + save it OVER the real entry. Mobile has its own editor,
+    // so BookSpread's guard doesn't cover this path — this is where the
+    // corruption was coming from. Blank the editor, bind autosave to the id, and
+    // deliberately DON'T mark this id hydrated, so when isE2EEReady flips and the
+    // entry re-decrypts to real text, this effect runs again and hydrates it.
+    const firstStrokes = currentEntry.doodles?.[0]?.strokes
+    const isE2EEPlaceholder =
+      (currentEntry.text || '').includes('[Encrypted') ||
+      (currentEntry.text || '').includes('[Decryption failed]') ||
+      (firstStrokes !== undefined && !Array.isArray(firstStrokes))
+    if (isE2EEPlaceholder) {
+      skipNextAutosaveRef.current = true
+      setText('')
+      setSongInput('')
+      setCurrentSong('')
+      setPendingPhotos([])
+      setDoodleStrokes([])
+      autosaveReset(currentEntry.id)
+      return
+    }
     lastHydratedIdRef.current = currentEntry.id
     skipNextAutosaveRef.current = true
     setText(htmlToPlainText(currentEntry.text || ''))
