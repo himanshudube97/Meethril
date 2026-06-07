@@ -11,6 +11,7 @@ import LayoutContent from "@/components/LayoutContent";
 import AuthGate from "@/components/AuthGate";
 import AuthProvider from "@/components/AuthProvider";
 import E2EEProvider from "@/components/e2ee/E2EEProvider";
+import DesktopGate from "@/components/DesktopGate";
 import ServiceWorkerRegistrar from "@/components/reminders/ServiceWorkerRegistrar";
 import ComebackHost from "@/components/comeback/ComebackHost";
 import { ProductTour } from "@/components/tour/product-tour";
@@ -88,14 +89,19 @@ export default function RootLayout({
         <ServiceWorkerRegistrar />
         <ComebackHost />
         <AuthProvider>
-          <E2EEProvider>
-            <AuthGate>
-              <LayoutContent>{children}</LayoutContent>
-            </AuthGate>
-            {/* Mounted once here (not inside LayoutContent's per-route branches)
-                so navigating between pages never unmounts a running walkthrough. */}
-            <ProductTour />
-          </E2EEProvider>
+          {/* Desktop-only gate: on phones/tablets this renders the splash
+              INSTEAD of the app — placed above E2EEProvider so the E2EE modals
+              and product tour (siblings of the page) are suppressed too. */}
+          <DesktopGate>
+            <E2EEProvider>
+              <AuthGate>
+                <LayoutContent>{children}</LayoutContent>
+              </AuthGate>
+              {/* Mounted once here (not inside LayoutContent's per-route branches)
+                  so navigating between pages never unmounts a running walkthrough. */}
+              <ProductTour />
+            </E2EEProvider>
+          </DesktopGate>
         </AuthProvider>
         {/* Vercel privacy-friendly analytics: cookieless pageviews + Web Vitals.
             No-ops outside Vercel hosting, so safe in local/Docker dev. */}
