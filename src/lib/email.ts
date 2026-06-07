@@ -321,7 +321,7 @@ ${doodleHtml}${musicHtml}
               <p style="color: #9a7b5b; font-size: 14px; margin: 0 0 16px 0;">
                 Want to write a letter back?
               </p>
-              <a href="https://hearth.app/letters"
+              <a href="https://meethril.com/letters"
                  style="display: inline-block; background-color: #e8945a; color: #1a1215; padding: 12px 32px; border-radius: 24px; text-decoration: none; font-size: 14px; font-weight: 500;">
                 Write a Letter
               </a>
@@ -334,7 +334,7 @@ ${doodleHtml}${musicHtml}
           <tr>
             <td align="center" style="padding: 24px 0; border-top: 1px solid rgba(154,123,91,0.2);">
               <p style="color: #6b5a4a; font-size: 12px; margin: 0;">
-                Sent with warmth from <a href="https://hearth.app" style="color: #e8945a; text-decoration: none;">Hearth</a>
+                Sent with warmth from <a href="https://meethril.com" style="color: #e8945a; text-decoration: none;">Meethril</a>
               </p>
               <p style="color: #4a3a2a; font-size: 11px; margin: 8px 0 0 0;">
                 Words that travel through time
@@ -387,7 +387,7 @@ export async function sendSelfLetterNotification({
           </tr>
           <tr>
             <td align="center" style="padding: 24px 0;">
-              <a href="https://hearth.app"
+              <a href="https://meethril.com"
                  style="display: inline-block; background-color: #e8945a; color: #1a1215; padding: 14px 40px; border-radius: 24px; text-decoration: none; font-size: 15px; font-weight: 500;">
                 Open Your Letter
               </a>
@@ -396,7 +396,7 @@ export async function sendSelfLetterNotification({
           <tr>
             <td align="center" style="padding: 32px 0; border-top: 1px solid rgba(154,123,91,0.2);">
               <p style="color: #6b5a4a; font-size: 12px; margin: 0;">
-                Sent with warmth from <a href="https://hearth.app" style="color: #e8945a; text-decoration: none;">Hearth</a>
+                Sent with warmth from <a href="https://meethril.com" style="color: #e8945a; text-decoration: none;">Meethril</a>
               </p>
             </td>
           </tr>
@@ -498,21 +498,93 @@ export async function sendFriendLetterEmail(args: {
   const url = `${appUrl}/letter/${args.publicToken}`
   const safeSender = escapeHtml(args.senderName)
   const safeRecipient = args.recipientName ? escapeHtml(args.recipientName) : null
-  const greeting = safeRecipient ? `Hi ${safeRecipient},` : 'Hello,'
+  const greeting = safeRecipient ? `Dear ${safeRecipient},` : 'Hello,'
   const html = `
-    <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
-      <p>${greeting}</p>
-      <p>${safeSender} wrote you a letter and asked us to deliver it today.</p>
-      <p>
-        <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #3d342a; color: #f6efe2; text-decoration: none; border-radius: 999px;">
-          Open your letter
-        </a>
-      </p>
-      <p style="font-size: 13px; opacity: 0.7;">
-        The letter is yours for 24 hours after you open it, then it fades.
-        Only you can read it — even Hearth's servers cannot.
-      </p>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeSender} sent you a letter</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500&display=swap');
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f6efe2; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f6efe2;">
+    <tr>
+      <td align="center" style="padding: 48px 20px;">
+
+        <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px;">
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <div style="font-size: 34px; margin-bottom: 12px;">✉️</div>
+              <h1 style="color: #3d342a; font-family: 'Crimson Pro', Georgia, serif; font-size: 27px; font-weight: 400; margin: 0; letter-spacing: 0.5px;">
+                A letter has arrived for you
+              </h1>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Letter Card -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px;">
+          <tr>
+            <td style="background-color: #fffdf8; background: linear-gradient(135deg, #fffdf8 0%, #fdf6e9 100%); border-radius: 16px; border: 1px solid rgba(61,52,42,0.10); box-shadow: 0 6px 24px rgba(61,52,42,0.08); padding: 36px 36px 40px 36px; margin-top: 28px;">
+
+              <p style="color: #9a7b5b; font-family: 'Crimson Pro', Georgia, serif; font-size: 18px; line-height: 1.7; margin: 0 0 14px 0; font-style: italic;">
+                ${greeting}
+              </p>
+              <p style="color: #3d342a; font-family: 'Crimson Pro', Georgia, serif; font-size: 19px; line-height: 1.7; margin: 0 0 28px 0;">
+                <strong style="font-weight: 600; color: #3d342a;">${safeSender}</strong> wrote you a letter and asked us to deliver it today.
+              </p>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" align="center">
+                <tr>
+                  <td align="center" style="border-radius: 26px; background-color: #3d342a;">
+                    <a href="${url}"
+                       style="display: inline-block; padding: 14px 42px; color: #f6efe2; text-decoration: none; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.3px; border-radius: 26px;">
+                      Open your letter
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+        </table>
+
+        <!-- Privacy note -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px;">
+          <tr>
+            <td align="center" style="padding: 24px 16px 0 16px;">
+              <p style="color: #8a7558; font-size: 13px; line-height: 1.7; margin: 0;">
+                The letter is yours for 24 hours after you open it, then it fades.
+                Only you can read it — even Meethril's servers cannot.
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px;">
+          <tr>
+            <td align="center" style="padding: 36px 0 0 0;">
+              <p style="color: #a3917a; font-size: 12px; margin: 0;">
+                Sent with warmth from <span style="color: #c47a3d;">Meethril</span>
+              </p>
+              <p style="color: #b8a890; font-size: 11px; margin: 8px 0 0 0;">
+                Words that travel through time
+              </p>
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `
   const r = await getResend().emails.send({
     from,
@@ -545,7 +617,7 @@ export async function sendSelfLetterReminderEmail(args: {
     <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
       <p>${greeting}</p>
       <p>A letter you wrote to yourself on ${writtenStr} is ready to be read.</p>
-      <p><a href="${appUrl}/letters" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Hearth</a></p>
+      <p><a href="${appUrl}/letters" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Meethril</a></p>
       <p style="font-size: 13px; opacity: 0.7;">Open the app to unlock and read it — your phrase is the key.</p>
     </div>
   `
@@ -570,8 +642,8 @@ export async function sendAskForCopyEmail(args: {
     <div style="font-family: Georgia, serif; line-height: 1.6; color: #3d342a;">
       <p>${greeting}</p>
       <p>${safeSender} has been thinking about the letter you saved and would love to read it again.</p>
-      <p>If you'd like to send a copy back to them, open Hearth and find the letter in your kept letters.</p>
-      <p><a href="${appUrl}/me" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Hearth</a></p>
+      <p>If you'd like to send a copy back to them, open Meethril and find the letter in your kept letters.</p>
+      <p><a href="${appUrl}/me" style="display:inline-block;padding:12px 24px;background:#3d342a;color:#f6efe2;text-decoration:none;border-radius:999px;">Open Meethril</a></p>
     </div>
   `
   const r = await getResend().emails.send({
