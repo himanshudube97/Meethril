@@ -654,3 +654,64 @@ export async function sendAskForCopyEmail(args: {
   })
   if (r.error) throw new Error(`Resend: ${r.error.message}`)
 }
+
+/**
+ * Confirmation that an account-deletion request was received. Deletion is
+ * processed manually by an operator on/after `purgeDate` (≈14 days out), so the
+ * copy tells the user the date and that they can email support to undo it.
+ * Best-effort: returns { success } and never throws, so a mail failure can't
+ * fail the deletion-request API.
+ */
+export async function sendAccountDeletionScheduledEmail(args: {
+  to: string
+  userName?: string | null
+  purgeDate: Date
+}): Promise<{ success: boolean; error?: string }> {
+  const from = process.env.RESEND_FROM_SYSTEM
+  if (!from) return { success: false, error: 'RESEND_FROM_SYSTEM not set' }
+
+  const safeName = args.userName ? escapeHtml(args.userName) : null
+  const greeting = safeName ? `Dear ${safeName},` : 'Hello,'
+  const dateStr = args.purgeDate.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  })
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Your account is scheduled for deletion</title></head>
+<body style="margin:0;padding:0;background-color:#1a1215;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#1a1215;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;">
+        <tr><td align="center" style="padding-bottom:24px;">
+          <div style="font-size:40px;margin-bottom:16px;">🕯️</div>
+          <h1 style="color:#f5e6d3;font-size:23px;font-weight:300;margin:0;">Your account is scheduled for deletion</h1>
+        </td></tr>
+        <tr><td style="color:#d8c4ae;font-size:15px;line-height:1.7;padding:0 8px;">
+          <p style="margin:0 0 16px 0;">${greeting}</p>
+          <p style="margin:0 0 16px 0;">We've received your request to delete your account. Your journal, letters, scrapbook, and everything else will be <strong style="color:#f5e6d3;">permanently erased on or shortly after ${dateStr}</strong>.</p>
+          <p style="margin:0 0 8px 0;">Changed your mind? Just reply to this email before then and we'll cancel the request — nothing is deleted until that date.</p>
+        </td></tr>
+        <tr><td align="center" style="padding:32px 0 0 0;border-top:1px solid rgba(154,123,91,0.2);">
+          <p style="color:#6b5a4a;font-size:12px;margin:16px 0 0 0;">If you didn't request this, please contact us right away.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+  try {
+    const { error } = await getResend().emails.send({
+      from, to: [args.to], subject: 'Your account is scheduled for deletion', html,
+    })
+    if (error) {
+      console.error('Failed to send deletion-scheduled email:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error('Error sending deletion-scheduled email:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
