@@ -179,10 +179,11 @@ When you create a new route, the mental checklist is: *Does this need the nav ba
 ### Journal Entry Editing Rules (Time-Locked Autosave)
 Entries are persisted via DB autosave (no Save button, no localStorage drafts):
 - **First change**: typing/photo/song/doodle on the new-entry spread fires a debounced (1500ms) `POST /api/entries`, creating the entry. Subsequent changes `PUT /api/entries/[id]`.
-- **Within calendar day of `createdAt`**: entry is fully editable — text, photos, song, doodle, mood can all be modified freely. The new-entry spread stays bound to the active entry until the user clicks "New Entry."
+- **Within calendar day of `createdAt`**: entry is fully editable — text, photos, song, doodle, mood can all be modified freely. The new-entry spread stays bound to that day's single entry.
 - **After calendar-day flip**: entry locks. Existing content (text, photos, song, doodle, mood) becomes **read-only**. Only empty slots remain fillable: if a photo slot is empty you can add a photo, if no song you can add one, if blank lines remain you can write there. Existing content can never be overwritten.
 - **Calendar-day comparison**: client uses local `Date.toDateString()`; server uses the `X-User-TZ` IANA header (defaults to UTC). Both sides must agree.
-- **v1 scope (currently shipped)**: only the new-entry spread is editable. Locked entries display read-only without empty-slot fillers (a v2 follow-up). Multi-entry-per-day works via "New Entry" in the entry selector — flushes the active entry's autosave, then starts a fresh one.
+- **One entry per calendar day**: there is no "New Entry" / multi-entry-per-day feature. `POST /api/entries` rejects a second same-day `normal` entry with HTTP 409 (`"An entry already exists for today. Edit that one instead."`). The single day page fills up and seals when the day flips.
+- **v1 scope (currently shipped)**: only the new-entry spread is editable. Locked entries display read-only without empty-slot fillers (a v2 follow-up).
 
 Server enforcement lives in `src/lib/entry-lock.ts` (`isEntryLocked` + `validateAppendOnlyDiff`). Client mirror in `src/lib/entry-lock-client.ts`. Autosave is the `useAutosaveEntry` hook in `src/hooks/`.
 

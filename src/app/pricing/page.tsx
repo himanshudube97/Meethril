@@ -505,6 +505,42 @@ export default function PricingPage() {
           <div className="space-y-6">
             {[
               {
+                q: 'Do I need to save my writing?',
+                a: "Never — there's no save button. Your journals, letters, and scrapbooks all save themselves quietly as you go.",
+              },
+              {
+                q: 'Can I edit a journal entry after I write it?',
+                a: "On the same day, freely — words, photos, song, mood, all of it. Once the day turns, that page gently seals: you can always read it, you just can't rewrite it. It keeps your journal an honest record of how you really felt.",
+              },
+              {
+                q: 'Can I write more than one entry in a day?',
+                a: "Each day holds a single page. It fills up as the day unfolds — add to it whenever you like — and seals softly when the day ends.",
+              },
+              {
+                q: 'Can I edit or unsend a letter after I send it?',
+                a: "Once a letter is sealed and on its way, it can't be changed or called back — that's part of the magic of a letter through time. While it's still a draft, though, you can edit it freely or delete it entirely.",
+              },
+              {
+                q: "What if I send a letter to a friend who isn't on Meethril?",
+                a: "That's perfectly fine — it arrives in their inbox as an email, no account needed. If the letter means something to them, they can save it and make a little Meethril of their own to keep it forever.",
+              },
+              {
+                q: 'Who can I send letters to?',
+                a: "Your future self, a friend, or — if you like — an anonymous stranger, who sends a kind note quietly back to you. Letters to yourself always travel forward in time, never back.",
+              },
+              {
+                q: 'Can anyone at Meethril read my entries?',
+                a: "No. Your journals, letters, scrapbooks, and photos are encrypted on your device before they ever reach us — we only ever hold the locked version. The key is yours alone.",
+              },
+              {
+                q: 'What if I forget my daily key?',
+                a: "When you first set up your journal, you're given a one-time recovery key — keep it somewhere safe. If your daily key ever slips your mind, that recovery key lets you back in and set a new one. Without either, not even we can unlock your entries — that's the price of true privacy.",
+              },
+              {
+                q: 'Can I use Meethril on my phone?',
+                a: "Yes — Meethril opens right in your phone's browser, so you can write from wherever you are.",
+              },
+              {
                 q: 'What happens to my entries if I downgrade?',
                 a: "Your entries are always yours. If you exceed the free limit, you can still read everything — you just can't create new ones until your next monthly window.",
               },

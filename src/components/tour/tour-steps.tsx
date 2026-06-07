@@ -57,7 +57,7 @@ export const tourSteps: TourStep[] = [
     icon: '✎',
     title: 'Your Journal',
     content:
-      'This is where you write. Each day opens like a page in a book — <b>swipe or flip</b> to turn between days. Add a photo, a song, even a little doodle. Everything here is encrypted, so only you can ever read it.',
+      'This is where you write. Each day opens like a page in a book — <b>swipe or flip</b> to turn between days. Add a photo, a song, even a little doodle. It saves itself as you write — <b>no save button to look for</b>. Everything here is encrypted, so only you can ever read it.',
   },
   {
     route: '/scrapbook',
@@ -67,7 +67,7 @@ export const tourSteps: TourStep[] = [
     icon: '✦',
     title: 'Your Scrapbook',
     content:
-      'A free canvas for the bits that don\'t fit in words — photos, doodles, little keepsakes. <b>Click a scrapbook to open it</b> and arrange things however feels right.',
+      'A free canvas for the bits that don\'t fit in words — photos, doodles, little keepsakes. <b>Click a scrapbook to open it</b> and arrange things however feels right. It saves on its own as you go — nothing to press.',
   },
   {
     route: '/letters',
@@ -77,7 +77,7 @@ export const tourSteps: TourStep[] = [
     icon: '✉',
     title: 'Letters',
     content:
-      'Write letters that arrive later — to your future self, or to someone you love. There are three kinds; let me show you each.',
+      'Write letters that arrive later — to your future self, or to someone you love. Drafts save themselves as you write, so you can always step away and finish later. There are three kinds; let me show you each.',
   },
   {
     clickSelector: '[data-tour="letters-inbox"]',
