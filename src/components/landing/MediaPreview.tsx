@@ -102,25 +102,10 @@ function MockJournalApp({ p }: { p: Palette }) {
           fontSize: 11,
           color: p.inkSoft,
           opacity: 0.7,
-          marginBottom: 8,
+          marginBottom: 14,
         }}
       >
         Tuesday · September 3
-      </div>
-      {/* Mood dots */}
-      <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <span
-            key={i}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: i === 3 ? p.accent : `${p.inkQuiet}55`,
-              boxShadow: i === 3 ? `0 0 8px ${p.accent}aa` : 'none',
-            }}
-          />
-        ))}
       </div>
       {/* Animated text lines */}
       {[0.92, 0.7, 0.85, 0.55].map((w, i) => (
@@ -360,74 +345,84 @@ function MockConstellationApp({ p }: { p: Palette }) {
   )
 }
 
-// V — Settings panel: toggle rows, all off
-function MockSettingsApp({ p }: { p: Palette }) {
-  const rows = [
-    { label: 'Push notifications', on: false },
-    { label: 'Streaks', on: false },
-    { label: 'Daily nudge', on: false },
-    { label: 'Sound effects', on: false },
+// IV — Shelf: a row of month-books, one pulling out
+function MockShelfApp({ p }: { p: Palette }) {
+  // Each book is a colored spine standing on the shelf; the highlighted one
+  // eases out a touch, as if being pulled to read.
+  const books = [
+    { h: 118, pull: 0 },
+    { h: 126, pull: 0 },
+    { h: 112, pull: 0 },
+    { h: 130, pull: 10, accent: true },
+    { h: 120, pull: 0 },
+    { h: 116, pull: 0 },
+    { h: 124, pull: 0 },
   ]
   return (
-    <AppWindow p={p}>
-      <div
-        style={{
-          fontFamily: 'var(--font-serif), Georgia, serif',
-          fontStyle: 'italic',
-          fontSize: 10,
-          color: p.inkSoft,
-          opacity: 0.6,
-          marginBottom: 10,
-          letterSpacing: '.1em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Quiet
-      </div>
-      {rows.map((row, i) => (
-        <motion.div
-          key={i}
+    <AppWindow p={p} padded={false}>
+      <div style={{ position: 'absolute', inset: 0, padding: '20px 16px 0 16px' }}>
+        {/* Books standing in a row, baseline-aligned on the shelf */}
+        <div
           style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: 14,
+            height: 132,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingBlock: 5,
-            borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${p.inkQuiet}22`,
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 5,
           }}
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.45, delay: 0.3 + i * 0.12 }}
         >
-          <span style={{ fontFamily: 'var(--font-serif), Georgia, serif', fontSize: 11, color: p.inkSoft }}>
-            {row.label}
-          </span>
-          {/* Toggle (off) */}
-          <span
-            style={{
-              width: 22,
-              height: 12,
-              borderRadius: 99,
-              background: row.on ? p.accent : `${p.inkQuiet}55`,
-              position: 'relative',
-              transition: 'background 0.3s',
-            }}
-          >
-            <span
+          {books.map((b, i) => (
+            <motion.div
+              key={i}
               style={{
-                position: 'absolute',
-                top: 1,
-                left: row.on ? 11 : 1,
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                background: p.page,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                transition: 'left 0.3s',
+                width: 22,
+                height: b.h,
+                borderRadius: '3px 3px 1px 1px',
+                background: b.accent
+                  ? p.accent
+                  : `color-mix(in srgb, ${p.accent} ${18 + (i % 3) * 14}%, ${p.page})`,
+                border: `1px solid ${p.inkQuiet}44`,
+                boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.18), 0 4px 8px rgba(0,0,0,0.14)',
+                position: 'relative',
               }}
-            />
-          </span>
-        </motion.div>
-      ))}
+              animate={{ y: b.pull ? [-b.pull, -b.pull - 3, -b.pull] : [0, 0, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {/* A couple of label lines down the spine */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 14,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 3,
+                  height: b.h - 40,
+                  borderRadius: 99,
+                  background: b.accent ? p.page : `${p.ink}33`,
+                  opacity: 0.6,
+                }}
+              />
+            </motion.div>
+          ))}
+        </div>
+        {/* The shelf board */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 8,
+            right: 8,
+            bottom: 8,
+            height: 7,
+            borderRadius: 2,
+            background: `color-mix(in srgb, ${p.inkSoft} 55%, ${p.page})`,
+            boxShadow: '0 4px 10px rgba(0,0,0,0.18)',
+          }}
+        />
+      </div>
     </AppWindow>
   )
 }
@@ -456,9 +451,9 @@ function MockLockApp({ p }: { p: Palette }) {
           <rect x="6" y="18" width="24" height="22" rx="3" fill={p.accent} opacity="0.85" />
           <circle cx="18" cy="29" r="2.2" fill={p.page} />
         </svg>
-        {/* Passphrase prompt */}
+        {/* Daily-key prompt */}
         <div style={{ fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic', fontSize: 10, color: p.inkSoft, opacity: 0.7 }}>
-          Enter your passphrase
+          Enter your daily key
         </div>
         {/* Animated dots */}
         <div style={{ display: 'flex', gap: 5 }}>
@@ -476,9 +471,11 @@ function MockLockApp({ p }: { p: Palette }) {
   )
 }
 
-// VII — Interactive theme switcher (special, no AppWindow shell — IT IS the switcher)
-const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen']
-const THEME_ORDER: ThemeName[] = ['rivendell', 'firelight', 'rose', 'sage', 'ocean', 'rain', 'postal', 'linen', 'sunset']
+// VII — Interactive theme switcher (special, no AppWindow shell — IT IS the switcher).
+// Only the user-selectable themes are shown — must mirror DeskSettingsPanel,
+// which hides `firelight` and `linen`. That leaves the seven the copy promises.
+const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen', 'rain']
+const THEME_ORDER: ThemeName[] = ['rivendell', 'rose', 'sage', 'ocean', 'postal', 'sunset']
 const VISIBLE_THEMES = THEME_ORDER.filter((n) => !HIDDEN_THEMES.includes(n))
 
 function MockThemeSwitcher() {
@@ -584,10 +581,10 @@ function MockDesktopApp({ p }: { p: Palette }) {
 
 const MOCKS: Record<string, React.FC<{ p: Palette }>> = {
   I: MockJournalApp,
-  II: MockLetterApp,
-  III: MockScrapbookApp,
-  IV: MockConstellationApp,
-  V: MockSettingsApp,
+  II: MockScrapbookApp,
+  III: MockLetterApp,
+  IV: MockShelfApp,
+  V: MockConstellationApp,
   VI: MockLockApp,
   VIII: MockDesktopApp,
 }

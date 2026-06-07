@@ -40,11 +40,9 @@ function formatDateLabel(d: Date): string {
 
 // Postcard paper picks up its colour from the active theme via
 // getGlassDiaryColors() — same tokens that drive .diary-page in globals.css.
-// Ink / line colours stay constant so the type and rules read against any
-// theme tint underneath.
-const PAPER_INK = '#3d342a'
-const PAPER_INK_MUTED = 'rgba(61, 52, 42, 0.55)'
-const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
+// Ink / line colours are derived from that same helper (see inside the
+// component) so they always contrast with the paper — a fixed dark ink used
+// to vanish on dark themes (Rivendell/Rain) where the paper is dark.
 
 export function PostcardFront({
   salutationName = 'future me',
@@ -74,6 +72,11 @@ export function PostcardFront({
   // a tinted overlay on top. Same tokens (pageBg / pageBgSolid) from the
   // same helper that drives .diary-page in globals.css.
   const diaryColors = getGlassDiaryColors(theme)
+  // Ink / muted / rule colours derived from the paper so they contrast on
+  // every theme (light paper → dark ink; dark paper → light ink).
+  const PAPER_INK = diaryColors.bodyText
+  const PAPER_INK_MUTED = diaryColors.prompt
+  const LINE_COLOR = diaryColors.ruledLine
 
   const [atVisualCap, setAtVisualCap] = useState(false)
   const trimmingRef = useRef(false)

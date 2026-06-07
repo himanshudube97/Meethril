@@ -396,7 +396,7 @@ function PageContent({ spread, idx, palette: p }: { spread: Spread; idx: number;
               left: 16,
               width: 80,
               height: 22,
-              background: `${p.accent}55`,
+              backgroundColor: `${p.accent}55`,
               transform: 'rotate(-9deg)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
               backgroundImage: `repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,0.18) 6px 12px)`,
@@ -508,7 +508,10 @@ function KnotBinding({ palette: p }: { palette: Palette }) {
   )
 }
 
-function btnStyle(p: Palette, disabled: boolean): React.CSSProperties {
+// Pagination buttons live on the theme background (outside the book), so they
+// take the theme's own text colour — not the paper ink, which is dark and would
+// disappear on dark themes.
+function btnStyle(textColor: string, mutedColor: string, disabled: boolean): React.CSSProperties {
   return {
     display: 'flex',
     alignItems: 'center',
@@ -516,9 +519,9 @@ function btnStyle(p: Palette, disabled: boolean): React.CSSProperties {
     fontFamily: 'var(--font-serif), Georgia, serif',
     fontStyle: 'italic',
     fontSize: 15,
-    color: disabled ? p.inkQuiet : p.ink,
+    color: disabled ? mutedColor : textColor,
     background: 'transparent',
-    border: `1px solid ${disabled ? p.inkQuiet + '44' : p.inkQuiet + '88'}`,
+    border: `1px solid ${disabled ? mutedColor + '44' : mutedColor + '88'}`,
     borderRadius: 99,
     padding: '10px 20px',
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -530,6 +533,11 @@ function btnStyle(p: Palette, disabled: boolean): React.CSSProperties {
 
 export default function Diary() {
   const palette = useDiaryPalette()
+  // Chrome that sits OUTSIDE the book (section header, subtitle, pagination)
+  // renders on the theme background, not on paper — so it must use the theme's
+  // own text colours, which contrast with the theme bg on every theme. Using
+  // the paper palette here made all of it vanish on dark themes (Rivendell/Rain).
+  const { theme } = useThemeStore()
   const tilt = useCursorTilt(12)
   const [idx, setIdx] = useState(0)
   const [dir, setDir] = useState(1)
@@ -592,7 +600,7 @@ export default function Diary() {
             fontSize: 54,
             lineHeight: 1.05,
             margin: '0 0 14px',
-            color: palette.ink,
+            color: theme.text.primary,
             textWrap: 'balance' as React.CSSProperties['textWrap'],
           }}
         >
@@ -602,7 +610,7 @@ export default function Diary() {
           style={{
             fontFamily: 'var(--font-serif), Georgia, serif',
             fontSize: 15.5,
-            color: palette.inkSoft,
+            color: theme.text.secondary,
             lineHeight: 1.6,
             margin: 0,
             maxWidth: 460,
@@ -657,7 +665,7 @@ export default function Diary() {
               position: 'absolute',
               inset: -14,
               borderRadius: 6,
-              background: palette.cover,
+              backgroundColor: palette.cover,
               backgroundImage:
                 'repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 5px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.06) 0 1px, transparent 1px 5px)',
               boxShadow:
@@ -744,7 +752,7 @@ export default function Diary() {
 
       {/* Pagination */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-        <button onClick={() => go(-1)} disabled={idx === 0} style={btnStyle(palette, idx === 0)}>
+        <button onClick={() => go(-1)} disabled={idx === 0} style={btnStyle(theme.text.primary, theme.text.muted, idx === 0)}>
           <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
           <span>Prev</span>
         </button>
@@ -762,18 +770,18 @@ export default function Diary() {
                 width: i === idx ? 24 : 7,
                 height: 7,
                 borderRadius: 99,
-                background: i === idx ? palette.accent : `${palette.inkQuiet}55`,
+                background: i === idx ? theme.accent.primary : `${theme.text.muted}66`,
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
                 transition: 'all .35s cubic-bezier(.4,0,.2,1)',
-                boxShadow: i === idx ? `0 0 12px ${palette.accent}88` : 'none',
+                boxShadow: i === idx ? `0 0 12px ${theme.accent.primary}88` : 'none',
               }}
             />
           ))}
         </div>
 
-        <button onClick={() => go(1)} disabled={idx === SPREADS.length - 1} style={btnStyle(palette, idx === SPREADS.length - 1)}>
+        <button onClick={() => go(1)} disabled={idx === SPREADS.length - 1} style={btnStyle(theme.text.primary, theme.text.muted, idx === SPREADS.length - 1)}>
           <span>Next</span>
           <span style={{ fontSize: 18, lineHeight: 1 }}>→</span>
         </button>
@@ -784,7 +792,7 @@ export default function Diary() {
           fontFamily: 'var(--font-serif), Georgia, serif',
           fontStyle: 'italic',
           fontSize: 13,
-          color: palette.inkQuiet,
+          color: theme.text.secondary,
         }}
       >
         {String(idx + 1).padStart(2, '0')} of {String(SPREADS.length).padStart(2, '0')} · {spread.title}

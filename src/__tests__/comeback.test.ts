@@ -60,8 +60,8 @@ describe('tierFor', () => {
   it('null for 0 days (just journaled today)', () => {
     expect(tierFor(0)).toBeNull()
   })
-  it('modal for first-ever visit (Infinity)', () => {
-    expect(tierFor(Infinity)).toBe('modal')
+  it('null for first-ever visit (Infinity) — never journaled, not a comeback', () => {
+    expect(tierFor(Infinity)).toBeNull()
   })
 })
 

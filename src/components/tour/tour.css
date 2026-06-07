@@ -1,0 +1,227 @@
+/**
+ * Meethril product-tour styling (driver.js overrides + welcome card + FAB).
+ *
+ * The popover is a warm parchment card with ink text so copy is legible on every
+ * theme (light or dark). Theme colour comes in via two CSS vars set on the tour
+ * wrapper by product-tour.tsx: --tour-accent and --tour-accent-soft. The driver
+ * popover is portalled to <body>, so those accent vars are mirrored onto
+ * :root-level rules through .driver-popover.meethril-tour (driver adds the class).
+ */
+
+:root {
+  --meethril-paper: #fbf6ec;
+  --meethril-ink: #3d342a;
+  --meethril-ink-soft: #6f6353;
+  --meethril-line: #e7dcc8;
+}
+
+/* ── "It's in Settings" nudge ────────────────────────────────────────────── */
+.meethril-tour-hint {
+  position: fixed;
+  top: 5.25rem; /* just below the top-right settings gear */
+  right: 1.5rem;
+  z-index: 60;
+  max-width: 280px;
+  padding: 0.7rem 0.95rem;
+  border-radius: 0.85rem;
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--meethril-ink);
+  background: var(--meethril-paper);
+  border: 1px solid var(--tour-accent, #8a6d4b);
+  box-shadow: 0 12px 30px rgba(28, 20, 16, 0.28);
+  animation: meethril-tour-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.meethril-tour-hint strong {
+  color: var(--tour-accent, #8a6d4b);
+  font-weight: 600;
+}
+
+/* ── First-visit welcome card ────────────────────────────────────────────── */
+.meethril-tour-welcome-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(28, 20, 16, 0.55);
+  backdrop-filter: blur(3px);
+  animation: meethril-tour-fade 0.3s ease;
+}
+.meethril-tour-welcome-card {
+  width: 420px;
+  max-width: 92vw;
+  padding: 2.2rem 2rem 1.8rem;
+  text-align: center;
+  border-radius: 1.25rem;
+  background: var(--meethril-paper);
+  border: 1px solid var(--meethril-line);
+  box-shadow: 0 30px 60px rgba(28, 20, 16, 0.4);
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  animation: meethril-tour-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.meethril-tour-welcome-mark {
+  font-size: 2.4rem;
+  line-height: 1;
+  margin-bottom: 0.85rem;
+}
+.meethril-tour-welcome-card h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--meethril-ink);
+  margin: 0 0 0.6rem;
+}
+.meethril-tour-welcome-card p {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--meethril-ink-soft);
+  margin: 0 0 1.5rem;
+}
+.meethril-tour-welcome-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.meethril-tour-btn-ghost {
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--meethril-line);
+  background: transparent;
+  color: var(--meethril-ink-soft);
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.meethril-tour-btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.meethril-tour-btn-solid {
+  padding: 0.6rem 1.4rem;
+  border-radius: 0.7rem;
+  border: none;
+  background: var(--tour-accent, #8a6d4b);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.meethril-tour-btn-solid:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* ── driver.js popover skin ──────────────────────────────────────────────── */
+.driver-popover.meethril-tour {
+  background: var(--meethril-paper);
+  border-radius: 1rem;
+  padding: 1.25rem 1.35rem 1.1rem;
+  box-shadow: 0 24px 50px rgba(28, 20, 16, 0.35);
+  max-width: 360px;
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+}
+.driver-popover.meethril-tour .driver-popover-title {
+  font-size: 1.18rem;
+  font-weight: 600;
+  color: var(--meethril-ink);
+  margin-bottom: 0.4rem;
+}
+.driver-popover.meethril-tour .driver-popover-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--meethril-ink-soft);
+}
+.driver-popover.meethril-tour .driver-popover-description b {
+  color: var(--meethril-ink);
+  font-weight: 600;
+}
+.driver-popover.meethril-tour .driver-popover-arrow {
+  color: var(--meethril-paper);
+}
+
+/* progress text */
+.driver-popover.meethril-tour .driver-popover-progress-text {
+  font-size: 0.78rem;
+  color: var(--meethril-ink-soft);
+  opacity: 0.75;
+  letter-spacing: 0.04em;
+}
+
+/* footer buttons */
+.driver-popover.meethril-tour .driver-popover-footer button {
+  font-family: inherit;
+  font-size: 0.86rem;
+  border-radius: 0.55rem;
+  padding: 0.4rem 0.85rem;
+  text-shadow: none;
+  border: 1px solid var(--meethril-line);
+  background: transparent;
+  color: var(--meethril-ink-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.driver-popover.meethril-tour .driver-popover-footer button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.driver-popover.meethril-tour .driver-popover-next-btn {
+  background: var(--tour-accent, #8a6d4b) !important;
+  border-color: var(--tour-accent, #8a6d4b) !important;
+  color: #fff !important;
+  font-weight: 500;
+}
+.driver-popover.meethril-tour .driver-popover-next-btn:hover {
+  opacity: 0.92;
+}
+.driver-popover.meethril-tour .driver-popover-close-btn {
+  color: var(--meethril-ink-soft);
+  font-size: 1.4rem;
+}
+
+/* ── Memory preview gallery ──────────────────────────────────────────────── */
+.meethril-tour-gallery {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.meethril-tour-shot {
+  flex: 1;
+  margin: 0;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  background: var(--meethril-line);
+  border: 1px solid var(--meethril-line);
+  box-shadow: 0 4px 12px rgba(28, 20, 16, 0.18);
+}
+.meethril-tour-shot img {
+  display: block;
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+}
+.meethril-tour-shot figcaption {
+  padding: 0.3rem 0;
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--meethril-ink-soft);
+}
+
+/* spotlight ring picks up the theme accent */
+.driver-active .driver-overlay,
+.driver-overlay {
+  /* overlayColor is set in JS; the stage cutout border follows the accent */
+}
+
+@keyframes meethril-tour-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes meethril-tour-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

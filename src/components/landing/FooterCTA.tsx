@@ -66,7 +66,7 @@ export default function FooterCTA() {
             className="text-base italic underline-offset-4 hover:underline"
             style={{ color: theme.text.muted, fontFamily: 'Georgia, serif' }}
           >
-            Also on desktop — Mac · Windows · Linux
+            Also on your desktop — installs from the browser
           </Link>
 
           {/* Social */}

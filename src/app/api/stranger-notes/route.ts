@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Daily limit — tier-dependent (free: 1/day, paid: 5/day).
+  // Daily limit — tier-dependent (free: 2/day, paid: 5/day).
   const tz = safeIanaTz(req.headers.get('X-User-TZ'))
   const dbUserForTier = await prisma.user.findUnique({
     where: { id: user.id },

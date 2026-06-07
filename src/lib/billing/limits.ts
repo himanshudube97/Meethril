@@ -24,16 +24,16 @@ export interface PlanLimits {
 export const FREE_LIMITS: PlanLimits = {
   journalPerMonth: 15,
   scrapbookPerMonth: 10,
-  letterSelfPerMonth: 2,
-  letterFriendPerMonth: 10,
-  strangerNotesPerDay: 1,
+  letterSelfPerMonth: 5,
+  letterFriendPerMonth: 5,
+  strangerNotesPerDay: 2,
 }
 
 export const PAID_LIMITS: PlanLimits = {
   journalPerMonth: Infinity, // only the 1/calendar-day rule caps paid journals
   scrapbookPerMonth: 30,
   letterSelfPerMonth: 10,
-  letterFriendPerMonth: 20,
+  letterFriendPerMonth: 10,
   strangerNotesPerDay: 5,
 }
 

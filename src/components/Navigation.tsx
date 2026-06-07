@@ -66,7 +66,7 @@ export default function Navigation() {
         {tabs.map(tab => {
           const isActive = pathname === tab.href
           return (
-            <Link key={tab.href} href={tab.href} aria-label={tab.label}>
+            <Link key={tab.href} href={tab.href} aria-label={tab.label} data-tour={`nav-${tab.label.toLowerCase()}`}>
               <motion.div
                 whileTap={{ scale: 0.92 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
@@ -134,7 +134,7 @@ export default function Navigation() {
         {tabs.map((tab) => {
           const isActive = pathname === tab.href
           return (
-            <Link key={tab.href} href={tab.href}>
+            <Link key={tab.href} href={tab.href} data-tour={`nav-${tab.label.toLowerCase()}`}>
               <motion.div
                 className="relative px-4 py-2 rounded-full flex items-center gap-2"
                 style={{

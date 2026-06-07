@@ -13,6 +13,7 @@ import AuthProvider from "@/components/AuthProvider";
 import E2EEProvider from "@/components/e2ee/E2EEProvider";
 import ServiceWorkerRegistrar from "@/components/reminders/ServiceWorkerRegistrar";
 import ComebackHost from "@/components/comeback/ComebackHost";
+import { ProductTour } from "@/components/tour/product-tour";
 
 const ebGaramond = EB_Garamond({
   variable: "--font-serif",
@@ -91,6 +92,9 @@ export default function RootLayout({
             <AuthGate>
               <LayoutContent>{children}</LayoutContent>
             </AuthGate>
+            {/* Mounted once here (not inside LayoutContent's per-route branches)
+                so navigating between pages never unmounts a running walkthrough. */}
+            <ProductTour />
           </E2EEProvider>
         </AuthProvider>
         {/* Vercel privacy-friendly analytics: cookieless pageviews + Web Vitals.

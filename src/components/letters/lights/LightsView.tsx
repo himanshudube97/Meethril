@@ -55,10 +55,12 @@ export default function LightsView() {
   const unread = sn.threads.filter((t) => t.unreadCount > 0).slice(0, SKY_CAP)
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl p-6 pt-32 sm:p-10 sm:pt-36">
+    // Fill the viewport and let the columns scroll inside, so a long
+    // correspondence history never grows (and scrolls) the whole page.
+    <div className="relative mx-auto flex h-svh w-full max-w-6xl flex-col px-6 pb-6 pt-32 sm:px-10 sm:pt-36">
       {/* Intro — mirrors the "sent" tab's header so this page reads as a place,
           not an empty form. Explains the ritual in the app's voice. */}
-      <header className="mb-12 text-center">
+      <header className="mb-8 shrink-0 text-center">
         <h2
           style={{
             fontFamily: 'var(--font-caveat), Caveat, cursive',
@@ -87,9 +89,9 @@ export default function LightsView() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14">
-        {/* Compose column */}
-        <div className="flex justify-center lg:justify-end">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14">
+        {/* Compose column — scrolls on its own if the card is taller than the row */}
+        <div className="flex min-h-0 justify-center overflow-y-auto lg:justify-end">
           <div className="w-full max-w-lg">
             <Compose
               key={composeKey}
@@ -100,10 +102,10 @@ export default function LightsView() {
         </div>
 
         {/* Sky + list column */}
-        <div className="flex w-full justify-center lg:justify-start">
-          <div className="w-full max-w-md">
+        <div className="flex min-h-0 w-full justify-center lg:justify-start">
+          <div className="flex min-h-0 w-full max-w-md flex-col">
             <p
-              className="mb-3 text-center font-serif text-[11px] uppercase italic lg:text-left"
+              className="mb-3 shrink-0 text-center font-serif text-[11px] uppercase italic lg:text-left"
               style={{
                 color: 'color-mix(in oklab, var(--text-primary) 55%, transparent)',
                 letterSpacing: '0.22em',
@@ -111,10 +113,12 @@ export default function LightsView() {
             >
               new arrivals
             </p>
-            <PlanesSky threads={unread} onPick={(id) => setActiveThreadId(id)} />
+            <div className="shrink-0">
+              <PlanesSky threads={unread} onPick={(id) => setActiveThreadId(id)} />
+            </div>
 
             <p
-              className="mb-3 mt-6 text-center font-serif text-[11px] uppercase italic lg:text-left"
+              className="mb-3 mt-6 shrink-0 text-center font-serif text-[11px] uppercase italic lg:text-left"
               style={{
                 color: 'color-mix(in oklab, var(--text-primary) 55%, transparent)',
                 letterSpacing: '0.22em',
@@ -122,13 +126,18 @@ export default function LightsView() {
             >
               all correspondence
             </p>
-            <CorrespondenceList
-              threads={sn.threads}
-              onPick={(id) => setActiveThreadId(id)}
-              onLoadMore={sn.loadMore}
-              hasMore={Boolean(sn.nextCursor)}
-              loadingMore={sn.loadingMore}
-            />
+            {/* The only scroll well on the page: a long history scrolls here,
+                not on the whole page. min-h-0 lets it shrink within the flex
+                column; pr keeps rows clear of the scrollbar. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+              <CorrespondenceList
+                threads={sn.threads}
+                onPick={(id) => setActiveThreadId(id)}
+                onLoadMore={sn.loadMore}
+                hasMore={Boolean(sn.nextCursor)}
+                loadingMore={sn.loadingMore}
+              />
+            </div>
           </div>
         </div>
       </div>

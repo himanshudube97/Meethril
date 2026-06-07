@@ -9,6 +9,103 @@ function getResend() {
 }
 
 
+/**
+ * Dunning email: a renewal charge failed and the subscription is now `on_hold`.
+ * Sent once per failure episode (the webhook gates on a non-on_hold → on_hold
+ * transition). `manageUrl` is a direct Dodo customer-portal link to update the
+ * card; `graceDays` mirrors the GRACE window in lib/billing/is-paid-user.ts so
+ * the copy promises the same window the code actually honours.
+ */
+export async function sendPaymentFailedEmail(args: {
+  to: string
+  userName?: string | null
+  manageUrl: string
+  graceDays: number
+}): Promise<{ success: boolean; error?: string }> {
+  const from = process.env.RESEND_FROM_SYSTEM
+  if (!from) return { success: false, error: 'RESEND_FROM_SYSTEM not set' }
+
+  const safeName = args.userName ? escapeHtml(args.userName) : null
+  const greeting = safeName ? `Dear ${safeName},` : 'Hello,'
+  const safeUrl = escapeHtml(args.manageUrl)
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your payment didn't go through</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #1a1215; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #1a1215; min-height: 100vh;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px;">
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <div style="font-size: 40px; margin-bottom: 16px;">🕯️</div>
+              <h1 style="color: #f5e6d3; font-size: 23px; font-weight: 300; margin: 0;">
+                We couldn't renew your premium
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: #d8c4ae; font-size: 15px; line-height: 1.7; padding: 0 8px;">
+              <p style="margin: 0 0 16px 0;">${greeting}</p>
+              <p style="margin: 0 0 16px 0;">
+                Your latest premium payment didn't go through — often this is just an
+                expired card or a paused auto-pay mandate. Nothing's lost: your journal,
+                letters, and scrapbook are all exactly where you left them.
+              </p>
+              <p style="margin: 0 0 8px 0;">
+                You'll keep full premium access for the next
+                <strong style="color: #f5e6d3;">${args.graceDays} days</strong>.
+                Update your payment method before then to keep everything uninterrupted.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding: 28px 0 8px 0;">
+              <a href="${safeUrl}"
+                 style="display: inline-block; background-color: #e8945a; color: #1a1215; padding: 14px 40px; border-radius: 24px; text-decoration: none; font-size: 15px; font-weight: 500;">
+                Update payment method
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding: 32px 0 0 0; border-top: 1px solid rgba(154,123,91,0.2);">
+              <p style="color: #6b5a4a; font-size: 12px; margin: 16px 0 0 0;">
+                If you meant to cancel, you can ignore this — access will simply wind down.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`
+
+  try {
+    const { error } = await getResend().emails.send({
+      from,
+      to: [args.to],
+      subject: 'Your premium payment needs attention',
+      html,
+    })
+    if (error) {
+      console.error('Failed to send payment-failed email:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error('Error sending payment-failed email:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // Generate beautiful HTML email for letter delivery
 export function generateLetterEmail({
   recipientName,

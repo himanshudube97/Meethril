@@ -103,7 +103,7 @@ export default function PostcardFolded({
               fontSize: 11,
               letterSpacing: 2.5,
               textTransform: 'uppercase',
-              color: 'rgba(120, 90, 50, 0.5)',
+              color: 'var(--text-muted, rgba(120, 90, 50, 0.5))',
               marginBottom: 6,
             }}
           >
@@ -127,7 +127,7 @@ export default function PostcardFolded({
                 fontFamily: 'Cormorant Garamond, Georgia, serif',
                 fontStyle: 'italic',
                 fontSize: 13,
-                color: 'rgba(120, 90, 50, 0.55)',
+                color: 'var(--text-muted, rgba(120, 90, 50, 0.55))',
                 marginTop: 8,
               }}
             >
@@ -141,7 +141,7 @@ export default function PostcardFolded({
               fontFamily: 'Cormorant Garamond, Georgia, serif',
               fontStyle: 'italic',
               fontSize: 11,
-              color: 'rgba(120, 90, 50, 0.40)',
+              color: 'var(--text-muted, rgba(120, 90, 50, 0.40))',
               marginTop: 4,
             }}
           >
@@ -213,7 +213,7 @@ export default function PostcardFolded({
               fontSize: 7,
               letterSpacing: 2,
               textTransform: 'uppercase',
-              color: 'rgba(120, 90, 50, 0.50)',
+              color: 'var(--text-muted, rgba(120, 90, 50, 0.50))',
               textAlign: 'center',
             }}
           >

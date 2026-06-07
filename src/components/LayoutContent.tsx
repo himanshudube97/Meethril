@@ -81,6 +81,7 @@ export default function LayoutContent({
   useApplyCursorStyles()
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mounted-guard to avoid a hydration flash
     setMounted(true)
   }, [])
 

@@ -10,28 +10,14 @@ import CompactDoodleCanvas from '@/components/desk/CompactDoodleCanvas'
 import type { StrokeData } from '@/store/journal'
 import { PostcardFrame } from './PostcardFrame'
 
-// Postcard paper picks up its colour from getGlassDiaryColors() (see
-// PostcardFront for the matching pattern). Ink / line colours stay constant so
-// they read against any theme tint underneath.
-const PAPER_INK = '#3d342a'
-const LINE_COLOR = 'rgba(120, 90, 50, 0.18)'
+// Postcard paper / ink / line colours are derived from getGlassDiaryColors()
+// inside the component (see PostcardFront for the matching pattern) so they
+// always contrast with the paper — a fixed dark ink vanished on dark themes
+// (Rivendell/Rain) where the paper itself is dark.
 
-// Doodle canvas colours — tuned to the paper aesthetic instead of theme-driven
-// so the doodle area reads as "drawn on the postcard".
+// Doodle canvas surround — very low alpha, reads on any paper tint.
 const DOODLE_BG = 'rgba(120, 90, 50, 0.05)'
 const DOODLE_BORDER = 'rgba(120, 90, 50, 0.22)'
-const DOODLE_COLORS = ['#3d342a', '#b34a3a', '#5a7a5a', '#7a5a3a']
-
-// Shared section label — the small italic lowercase caption above each block.
-const labelStyle: CSSProperties = {
-  fontFamily: 'Cormorant Garamond, Georgia, serif',
-  fontStyle: 'italic',
-  fontSize: 11,
-  letterSpacing: 2,
-  color: 'rgba(120, 90, 50, 0.55)',
-  textTransform: 'lowercase',
-  marginBottom: 6,
-}
 
 export function PostcardBack({
   photos = [],
@@ -68,6 +54,24 @@ export function PostcardBack({
   // .diary-page exactly.
   const diaryColors = getGlassDiaryColors(theme)
   const accent = theme.accent.primary
+
+  // Ink / muted / rule colours derived from the paper so they contrast on
+  // every theme (light paper → dark ink; dark paper → light ink).
+  const PAPER_INK = diaryColors.bodyText
+  const PAPER_INK_MUTED = diaryColors.prompt
+  const LINE_COLOR = diaryColors.ruledLine
+  // Default doodle pen contrasts with the paper; the rest stay as accents.
+  const DOODLE_COLORS = [diaryColors.bodyText, '#b34a3a', '#5a7a5a', '#7a5a3a']
+  // Shared section label — small italic lowercase caption above each block.
+  const labelStyle: CSSProperties = {
+    fontFamily: 'Cormorant Garamond, Georgia, serif',
+    fontStyle: 'italic',
+    fontSize: 11,
+    letterSpacing: 2,
+    color: PAPER_INK_MUTED,
+    textTransform: 'lowercase',
+    marginBottom: 6,
+  }
 
   // Music input — same pattern as the journal's LeftPage: a single text input
   // that auto-collapses into <SongEmbed> the moment a valid URL is detected.
@@ -156,7 +160,7 @@ export function PostcardBack({
                   borderRadius: '50%',
                   border: 'none',
                   background: 'rgba(120, 90, 50, 0.15)',
-                  color: 'rgba(120, 90, 50, 0.7)',
+                  color: PAPER_INK_MUTED,
                   fontSize: 12,
                   cursor: 'pointer',
                   opacity: 0.6,
@@ -204,7 +208,7 @@ export function PostcardBack({
               canvasBackground={DOODLE_BG}
               canvasBorder={DOODLE_BORDER}
               textColor={PAPER_INK}
-              mutedColor="rgba(120, 90, 50, 0.5)"
+              mutedColor={PAPER_INK_MUTED}
               readOnly={readOnly}
             />
           </div>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
-import { verifyDodoWebhookSignature } from '@/lib/dodo'
+import { verifyDodoWebhookSignature, createPortalSession } from '@/lib/dodo'
+import { sendPaymentFailedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,10 +118,13 @@ async function applySubscriptionState(payload: DodoWebhookEnvelope) {
   // Resolve the Hearth user: metadata.user_id (stuffed at checkout) → email → existing link.
   const userId = data.metadata?.user_id
   const email = data.customer?.email
+  // Select the fields the dunning path needs (prior status to detect the
+  // failure transition, email to notify, customer id for the portal link).
+  const userSelect = { id: true, email: true, subscriptionStatus: true, dodoCustomerId: true } as const
   const user =
-    (userId ? await prisma.user.findUnique({ where: { id: userId }, select: { id: true } }) : null) ??
-    (email ? await prisma.user.findUnique({ where: { email }, select: { id: true } }) : null) ??
-    (await prisma.user.findFirst({ where: { dodoSubscriptionId: subscriptionId }, select: { id: true } }))
+    (userId ? await prisma.user.findUnique({ where: { id: userId }, select: userSelect }) : null) ??
+    (email ? await prisma.user.findUnique({ where: { email }, select: userSelect }) : null) ??
+    (await prisma.user.findFirst({ where: { dodoSubscriptionId: subscriptionId }, select: userSelect }))
 
   if (!user) {
     console.warn(`No Hearth user found for Dodo subscription ${subscriptionId}`)
@@ -145,4 +149,38 @@ async function applySubscriptionState(payload: DodoWebhookEnvelope) {
   })
 
   console.log(`Dodo ${payload.type}: user ${user.id} → status=${status ?? '(unchanged)'}`)
+
+  // Dunning: a renewal just FAILED — status flipped INTO on_hold from something
+  // else. Send one "update your card" email per failure episode. Gating on the
+  // stored prior status (not the event type) makes this idempotent on top of the
+  // webhook ledger: once the row is on_hold, a duplicate on_hold/updated event
+  // won't re-fire. Best-effort — never let a mail failure fail the webhook.
+  if (status === 'on_hold' && user.subscriptionStatus !== 'on_hold') {
+    await sendDunningEmail(
+      user.email,
+      data.customer?.customer_id ?? user.dodoCustomerId,
+    ).catch((err) => console.error('Dunning email failed:', err))
+  }
+}
+
+// GRACE window in lib/billing/is-paid-user.ts (4 days). Keep these in sync so
+// the email promises the same access window the entitlement check honours.
+const GRACE_DAYS = 4
+
+/**
+ * Send the failed-payment dunning email. Resolves a fresh Dodo customer-portal
+ * link (direct "update card" screen) when we have a customer id; falls back to
+ * the in-app pricing page otherwise.
+ */
+async function sendDunningEmail(to: string, customerId: string | null) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hearth.app'
+  let manageUrl = `${appUrl}/pricing`
+  if (customerId) {
+    try {
+      manageUrl = await createPortalSession(customerId)
+    } catch (err) {
+      console.warn('Portal link unavailable for dunning email, using app URL:', err)
+    }
+  }
+  await sendPaymentFailedEmail({ to, manageUrl, graceDays: GRACE_DAYS })
 }

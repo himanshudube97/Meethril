@@ -424,7 +424,7 @@ export default function DatePicker({
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full text-left text-sm bg-transparent outline-none flex items-center justify-between"
+        className="w-full text-left text-base bg-transparent outline-none flex items-center justify-between"
         style={{ color: value ? theme.text.primary : theme.text.muted }}
       >
         <span>{value ? formatDisplayDate(value) : placeholder}</span>

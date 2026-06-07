@@ -78,6 +78,7 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
 
   // Sync initial value when it changes (after fetch)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional prop→state sync after async fetch
     setValue(initialValue)
   }, [initialValue])
 
@@ -91,7 +92,7 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
   return (
     <div>
       <label
-        className="block text-sm mb-2"
+        className="block text-base mb-2"
         style={{ color: theme.text.muted }}
       >
         {label}
@@ -109,7 +110,7 @@ const PersonalInfoInput = memo(function PersonalInfoInput({
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full bg-transparent outline-none ${type === 'text' ? 'text-lg font-light' : 'text-sm'} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        className={`w-full bg-transparent outline-none ${type === 'text' ? 'text-xl font-light' : 'text-base'} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
         style={{
           color: disabled ? theme.text.muted : theme.text.primary,
         }}
@@ -130,6 +131,7 @@ const DateOfBirthInput = memo(function DateOfBirthInput({
 
   // Sync initial value when it changes (after fetch)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional prop→state sync after async fetch
     setValue(initialValue)
   }, [initialValue])
 
@@ -141,7 +143,7 @@ const DateOfBirthInput = memo(function DateOfBirthInput({
   return (
     <div>
       <label
-        className="block text-sm mb-2"
+        className="block text-base mb-2"
         style={{ color: theme.text.muted }}
       >
         when were you born?
@@ -216,7 +218,7 @@ const E2EESettings = memo(function E2EESettings() {
 
         <div className="flex-1 space-y-3">
           <h3
-            className="text-base font-medium"
+            className="text-lg font-medium"
             style={{ color: theme.text.primary }}
           >
             End-to-end encryption
@@ -225,7 +227,7 @@ const E2EESettings = memo(function E2EESettings() {
           {!isEnabled && (
             <>
               <p
-                className="text-sm"
+                className="text-base"
                 style={{ color: theme.text.secondary }}
               >
                 Encrypt your journal entries with a key only you know. Not even we can read them.
@@ -235,7 +237,7 @@ const E2EESettings = memo(function E2EESettings() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 disabled={e2eeLoading}
-                className="px-4 py-2 rounded-xl text-sm font-medium"
+                className="px-4 py-2 rounded-xl text-base font-medium"
                 style={{
                   background: theme.accent.primary,
                   color: '#fff',
@@ -249,13 +251,13 @@ const E2EESettings = memo(function E2EESettings() {
 
           {isEnabled && (
             <>
-              <p className="text-sm" style={{ color: theme.text.secondary }}>
+              <p className="text-base" style={{ color: theme.text.secondary }}>
                 {keyData?.e2eeSetupAt
                   ? `Encrypted on ${new Date(keyData.e2eeSetupAt).toLocaleDateString()}.`
                   : 'Encrypted.'}
               </p>
               <p
-                className="text-sm"
+                className="text-base"
                 style={{ color: theme.text.secondary }}
                 title={
                   isUnlocked
@@ -271,7 +273,7 @@ const E2EESettings = memo(function E2EESettings() {
                 <button
                   onClick={() => clearMasterKey()}
                   title="Remove your encryption key from this browser. Nothing is deleted — your entries stay safely encrypted and can be reopened anytime by unlocking with your daily key. Handy on shared or public computers."
-                  className="px-3 py-1.5 rounded-lg text-sm"
+                  className="px-3 py-1.5 rounded-lg text-base"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -283,7 +285,7 @@ const E2EESettings = memo(function E2EESettings() {
                 <button
                   onClick={() => setShowUnlockModal(true)}
                   title="Change the daily key — the password you type to unlock day to day. Your entries and your recovery key are unaffected."
-                  className="px-3 py-1.5 rounded-lg text-sm"
+                  className="px-3 py-1.5 rounded-lg text-base"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -300,7 +302,7 @@ const E2EESettings = memo(function E2EESettings() {
                       ? 'Create a fresh backup recovery key. Your old recovery key stops working; your daily key is unaffected. Save the new key somewhere safe.'
                       : 'Unlock first (your key must be loaded in this browser) before you can generate a new recovery key.'
                   }
-                  className="px-3 py-1.5 rounded-lg text-sm"
+                  className="px-3 py-1.5 rounded-lg text-base"
                   style={{
                     background: theme.glass.bg,
                     border: `1px solid ${theme.glass.border}`,
@@ -313,7 +315,7 @@ const E2EESettings = memo(function E2EESettings() {
                 </button>
               </div>
               {/* Plain-language helper so the two key types aren't confusing. */}
-              <p className="text-xs leading-relaxed pt-1" style={{ color: theme.text.muted }}>
+              <p className="text-base leading-relaxed pt-1" style={{ color: theme.text.muted }}>
                 Two keys open the same vault: a <strong>daily key</strong> you type to unlock, and a{' '}
                 <strong>recovery key</strong> kept as a backup. Changing one never affects the other.
                 {!isUnlocked && ' Unlock first to generate a new recovery key.'}
@@ -323,7 +325,7 @@ const E2EESettings = memo(function E2EESettings() {
 
           <Link
             href="/security"
-            className="text-sm underline block pt-1"
+            className="text-base underline block pt-1"
             style={{ color: theme.text.muted }}
           >
             How E2EE works →
@@ -332,6 +334,126 @@ const E2EESettings = memo(function E2EESettings() {
       </div>
 
       <RotateRecoveryKeyModal open={showRotate} onClose={() => setShowRotate(false)} />
+    </motion.div>
+  )
+})
+
+// Feedback / suggestion / issue — saved to the Feedback table, reviewed later.
+const CATEGORIES = [
+  { key: 'feedback', label: 'Feedback' },
+  { key: 'suggestion', label: 'Suggestion' },
+  { key: 'issue', label: 'Issue' },
+] as const
+
+const FeedbackSection = memo(function FeedbackSection() {
+  const { theme } = useThemeStore()
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]['key']>('feedback')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    if (!message.trim() || sending) return
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, message }),
+      })
+      if (res.ok) {
+        setSent(true)
+        setMessage('')
+        setTimeout(() => setSent(false), 4000)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Could not send — try again.')
+      }
+    } catch {
+      setError('Could not send — try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, delay: 0.95, ease: [0.22, 1, 0.36, 1] }}
+      className="p-6 rounded-2xl mb-8"
+      style={{
+        background: theme.glass.bg,
+        backdropFilter: `blur(${theme.glass.blur})`,
+        border: `1px solid ${theme.glass.border}`,
+      }}
+    >
+      <h3 className="text-lg font-medium mb-1" style={{ color: theme.text.primary }}>
+        help shape Meethril
+      </h3>
+      <p className="text-base mb-4" style={{ color: theme.text.muted }}>
+        Something you love, wish for, or that is broken? Tell us — we read every note.
+      </p>
+
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {CATEGORIES.map((c) => {
+          const active = c.key === category
+          return (
+            <button
+              key={c.key}
+              onClick={() => setCategory(c.key)}
+              className="px-3 py-1.5 rounded-full text-base transition-colors"
+              style={
+                active
+                  ? { background: theme.accent.primary, color: theme.bg.primary }
+                  : { background: theme.glass.bg, border: `1px solid ${theme.glass.border}`, color: theme.text.muted }
+              }
+            >
+              {c.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <textarea
+        value={message}
+        onChange={(e) => {
+          setMessage(e.target.value)
+          if (error) setError(null)
+        }}
+        maxLength={2000}
+        rows={4}
+        placeholder="write your thoughts..."
+        className="w-full bg-transparent outline-none text-base resize-none rounded-xl p-3"
+        style={{
+          color: theme.text.primary,
+          border: `1px solid ${theme.glass.border}`,
+        }}
+      />
+
+      <div className="flex items-center justify-between gap-3 mt-3">
+        <span className="text-base" style={{ color: sent ? theme.accent.primary : '#b94c4c' }}>
+          {sent ? 'thank you 🌱' : error || ''}
+        </span>
+        <motion.button
+          onClick={submit}
+          disabled={sending || !message.trim()}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="px-5 py-2 rounded-full text-base whitespace-nowrap"
+          style={{
+            background: theme.accent.primary,
+            color: theme.bg.primary,
+            opacity: sending || !message.trim() ? 0.5 : 1,
+            cursor: sending || !message.trim() ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {sending ? 'sending...' : 'send'}
+        </motion.button>
+      </div>
     </motion.div>
   )
 })
@@ -370,7 +492,7 @@ export default function MePage() {
         className="text-center mb-10"
       >
         <h1
-          className="text-2xl font-light"
+          className="text-3xl font-light"
           style={{ color: theme.text.primary }}
         >
           {profile.nickname ? `about you, ${profile.nickname}` : 'about you'}
@@ -426,7 +548,7 @@ export default function MePage() {
           style={{ background: theme.glass.border }}
         />
         <span
-          className="text-xs italic"
+          className="text-sm italic"
           style={{ color: theme.text.muted }}
         >
           security & privacy
@@ -466,13 +588,13 @@ export default function MePage() {
       >
         <div>
           <h3
-            className="text-base font-medium mb-1"
+            className="text-lg font-medium mb-1"
             style={{ color: theme.text.primary }}
           >
             Hearth on your desktop
           </h3>
           <p
-            className="text-sm"
+            className="text-base"
             style={{ color: theme.text.muted }}
           >
             A quiet little app for your dock.
@@ -480,7 +602,7 @@ export default function MePage() {
         </div>
         <Link
           href="/download"
-          className="px-4 py-2 rounded-full text-sm whitespace-nowrap"
+          className="px-4 py-2 rounded-full text-base whitespace-nowrap"
           style={{
             background: theme.accent.primary,
             color: theme.bg.primary,
@@ -492,6 +614,9 @@ export default function MePage() {
 
       {/* E2EE Settings */}
       <E2EESettings />
+
+      {/* Feedback / suggestion / issue */}
+      <FeedbackSection />
 
       {/* Final Divider */}
       <motion.div
@@ -505,10 +630,10 @@ export default function MePage() {
           style={{ background: theme.glass.border }}
         />
         <span
-          className="text-xs"
+          className="text-sm"
           style={{ color: theme.text.muted }}
         >
-          that's all for now
+          that&apos;s all for now
         </span>
         <div
           className="flex-1 h-px"
@@ -527,7 +652,7 @@ export default function MePage() {
           onClick={logout}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="px-6 py-3 rounded-full text-sm"
+          className="px-6 py-3 rounded-full text-base"
           style={{
             background: theme.glass.bg,
             border: `1px solid ${theme.glass.border}`,

@@ -3,9 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useCursorStore } from '@/store/cursor'
-import { useDeskSettings } from '@/store/deskSettings'
 import { useDeskPanel } from '@/store/deskPanel'
-import { useSoundStore } from '@/store/sound'
+import { useTourStore } from '@/store/tour'
 import { themes, ThemeName } from '@/lib/themes'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
 import { cursors, cursorIcons, CursorName } from '@/lib/cursors'
@@ -26,19 +25,11 @@ export default function DeskSettingsPanel() {
   const { open, setOpen } = useDeskPanel()
   const { theme, themeName, setTheme } = useThemeStore()
   const { cursorName, setCursor } = useCursorStore()
-  const { animationsEnabled, setAnimationsEnabled } = useDeskSettings()
-  const {
-    ambientEnabled,
-    ambientVolume,
-    uiSoundsEnabled,
-    setAmbientEnabled,
-    setAmbientVolume,
-    setUiSoundsEnabled,
-  } = useSoundStore()
+  const requestTour = useTourStore((s) => s.requestStart)
 
   // Themes hidden from the picker (still registered, just not offered).
-  // Hearth and Linen are temporarily hidden until their views are polished.
-  const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen']
+  // Hearth, Linen, and Rain are temporarily hidden until their views are polished.
+  const HIDDEN_THEMES: ThemeName[] = ['firelight', 'linen', 'rain']
   // Mobile keeps just two themes: sunset + rose. The other ambiences depend
   // on particles, scenes, and chrome that don't translate well to small
   // screens. A user who set a desktop-only theme still sees it apply; they
@@ -208,117 +199,39 @@ export default function DeskSettingsPanel() {
                 </section>
                 )}
 
-                {/* Background animations */}
+                {/* Guided tour — replayable walkthrough entry point. */}
                 <section>
                   <h3 className="text-xs uppercase tracking-[0.15em] mb-3" style={{ color: theme.text.muted }}>
-                    Background
+                    Tour
                   </h3>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm" style={{ color: theme.text.primary }}>
-                        Animations
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
-                        Particles, drifting glows, and ambient motion
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setAnimationsEnabled(!animationsEnabled)}
-                      className="w-10 h-6 rounded-full relative transition-colors"
-                      style={{
-                        background: animationsEnabled ? theme.accent.warm : theme.glass.border,
-                      }}
-                      aria-label="Toggle background animations"
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      setOpen(false)
+                      requestTour()
+                    }}
+                    className="w-full p-3 rounded-xl flex items-center gap-3 text-left transition-all"
+                    style={{
+                      background: `${theme.accent.primary}18`,
+                      border: `1px solid ${theme.accent.primary}`,
+                    }}
+                    aria-label="Take a guided tour of Meethril"
+                  >
+                    <span
+                      className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-lg"
+                      style={{ background: `linear-gradient(135deg, ${theme.accent.warm}, ${theme.accent.primary})` }}
                     >
-                      <motion.span
-                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
-                        animate={{ left: animationsEnabled ? '18px' : '2px' }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    </button>
-                  </div>
-                </section>
-
-                {/* Sound */}
-                <section>
-                  <h3 className="text-xs uppercase tracking-[0.15em] mb-3" style={{ color: theme.text.muted }}>
-                    Sound
-                  </h3>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-sm" style={{ color: theme.text.primary }}>
-                        Ambient
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
-                        Background loop matched to your theme
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setAmbientEnabled(!ambientEnabled)}
-                      className="w-10 h-6 rounded-full relative transition-colors"
-                      style={{
-                        background: ambientEnabled ? theme.accent.warm : theme.glass.border,
-                      }}
-                      aria-label="Toggle ambient sound"
-                    >
-                      <motion.span
-                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
-                        animate={{ left: ambientEnabled ? '18px' : '2px' }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="mb-4" style={{ opacity: ambientEnabled ? 1 : 0.4 }}>
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-[10px] uppercase tracking-wider" style={{ color: theme.text.muted }}>
-                        Volume
+                      🧭
+                    </span>
+                    <span className="flex flex-col">
+                      <span className="text-sm leading-tight" style={{ color: theme.text.primary }}>
+                        Take a tour
                       </span>
-                      <span className="text-[10px] font-mono" style={{ color: theme.text.primary }}>
-                        {Math.round(ambientVolume * 100)}%
+                      <span className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
+                        A quick walkthrough of every corner
                       </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={Math.round(ambientVolume * 100)}
-                      onChange={(e) => setAmbientVolume(Number(e.target.value) / 100)}
-                      disabled={!ambientEnabled}
-                      className="w-full h-1 rounded-full appearance-none cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, ${theme.accent.warm} 0%, ${theme.accent.warm} ${ambientVolume * 100}%, ${theme.glass.border} ${ambientVolume * 100}%, ${theme.glass.border} 100%)`,
-                        accentColor: theme.accent.warm,
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm" style={{ color: theme.text.primary }}>
-                        UI sounds
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: theme.text.muted }}>
-                        Page turn sound when navigating the diary
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setUiSoundsEnabled(!uiSoundsEnabled)}
-                      className="w-10 h-6 rounded-full relative transition-colors"
-                      style={{
-                        background: uiSoundsEnabled ? theme.accent.warm : theme.glass.border,
-                      }}
-                      aria-label="Toggle UI sounds"
-                    >
-                      <motion.span
-                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
-                        animate={{ left: uiSoundsEnabled ? '18px' : '2px' }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    </button>
-                  </div>
+                    </span>
+                  </motion.button>
                 </section>
               </div>
             </motion.aside>

@@ -81,7 +81,7 @@ export default function StickyHeader() {
               >
                 <MenuLink href="/">Home</MenuLink>
                 <MenuLink href="/pricing">Pricing</MenuLink>
-                <MenuLink href="/download">Desktop apps</MenuLink>
+                <MenuLink href="/download">Desktop app</MenuLink>
                 <MenuLink href="/write">Begin writing</MenuLink>
               </motion.div>
             </>

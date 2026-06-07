@@ -132,7 +132,7 @@ export default function SomedayDatePicker({ selectedDate, onSelect, onClose }: P
             style={{
               textAlign: 'center',
               fontSize: 10,
-              color: 'rgba(120, 90, 50, 0.5)',
+              color: 'var(--text-muted, rgba(120, 90, 50, 0.5))',
               fontFamily: 'Cormorant Garamond, Georgia, serif',
               letterSpacing: 0.5,
               padding: '2px 0',
@@ -174,10 +174,11 @@ export default function SomedayDatePicker({ selectedDate, onSelect, onClose }: P
                 color: isSelected
                   ? '#fff'
                   : disabled
-                  ? 'rgba(120, 90, 50, 0.25)'
+                  ? 'var(--text-muted, rgba(120, 90, 50, 0.25))'
                   : !inCurrentMonth
-                  ? 'rgba(120, 90, 50, 0.35)'
+                  ? 'var(--text-muted, rgba(120, 90, 50, 0.35))'
                   : 'var(--text-primary, #3a2025)',
+                opacity: disabled ? 0.45 : !inCurrentMonth ? 0.6 : 1,
                 fontSize: 13,
                 fontFamily: 'Caveat, cursive',
                 cursor: disabled ? 'not-allowed' : 'pointer',

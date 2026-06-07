@@ -14,31 +14,32 @@ const freeTier = {
   features: [
     { text: '15 journal entries per month', included: true },
     { text: 'Every theme & cursor', included: true },
-    { text: '2 letters to your future self / month', included: true },
-    { text: '10 letters to a friend / month', included: true },
+    { text: '5 letters to your future self / month', included: true },
+    { text: '5 letters to a friend / month', included: true },
     { text: '10 scrapbook pages / month', included: true },
-    { text: '1 stranger note per day', included: true },
-    { text: 'Mood tracking, calendar & search', included: true },
-    { text: 'Constellation & garden views', included: true },
+    { text: '2 stranger notes per day', included: true },
+    { text: 'Calendar & search', included: true },
+    { text: 'Memory — revisit your past writings', included: true },
   ],
 }
 
 const premiumTier = {
   name: 'Premium',
-  monthlyPrice: '$5',
+  monthlyPrice: '$4',
   monthlyPeriod: '/month',
-  yearlyPrice: '$40',
-  yearlyOriginal: '$60',
+  yearlyPrice: '$32',
+  yearlyOriginal: '$48',
   yearlyPeriod: '/year',
   yearlySavings: 'Save 4 months',
   description: 'More room to reflect & connect',
   features: [
-    { text: 'Unlimited journal entries', included: true },
+    { text: 'Unlimited journal entries (1 per day)', included: true },
     { text: '10 letters to your future self / month', included: true },
-    { text: '20 letters to a friend / month', included: true },
+    { text: '10 letters to a friend / month', included: true },
     { text: '30 scrapbook pages / month', included: true },
     { text: '5 stranger notes per day', included: true },
     { text: 'Ask friends to save a copy of their letter', included: true },
+    { text: 'Memory — revisit your past writings', included: true },
     { text: 'Every theme, cursor & view — always', included: true },
   ],
 }
@@ -457,7 +458,7 @@ export default function PricingPage() {
                     onClick={() => handleCheckout('monthly')}
                     disabled={checkoutLoading !== null || isLoading}
                   >
-                    {checkoutLoading === 'monthly' ? 'Loading...' : 'Get Monthly — $5/mo'}
+                    {checkoutLoading === 'monthly' ? 'Loading...' : 'Get Monthly — $4/mo'}
                   </motion.button>
                 </>
               )}

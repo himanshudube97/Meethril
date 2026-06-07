@@ -23,6 +23,7 @@ export default function LettersNav({ active, onChange, newCount = 0 }: Props) {
       {(['inbox', 'sent', 'lights'] as LettersTab[]).map(t => (
         <button
           key={t}
+          data-tour={`letters-${t}`}
           onClick={() => onChange(t)}
           className={`
             px-[22px] py-[7px] pb-[9px] rounded-full

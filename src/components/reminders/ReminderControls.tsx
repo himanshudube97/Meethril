@@ -73,7 +73,7 @@ export default function ReminderControls() {
               }
             }}
             disabled={desktopBusy}
-            className="px-4 py-2 rounded-xl text-sm font-medium"
+            className="px-4 py-2 rounded-xl text-base font-medium"
             style={{ background: theme.accent.primary, color: '#fff', opacity: desktopBusy ? 0.6 : 1 }}
           >
             {desktopBusy ? 'Enabling...' : 'Enable nightly reminders'}
@@ -83,13 +83,13 @@ export default function ReminderControls() {
         {desktopEnabled && (
           <>
             <div className="space-y-2">
-              <label className="block text-sm" style={{ color: theme.text.secondary }}>
+              <label className="block text-base" style={{ color: theme.text.secondary }}>
                 When should we ping you?
               </label>
               <div className="flex gap-2 items-center flex-wrap">
                 <button
                   onClick={() => handleTime('')}
-                  className="px-3 py-1.5 rounded-lg text-sm"
+                  className="px-3 py-1.5 rounded-lg text-base"
                   style={
                     reminderTime === null
                       ? { background: theme.accent.primary, color: '#fff' }
@@ -107,7 +107,7 @@ export default function ReminderControls() {
                   type="time"
                   value={reminderTime ?? ''}
                   onChange={(e) => handleTime(e.target.value)}
-                  className="px-2 py-1 rounded-lg text-sm bg-transparent"
+                  className="px-2 py-1 rounded-lg text-base bg-transparent"
                   style={{ border: `1px solid ${theme.glass.border}`, color: theme.text.primary }}
                 />
               </div>
@@ -123,7 +123,7 @@ export default function ReminderControls() {
                 }
               }}
               disabled={desktopBusy}
-              className="px-3 py-1.5 rounded-lg text-sm"
+              className="px-3 py-1.5 rounded-lg text-base"
               style={{ color: theme.text.muted, opacity: desktopBusy ? 0.6 : 1 }}
             >
               Turn off
@@ -139,7 +139,7 @@ export default function ReminderControls() {
       return (
         <section id="reminders" className="space-y-2">
           {heading}
-          <p className="text-sm" style={{ color: theme.text.secondary }}>
+          <p className="text-base" style={{ color: theme.text.secondary }}>
             To get reminders on iPhone, install Hearth as a PWA: tap Share → Add to Home Screen,
             then open Hearth from your home screen and try again.
           </p>
@@ -149,7 +149,7 @@ export default function ReminderControls() {
     return (
       <section id="reminders" className="space-y-2">
         {heading}
-        <p className="text-sm" style={{ color: theme.text.secondary }}>
+        <p className="text-base" style={{ color: theme.text.secondary }}>
           Your browser doesn&apos;t support push notifications.
         </p>
       </section>
@@ -170,7 +170,7 @@ export default function ReminderControls() {
       {!subscribed && permission !== 'denied' && (
         <button
           onClick={handleEnable}
-          className="px-4 py-2 rounded-xl text-sm font-medium"
+          className="px-4 py-2 rounded-xl text-base font-medium"
           style={{ background: theme.accent.primary, color: '#fff' }}
         >
           Enable nightly reminders
@@ -179,10 +179,10 @@ export default function ReminderControls() {
 
       {!subscribed && permission === 'denied' && (
         <div className="space-y-3">
-          <p className="text-sm" style={{ color: theme.text.secondary }}>
+          <p className="text-base" style={{ color: theme.text.secondary }}>
             Notifications are blocked for Hearth in your browser.
           </p>
-          <details className="text-xs" style={{ color: theme.text.muted }}>
+          <details className="text-sm" style={{ color: theme.text.muted }}>
             <summary className="cursor-pointer select-none" style={{ color: theme.text.secondary }}>
               How to re-enable
             </summary>
@@ -197,7 +197,7 @@ export default function ReminderControls() {
           </details>
           <button
             onClick={refreshPermission}
-            className="px-3 py-1.5 rounded-lg text-sm"
+            className="px-3 py-1.5 rounded-lg text-base"
             style={{
               background: theme.glass.bg,
               border: `1px solid ${theme.glass.border}`,
@@ -212,18 +212,18 @@ export default function ReminderControls() {
       {subscribed && (
         <>
           {paused && (
-            <p className="text-sm italic" style={{ color: theme.text.secondary }}>
+            <p className="text-base italic" style={{ color: theme.text.secondary }}>
               Reminders are currently paused (no entries written for a week). Re-enable below to start again.
             </p>
           )}
           <div className="space-y-2">
-            <label className="block text-sm" style={{ color: theme.text.secondary }}>
+            <label className="block text-base" style={{ color: theme.text.secondary }}>
               When should we ping you?
             </label>
             <div className="flex gap-2 items-center flex-wrap">
               <button
                 onClick={() => handleTime('')}
-                className="px-3 py-1.5 rounded-lg text-sm"
+                className="px-3 py-1.5 rounded-lg text-base"
                 style={
                   reminderTime === null
                     ? { background: theme.accent.primary, color: '#fff' }
@@ -241,7 +241,7 @@ export default function ReminderControls() {
                 type="time"
                 value={reminderTime ?? ''}
                 onChange={(e) => handleTime(e.target.value)}
-                className="px-2 py-1 rounded-lg text-sm bg-transparent"
+                className="px-2 py-1 rounded-lg text-base bg-transparent"
                 style={{
                   border: `1px solid ${theme.glass.border}`,
                   color: theme.text.primary,
@@ -262,7 +262,7 @@ export default function ReminderControls() {
                 }
               }}
               disabled={testing}
-              className="px-3 py-1.5 rounded-lg text-sm"
+              className="px-3 py-1.5 rounded-lg text-base"
               style={{
                 background: theme.glass.bg,
                 border: `1px solid ${theme.glass.border}`,
@@ -274,7 +274,7 @@ export default function ReminderControls() {
             </button>
             <button
               onClick={unsubscribe}
-              className="px-3 py-1.5 rounded-lg text-sm"
+              className="px-3 py-1.5 rounded-lg text-base"
               style={{ color: theme.text.muted }}
             >
               Turn off

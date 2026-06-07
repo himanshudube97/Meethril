@@ -26,6 +26,9 @@ export function gapDaysLocal(args: {
 }
 
 export function tierFor(gapDays: number): ComebackTier | null {
+  // No finite gap means the user has never journaled (lastEntryAt was null).
+  // A "comeback" requires a prior visit to come back from, so show nothing.
+  if (!Number.isFinite(gapDays)) return null
   if (gapDays <= 0) return null
   if (gapDays <= 2) return 'whisper'
   if (gapDays <= 7) return 'card'

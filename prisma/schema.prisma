@@ -23,6 +23,7 @@ model User {
   orphanedBlobs     OrphanedBlob[]
   pushSubscriptions PushSubscription[]
   letters           Letter[]
+  feedback          Feedback[]
 
   // A Small Light counters & rate limit (anonymous notes to strangers)
   strangerNotesSent       Int       @default(0)
@@ -324,6 +325,23 @@ model BookQuote {
   createdAt DateTime @default(now())
 
   @@map("book_quotes")
+}
+
+/// In-app feedback from users — feedback / suggestion / issue. One row per
+/// submission (a user can submit many). Plaintext on purpose: you need to read
+/// these to act on them, and they're not journal content. Review in Prisma
+/// Studio, newest first.
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String // "feedback" | "suggestion" | "issue"
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("feedback")
 }
 
 model Whisper {

@@ -189,31 +189,25 @@ export default function ThreadView({
   return (
     <div className="relative flex w-full max-w-4xl flex-col gap-4">
       {/* Header with partner name + close — sits above the window */}
-      <header className="flex items-baseline justify-between px-1">
+      <header className="flex items-center justify-between px-1">
         <div className="flex flex-col">
           <span
-            className="font-serif text-[10px] uppercase italic"
+            className="font-serif text-[12px] uppercase italic"
             style={{
-              color: 'color-mix(in oklab, var(--text-primary) 55%, transparent)',
+              color: 'color-mix(in oklab, var(--text-primary) 70%, transparent)',
               letterSpacing: '0.22em',
             }}
           >
             {thread.status === 'pen_pal' ? 'pen pal' : 'a stranger'}
           </span>
           <h3
-            className="font-serif text-[20px]"
+            className="font-serif text-[24px]"
             style={{ color: 'var(--text-primary)' }}
           >
             to {monogram(thread.partnerDisplayName)}
           </h3>
         </div>
-        <button
-          onClick={onClose}
-          className="font-serif text-[12px] italic underline-offset-2 hover:underline"
-          style={{ color: 'color-mix(in oklab, var(--text-primary) 60%, transparent)' }}
-        >
-          close
-        </button>
+        <ActionPill onClick={onClose}>close</ActionPill>
       </header>
 
       {/* The window — a fixed-height frosted pane the notes float and scroll
@@ -382,20 +376,11 @@ export default function ThreadView({
       )}
 
       {/* Bottom actions */}
-      <div
-        className="flex gap-4 pt-2 font-serif text-[11px] italic"
-        style={{
-          color: 'color-mix(in oklab, var(--text-primary) 50%, transparent)',
-        }}
-      >
-        <button onClick={onSkip} className="underline-offset-2 hover:underline">
-          set aside
-        </button>
-        <button onClick={onBlock} className="underline-offset-2 hover:underline">
-          block
-        </button>
+      <div className="flex flex-wrap gap-2.5 pt-2">
+        <ActionPill onClick={onSkip}>set aside</ActionPill>
+        <ActionPill onClick={onBlock}>block</ActionPill>
         {thread.status === 'pen_pal' && (
-          <button
+          <ActionPill
             onClick={async () => {
               if (confirm('end this connection? the thread will be erased on both sides.')) {
                 await fetch(`/api/stranger-notes/threads/${threadId}`, {
@@ -405,13 +390,44 @@ export default function ThreadView({
                 onClose()
               }
             }}
-            className="underline-offset-2 hover:underline"
           >
             end connection
-          </button>
+          </ActionPill>
         )}
       </div>
     </div>
+  )
+}
+
+// ───────────────────────────── ActionPill ─────────────────────────────
+
+/**
+ * Shared thread control (close / set aside / block / end connection). Earlier
+ * these were tiny low-contrast underlined links that vanished on several themes.
+ * A bordered pill with solid-enough ink reads clearly on every palette, light
+ * or dark, and gives a real tap target.
+ */
+function ActionPill({
+  onClick,
+  children,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full font-serif text-[14px] italic transition-colors hover:brightness-95"
+      style={{
+        padding: '7px 16px',
+        color: 'color-mix(in oklab, var(--text-primary) 90%, transparent)',
+        background: 'color-mix(in oklab, var(--paper-1) 70%, transparent)',
+        border: '1px solid color-mix(in oklab, var(--text-primary) 32%, transparent)',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -588,20 +604,20 @@ function EmptyState({ message, onClose }: { message: string; onClose: () => void
 
 function WaitingLine({ isUnmatched }: { isUnmatched: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-1 py-4 text-center">
+    <div className="flex flex-col items-center gap-1.5 py-4 text-center">
       <p
-        className="font-serif text-[13px] italic"
-        style={{ color: 'color-mix(in oklab, var(--text-primary) 65%, transparent)' }}
+        className="font-serif text-[16px] italic"
+        style={{ color: 'color-mix(in oklab, var(--text-primary) 82%, transparent)' }}
       >
         {isUnmatched
           ? 'your light is still traveling through the night…'
           : 'you let your last letter travel. waiting for them to write back.'}
       </p>
       <p
-        className="font-serif text-[10px]"
+        className="font-serif text-[12px]"
         style={{
-          color: 'color-mix(in oklab, var(--text-primary) 45%, transparent)',
-          letterSpacing: '0.18em',
+          color: 'color-mix(in oklab, var(--text-primary) 62%, transparent)',
+          letterSpacing: '0.16em',
         }}
       >
         no rush. it will arrive when it arrives.
