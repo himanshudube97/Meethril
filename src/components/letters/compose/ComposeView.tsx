@@ -273,7 +273,7 @@ export default function ComposeView() {
       throw new Error('Draft has not been saved yet — please add some text.')
     }
     if (!masterKey) {
-      throw new Error('Unlock Hearth first — your master key is required to seal letters.')
+      throw new Error('Unlock Meethril first — your master key is required to seal letters.')
     }
     if (!recipient) throw new Error('No recipient selected.')
 
