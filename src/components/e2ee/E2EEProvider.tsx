@@ -47,12 +47,14 @@ export default function E2EEProvider({ children }: E2EEProviderProps) {
     }
   }, [user, initialized, initialize, modalsAllowed])
 
-  // Clear master key when user logs out
+  // Clear master key when user logs out. Exempt the anonymous /try sandbox:
+  // it deliberately primes a throwaway in-tab key with no logged-in user, and
+  // this effect would otherwise wipe it the instant trial sets `initialized`.
   useEffect(() => {
-    if (!user && initialized) {
+    if (!user && initialized && !pathname.startsWith('/try')) {
       clearMasterKey()
     }
-  }, [user, initialized, clearMasterKey])
+  }, [user, initialized, clearMasterKey, pathname])
 
   // Auto-resume backfill if it was previously running or paused
   useEffect(() => {

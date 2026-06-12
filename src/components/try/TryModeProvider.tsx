@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth'
 import { useTrialStore } from '@/store/trial'
@@ -16,8 +16,6 @@ export default function TryModeProvider({ children }: { children: React.ReactNod
   const user = useAuthStore(s => s.user)
   const loading = useAuthStore(s => s.loading)
   const [ready, setReady] = useState(false)
-  const restoreRef = useRef<null | (() => void)>(null)
-  const uninstallRef = useRef<null | (() => void)>(null)
 
   useEffect(() => {
     // Wait for auth to resolve before acting — avoids flash-redirecting an
@@ -28,19 +26,27 @@ export default function TryModeProvider({ children }: { children: React.ReactNod
     // throwaway key can never touch real data.
     if (user) { router.replace('/me'); return }
 
-    let cancelled = false
-    useTrialStore.getState().reset()
-    uninstallRef.current = installTrialFetch()
-    primeTrialCrypto().then(restore => {
-      if (cancelled) { restore(); return }
-      restoreRef.current = restore
-      setReady(true)
+    // StrictMode-safe: the async prime's restore is owned ONLY by this effect's
+    // cleanup, read through the `restore` binding below. We must NOT call restore
+    // from inside .then on cancel — under StrictMode's double-invoke the first
+    // run's late-resolving prime would otherwise clear the key the second run
+    // just set (the throwaway key + store priming live in shared global state).
+    let active = true
+    let restore: () => void = () => {}
+    // Seed ONLY on a fresh tab. The trial store persists to sessionStorage, so on
+    // reload/navigation within the session it's already populated — reset()ing
+    // here would wipe entries the visitor just wrote. Empty entries ⇒ first visit.
+    if (useTrialStore.getState().entries.length === 0) useTrialStore.getState().reset()
+    const uninstall = installTrialFetch()
+    primeTrialCrypto().then(r => {
+      restore = r
+      if (active) setReady(true)
     })
 
     return () => {
-      cancelled = true
-      uninstallRef.current?.()
-      restoreRef.current?.()
+      active = false
+      uninstall()
+      restore()        // no-op if prime hasn't resolved yet — that's intended
       clearBlobs()
     }
   }, [user, loading, router])
