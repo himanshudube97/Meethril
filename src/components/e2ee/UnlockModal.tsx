@@ -1,68 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
-import { PasswordToggle } from '@/components/PasswordToggle'
-import {
-  deriveKeyFromPassphrase,
-  parseSalt,
-  unwrapMasterKey,
-} from '@/lib/e2ee/crypto'
+import { UnlockForm } from './UnlockForm'
 
 export default function UnlockModal() {
   const { theme } = useThemeStore()
-  const {
-    showUnlockModal,
-    setShowUnlockModal,
-    setShowRecoveryModal,
-    keyData,
-    storeMasterKey,
-  } = useE2EEStore()
-
-  const [dailyKey, setDailyKey] = useState('')
-  const [show, setShow] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleUnlock = async () => {
-    if (!keyData?.encryptedMasterKey || !keyData?.masterKeyIV || !keyData?.masterKeySalt) {
-      setError('E2EE key data not available')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-
-    try {
-      // Derive wrapping key from daily key
-      const salt = parseSalt(keyData.masterKeySalt)
-      const wrappingKey = await deriveKeyFromPassphrase(dailyKey, salt)
-
-      // Unwrap master key
-      const masterKey = await unwrapMasterKey(
-        keyData.encryptedMasterKey,
-        wrappingKey,
-        keyData.masterKeyIV
-      )
-
-      // Store master key (sessionStorage — cleared on tab close, see crypto.ts)
-      // and close the modal. Also cleared on explicit "Lock diary" / logout.
-      await storeMasterKey(masterKey)
-      setShowUnlockModal(false)
-      setDailyKey('')
-    } catch {
-      setError('Incorrect daily key. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleForgotKey = () => {
-    setShowUnlockModal(false)
-    setShowRecoveryModal(true)
-  }
+  const showUnlockModal = useE2EEStore((s) => s.showUnlockModal)
 
   if (!showUnlockModal) return null
 
@@ -91,80 +36,7 @@ export default function UnlockModal() {
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             }}
           >
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="text-4xl mb-4">
-                  <svg className="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="none" stroke={theme.accent.primary} strokeWidth="1.5">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-light mb-2" style={{ color: theme.text.primary }}>
-                  Unlock Your Journal
-                </h2>
-                <p className="text-base" style={{ color: theme.text.secondary }}>
-                  Enter your daily key to decrypt your entries.
-                </p>
-                <p className="text-sm mt-2" style={{ color: theme.text.muted }}>
-                  This device stays unlocked until you close the tab.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm mb-2" style={{ color: theme.text.secondary }}>
-                    Daily Key
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={show ? 'text' : 'password'}
-                      value={dailyKey}
-                      onChange={(e) => setDailyKey(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && dailyKey) handleUnlock()
-                      }}
-                      placeholder="Enter your daily key..."
-                      autoFocus
-                      className="w-full p-4 rounded-xl text-base outline-none"
-                      style={{
-                        background: theme.glass.bg,
-                        border: `1px solid ${theme.glass.border}`,
-                        color: theme.text.primary,
-                        paddingRight: '2.75rem',
-                      }}
-                    />
-                    <PasswordToggle shown={show} onToggle={() => setShow((v) => !v)} color={theme.text.muted} />
-                  </div>
-                </div>
-
-                {error && (
-                  <p className="text-base text-center" style={{ color: theme.accent.warm }}>
-                    {error}
-                  </p>
-                )}
-              </div>
-
-              <button
-                onClick={handleUnlock}
-                disabled={loading || !dailyKey}
-                className="w-full py-3 rounded-xl text-base font-medium"
-                style={{
-                  background: theme.accent.primary,
-                  color: '#fff',
-                  opacity: loading || !dailyKey ? 0.5 : 1,
-                }}
-              >
-                {loading ? 'Unlocking...' : 'Unlock'}
-              </button>
-
-              <button
-                onClick={handleForgotKey}
-                className="w-full text-base"
-                style={{ color: theme.text.secondary }}
-              >
-                Forgot your daily key? Use recovery key
-              </button>
-            </div>
+            <UnlockForm />
           </motion.div>
         </>
       )}
