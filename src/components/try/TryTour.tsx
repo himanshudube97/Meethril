@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useThemeStore } from '@/store/theme'
 import DeskScene from '@/components/desk/DeskScene'
-import MobileLettersView from '@/components/letters/MobileLettersView'
+import TryLetterDemo from '@/components/try/TryLetterDemo'
 import ButterflyMemoryView from '@/components/memory/ButterflyMemoryView'
 import ShelfScene from '@/components/shelf/ShelfScene'
 
 const STEPS = [
   { key: 'write',  label: 'Write a page',     render: () => <DeskScene /> },
-  { key: 'letter', label: 'Send a letter',    render: () => <MobileLettersView /> },
+  { key: 'letter', label: 'Send a letter',    render: () => <TryLetterDemo /> },
   { key: 'memory', label: 'Revisit a memory', render: () => <ButterflyMemoryView /> },
   { key: 'shelf',  label: 'Your shelf',       render: () => <ShelfScene /> },
 ] as const
