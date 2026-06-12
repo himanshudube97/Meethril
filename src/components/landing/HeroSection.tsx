@@ -78,17 +78,31 @@ export default function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <Link
-            href="/write"
-            className="inline-block px-10 py-4 rounded-full text-lg font-medium transition"
-            style={{
-              background: theme.accent.primary,
-              color: theme.bg.primary,
-              fontFamily: 'Georgia, serif',
-            }}
-          >
-            Begin writing
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/write"
+              className="inline-block px-10 py-4 rounded-full text-lg font-medium transition"
+              style={{
+                background: theme.accent.primary,
+                color: theme.bg.primary,
+                fontFamily: 'Georgia, serif',
+              }}
+            >
+              Begin writing
+            </Link>
+            <Link
+              href="/try"
+              className="inline-block px-10 py-4 rounded-full text-lg font-medium transition hover:opacity-80"
+              style={{
+                background: 'transparent',
+                color: theme.text.primary,
+                border: `1px solid ${theme.glass.border}`,
+                fontFamily: 'Georgia, serif',
+              }}
+            >
+              Get the feel
+            </Link>
+          </div>
         </motion.div>
       </div>
     </section>
