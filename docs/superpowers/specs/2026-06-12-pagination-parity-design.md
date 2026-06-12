@@ -43,7 +43,7 @@ left→right cut," **not** N-page reflow.
 | Drift guard | **Shared config + parity test.** Both the on-screen textarea AND the offscreen measurer read ONE `page-geometry.ts` config (font, size, line-height, writing-area width, padding), so geometry can't drift. PLUS a parity test feeding sample texts through the engine and asserting the break matches desktop's reference. (This overrides the project's usual skip-tests default — it's the one place a test directly guards the regression this feature fixes.) |
 | Mobile display | **One scroll + overlay divider.** Phone keeps ONE continuous textarea; an absolutely-positioned divider line ("┈┈ page 2 ┈┈") is drawn on top at the break's y-position. Text flows normally, caret moves freely, divider is informational and moves live. |
 | Recompute timing | **Live, debounced.** Break recomputes as the user types (debounced), like desktop pushing overflow in real time. |
-| Song dependency | Engine takes **`hasSong`**: a song reserves 80px on the left page → fewer lines → break moves up. Photos/doodle only shrink the *right* page, which always has room under the 1200 cap, so they don't affect the left break. |
+| Song dependency | **None** (corrected during planning). The left page's song section is a fixed-height container (~68px) that is *always reserved* whether or not a song is attached, so the writing capacity — and thus the break — is constant. Engine takes no `hasSong`. Photos/doodle only affect the right page (always has room under the 1200 cap). |
 
 ## Architecture
 
