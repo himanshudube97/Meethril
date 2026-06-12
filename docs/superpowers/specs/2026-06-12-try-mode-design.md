@@ -11,13 +11,12 @@ know if they like the product. Try Mode lets anyone *write and feel the magic*
 with zero friction — no account, no key, no server. It is a taste, not real
 data. Conversion happens once they're hooked.
 
-This is **one of three related features.** Build order (revised after design
-grilling): **(b) mobile↔desktop pagination-parity engine FIRST**, then **(c)
-this Try Mode**, then **(a) general mobile polish + desktop-gate decision**. Try
-Mode depends on (b): on phone, "Begin writing" must show the real two-page book,
-which only exists once the pagination-parity engine ships. Building (c) before
-(b) would showcase the *least* magical phone editor. So this spec is approved but
-**parked behind feature (b)**.
+This is **one of three related features.** Build order (revised 2026-06-12, after
+the audit): **(c) this Try Mode FIRST (standalone)**, then **(a) mobile polish**,
+with **(b) pagination parity** layering in whenever. Try Mode is **not** blocked
+by (b): it reuses the existing mobile editor as-is; once (b) ships, its page-break
+divider appears inside the trial automatically (same components). `/try` is its
+own public route, so it also sidesteps the desktop gate — fully self-contained.
 
 ## Decisions (locked)
 
@@ -29,8 +28,8 @@ which only exists once the pagination-parity engine ships. Building (c) before
 | Entry limit | **5 entries → soft wall + CTA.** Gentle overlay ("keep your diary forever") + sign-up CTA. Existing entries stay readable. |
 | 1-entry-per-day | **Each trial entry is dated to a different day** (today, yesterday, …). 5 entries = 5 days, so the real "1 entry per calendar day" rule is respected (no contradiction the user has to unlearn), and the user's own writing naturally fills memory/shelf with multi-day history. |
 | Migration on signup | **Discard — fresh start.** Local trial data stays local/ephemeral. After signup the user starts clean (with real E2EE). |
-| Reuse architecture | **Approach C — try-mode flag + local adapter, reuse the real scenes.** Data hooks get one `isTryMode` branch — **except `useE2EE.ts`, which is NEVER modified** (see Crypto isolation below). Scenes render unchanged. |
-| Crypto isolation | **Hard isolation.** Trial's no-op (identity) crypto lives in a separate `useTrialCrypto`. `useE2EE.ts` is never touched. Scenes read crypto via a source-selector that returns trial-crypto only under `/try`. The real encryption path *physically cannot* run a plaintext-to-server leak. |
+| Reuse architecture | **REVISED during planning → fetch interceptor.** Planning found the scenes fetch `/api/*` **inline** (BookSpread, letters views, `useMemories`, autosave), not through a single hook layer — so branching hooks can't intercept them. Instead, under `/try` a `TryModeProvider` installs a **`window.fetch` interceptor** that answers all `/api/*` from the local store (+ IndexedDB for photo bytes); external calls (iTunes) pass through. Scenes render **completely unchanged**. See the plan `docs/superpowers/plans/2026-06-12-try-mode.md`. |
+| Crypto handling | **REVISED → throwaway in-tab key, anonymous-only.** Rather than a `useCryptoSource` selector editing ~6 scenes, `/try` is **anonymous-only** (a logged-in session in the tab is redirected to `/me`), so there is no real key to protect. A throwaway in-tab AES key flips the global E2EE store to "unlocked" so `useE2EE().isE2EEReady` is true and scenes round-trip unchanged; trial entries carry `e2eeIVs:null` (decryptor passes plaintext through). `useE2EE.ts` and the scenes are untouched. The seatbelt redirect (not auth) is what guarantees the throwaway key never reaches real data. This supersedes the earlier "hard isolation / useTrialCrypto" decision, which assumed hook-level interception. |
 | Demo seed | **Pre-written demo entries** (a few beautiful past-dated entries) so memory constellation + shelf look alive in the tour even before the user writes much. The user's own dated entries (see 1/day above) add to them. |
 | Entry buttons | Two buttons on `/try`, identical on desktop + phone: **"Begin writing"** = drop straight into the diary write scene (free play, 5-entry limit). **"Get the feel"** = guided linear tour through the screens (write → letter → postbox → memory → shelf) with next-buttons. No persistent tab nav — the tour IS how you reach the other screens. |
 | Mobile model (shared across all 3 features) | **Bridge** — keep the separate mobile components, share the pagination engine with desktop. Try Mode reuses this split for free: `BookSpread` on desktop, mobile components on phone, both wired to the local adapter. |
