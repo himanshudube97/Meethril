@@ -30,8 +30,7 @@ interface TrialState {
   atWall: () => boolean
 }
 
-let seq = 0
-const nextId = () => `trial-${seq++}`
+const nextId = () => `trial-${crypto.randomUUID()}`
 
 export const useTrialStore = create<TrialState>()(
   persist(
@@ -42,7 +41,6 @@ export const useTrialStore = create<TrialState>()(
       entryCount: 0,
 
       reset: (now = new Date()) => {
-        seq = 0
         set({ version: 1, entries: buildSeedEntries(now), letters: [], entryCount: 0 })
       },
 
@@ -54,9 +52,13 @@ export const useTrialStore = create<TrialState>()(
 
       createEntry: (draft) => {
         const id = nextId()
-        const d = new Date(get().newestDate())
-        d.setDate(d.getDate() - 1)
-        const createdAt = d.toISOString()
+        const usedDays = new Set(get().entries.map(e => e.createdAt.slice(0, 10)))
+        const candidate = new Date()
+        candidate.setHours(12, 0, 0, 0)
+        while (usedDays.has(candidate.toISOString().slice(0, 10))) {
+          candidate.setDate(candidate.getDate() - 1)
+        }
+        const createdAt = candidate.toISOString()
         const entry: JournalEntry = {
           id,
           text: draft.text,
@@ -81,6 +83,7 @@ export const useTrialStore = create<TrialState>()(
               ? {
                   ...e,
                   text: draft.text,
+                  textPreview: draft.text.replace(/<[^>]*>/g, '').slice(0, 80),
                   song: draft.song ?? undefined,
                   photos: draft.photos ?? e.photos,
                   doodles: draft.doodles ?? e.doodles,
@@ -118,6 +121,7 @@ export const useTrialStore = create<TrialState>()(
     {
       name: 'meethril-trial',
       storage: createJSONStorage(() =>
+        // 'use client' store — sessionStorage is always present at runtime; this fallback only satisfies SSR typing.
         typeof sessionStorage !== 'undefined' ? sessionStorage : (undefined as unknown as Storage)
       ),
       partialize: (s) => ({

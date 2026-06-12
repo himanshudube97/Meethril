@@ -8,11 +8,11 @@ describe('trial store', () => {
     expect(useTrialStore.getState().entries.length).toBeGreaterThanOrEqual(3)
     expect(useTrialStore.getState().entryCount).toBe(0)
   })
-  it('createEntry adds a user entry dated before the newest existing entry', () => {
-    const before = useTrialStore.getState().newestDate()
+  it('createEntry adds a user entry on a calendar day not already used by any existing entry', () => {
+    const existingDays = new Set(useTrialStore.getState().entries.map(e => e.createdAt.slice(0, 10)))
     const id = useTrialStore.getState().createEntry({ text: '<p>hi</p>', song: null })
     const created = useTrialStore.getState().entries.find(e => e.id === id)!
-    expect(new Date(created.createdAt).getTime()).toBeLessThan(new Date(before).getTime())
+    expect(existingDays.has(created.createdAt.slice(0, 10))).toBe(false)
     expect(useTrialStore.getState().entryCount).toBe(1)
   })
   it('updateEntry edits text in place', () => {
@@ -24,5 +24,15 @@ describe('trial store', () => {
     for (let i = 0; i < 5; i++) useTrialStore.getState().createEntry({ text: `<p>${i}</p>`, song: null })
     expect(useTrialStore.getState().entryCount).toBe(5)
     expect(useTrialStore.getState().atWall()).toBe(true)
+  })
+  it('dates successive user entries on distinct calendar days', () => {
+    const ids = [0, 1, 2, 3].map(i => useTrialStore.getState().createEntry({ text: `<p>${i}</p>`, song: null }))
+    const days = ids.map(id => useTrialStore.getState().entries.find(e => e.id === id)!.createdAt.slice(0, 10))
+    expect(new Set(days).size).toBe(4) // all distinct days
+  })
+  it('keeps ids unique', () => {
+    const a = useTrialStore.getState().createEntry({ text: '<p>a</p>', song: null })
+    const b = useTrialStore.getState().createEntry({ text: '<p>b</p>', song: null })
+    expect(a).not.toBe(b)
   })
 })
