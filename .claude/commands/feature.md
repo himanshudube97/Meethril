@@ -19,6 +19,7 @@ Build the feature described in `$ARGUMENTS` end-to-end, with full context and no
 - For changes to **encryption, entry-lock, billing/quota, or any pure data-rule logic**: write the Vitest test FIRST (see `src/__tests__/` for the house style), then implement. UI is exempt from tests (manual verify instead).
 - Respect the invariants as you go. If you touch one editor, touch the other.
 - Schema change? Use the `/migrate` command (additive-only).
+- **Building UI?** Invoke the **frontend-design** skill while writing components — it pushes toward Hearth's calm, literary, theme-driven aesthetic and away from generic default-AI layouts. Style against `useThemeStore`, never hardcoded colours.
 
 ## 4. Gate (no-regression — must pass before "done")
 Run in the **Docker container** (the host node_modules is partial — stale Prisma client, missing deps — so host runs give false failures). In order, and FIX before proceeding — never report success on a red gate:
@@ -30,8 +31,16 @@ The Stop hook runs both automatically in Docker when you finish (and skips clean
 ## 5. Hearth review
 - Dispatch the **hearth-reviewer** agent on the diff. Resolve every 🔴/🟠 finding (or justify explicitly why it's a non-issue).
 
-## 6. Manual verify
-- Bring the app up (`/restart`), log in with the `.dev-creds.local` test account (unlock with `DEV_TEST_E2EE_DAILY_KEY` so entries decrypt), and confirm the feature works on the **active theme** — and at least one contrasting theme (e.g. rivendell dark + rose light) so theme bugs surface.
+## 6. Visual gate (only if the feature has UI — skip for pure backend/logic)
+Don't ship UI you never looked at. Render it, screenshot it, judge it, fix it — before claiming done.
+
+1. Bring the app up (`/restart`). App serves at **http://localhost:3112**.
+2. Log in via Playwright MCP with the `.dev-creds.local` account (`DEV_TEST_EMAIL` / `DEV_TEST_PASSWORD`), and unlock E2EE with `DEV_TEST_E2EE_DAILY_KEY` so real content decrypts (not `[Encrypted — unlock to view]`). Read `.dev-creds.local` for the live values.
+3. Navigate to the new/changed route. Screenshot it on **two contrasting themes** — one dark (`rivendell`) + one light (`rose`) — switching theme via the gear/theme picker between shots. If the feature touches the journal spread, capture **both desktop and a mobile viewport** (`browser_resize` to ~390px), since the two editors are separate. Save the PNGs (e.g. under `/tmp/`).
+4. **Look at your own screenshots** (Read them) against the **frontend-design** skill's bar. Fix spacing/hierarchy/contrast/theme issues yourself, re-shoot, iterate until it actually looks intentional — not default-AI.
+5. Dispatch the **design-reviewer** agent on the saved screenshots (pass the paths + route + what changed). Resolve every 🔴/🟠 finding, re-shoot to confirm. Re-run the correctness gate (step 4) if any fix touched logic.
+
+The goal: the iteration happens here, inside the turn, so the human sees a finished screen — not a first draft.
 
 ## 7. Finish
 - Commit (Co-Authored-By trailer). If this closes a GitHub issue, post the ✅ summary comment (change + files + commit SHA + caveats) per the project convention; leave the issue open unless told to close.

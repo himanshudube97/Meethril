@@ -47,10 +47,20 @@ export const viewport: Viewport = {
   ],
 };
 
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://meethril.com"
+).replace(/\/+$/, "");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Meethril — a hush at the end of the day, kept just for you",
-  description: "Write freely, and over time, it gently shows you who you are.",
+  description:
+    "Meethril is a quiet, end-to-end encrypted journaling web app. Write freely each evening, seal letters to your future self, keep scrapbooks — no streaks, no AI. Over time it gently shows you who you are.",
+  applicationName: "Meethril",
   manifest: "/manifest.json",
+  alternates: {
+    canonical: SITE_URL,
+  },
 
   appleWebApp: {
     capable: true,
@@ -69,10 +79,22 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "Meethril",
-    description: "A hush at the end of the day, kept just for you.",
+    title: "Meethril — a quieter place to think",
+    description:
+      "A quiet, end-to-end encrypted journaling app. Sealed letters to your future self, scrapbooks, and a gentle space to reflect — no streaks, no AI.",
+    url: SITE_URL,
     siteName: "Meethril",
     type: "website",
+    locale: "en_US",
+    // images: omitted — opengraph-image.tsx auto-populates og:image.
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Meethril — a quieter place to think",
+    description:
+      "A quiet, end-to-end encrypted journaling app. Sealed letters, scrapbooks, no streaks, no AI.",
+    // images: omitted — twitter-image.tsx auto-populates twitter:image.
   },
 };
 
