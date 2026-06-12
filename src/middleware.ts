@@ -14,13 +14,14 @@ const PUBLIC_PATHS = [
   '/api/letter',
   '/api/download',
   '/letter',
+  '/try',
 ]
 const PUBLIC_EXACT_PATHS = ['/', '/pricing', '/forgot', '/reset', '/verify', '/download', '/privacy', '/terms']
 
 // Must stay in sync with E2EE_ONBOARDED_COOKIE in src/lib/auth/e2ee-cookie.ts.
 // Kept local here so middleware stays safe on the edge runtime.
 const E2EE_ONBOARDED_COOKIE = 'meethril-e2ee-onboarded'
-const STATIC_PATHS = ['/_next', '/favicon.ico', '/images', '/icons', '/manifest.json', '/sw.js', '/workbox']
+const STATIC_PATHS = ['/_next', '/favicon.ico', '/images', '/icons', '/manifest.json', '/sw.js', '/workbox', '/robots.txt', '/sitemap.xml', '/opengraph-image', '/twitter-image', '/apple-touch-icon']
 
 const isDevAuth = process.env.USE_DEV_AUTH === 'true'
 const DEV_JWT_SECRET = process.env.DEV_JWT_SECRET || 'dev-secret-key-for-local-development-only-min-32-chars'
