@@ -69,7 +69,9 @@ export default function LayoutContent({
   // /onboarding is a forced flow: themed Background, no Navigation, no
   // padded main wrapper — the page lays itself out full-bleed so it feels
   // like a moment, not another tab.
-  const isOnboardingPage = pathname.startsWith('/onboarding')
+  // /try routes share the same full-bleed treatment — no nav/gear/avatar,
+  // just the themed Background + ambience so the sandbox feels immersive.
+  const isOnboardingPage = pathname.startsWith('/onboarding') || pathname.startsWith('/try')
   // /letter/[token] is the public friend-letter recipient flow. It's a
   // cinematic full-bleed scene and must NOT inherit the nav bar or the
   // pt-20 main padding — both would push the letter scene down and break
