@@ -7,6 +7,7 @@ import { isEmailVerified } from '@/lib/auth/email-verified'
 const PUBLIC_PATHS = [
   '/login',
   '/onboarding',
+  '/try',
   '/api/auth',
   '/api/cron',
   '/api/me/desktop-pending',
