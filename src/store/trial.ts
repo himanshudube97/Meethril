@@ -23,8 +23,8 @@ interface TrialState {
   entryCount: number
   reset: (now?: Date) => void
   newestDate: () => string
-  createEntry: (draft: { text: string; song: string | null; photos?: JournalEntry['photos']; doodles?: JournalEntry['doodles'] }) => string
-  updateEntry: (id: string, draft: { text: string; song: string | null; photos?: JournalEntry['photos']; doodles?: JournalEntry['doodles'] }) => void
+  createEntry: (draft: { text: string; song: string | null; photos?: JournalEntry['photos']; doodles?: JournalEntry['doodles']; e2eeIVs?: Record<string, string> | null; textPreview?: string }) => string
+  updateEntry: (id: string, draft: { text: string; song: string | null; photos?: JournalEntry['photos']; doodles?: JournalEntry['doodles']; e2eeIVs?: Record<string, string> | null; textPreview?: string }) => void
   createLetter: (l: { text: string; recipientName: string | null }) => string
   revealLetter: (id: string) => void
   atWall: () => boolean
@@ -59,10 +59,15 @@ export const useTrialStore = create<TrialState>()(
           candidate.setDate(candidate.getDate() - 1)
         }
         const createdAt = candidate.toISOString()
+        // When e2eeIVs is present the text is ciphertext; don't store a ciphertext
+        // preview — consumers re-derive from the decrypted text.
+        const textPreview = draft.e2eeIVs
+          ? undefined
+          : draft.textPreview ?? draft.text.replace(/<[^>]*>/g, '').slice(0, 80)
         const entry: JournalEntry = {
           id,
           text: draft.text,
-          textPreview: draft.text.replace(/<[^>]*>/g, '').slice(0, 80),
+          textPreview,
           createdAt,
           updatedAt: createdAt,
           song: draft.song ?? undefined,
@@ -70,7 +75,7 @@ export const useTrialStore = create<TrialState>()(
           doodles: draft.doodles ?? [],
           photos: draft.photos ?? [],
           entryType: 'normal',
-          e2eeIVs: null,
+          e2eeIVs: draft.e2eeIVs ?? null,
         }
         set(s => ({ entries: [entry, ...s.entries], entryCount: s.entryCount + 1 }))
         return id
@@ -83,11 +88,15 @@ export const useTrialStore = create<TrialState>()(
               ? {
                   ...e,
                   text: draft.text,
-                  textPreview: draft.text.replace(/<[^>]*>/g, '').slice(0, 80),
+                  // When e2eeIVs is present the text is ciphertext; don't derive preview from it.
+                  textPreview: draft.e2eeIVs
+                    ? undefined
+                    : draft.textPreview ?? draft.text.replace(/<[^>]*>/g, '').slice(0, 80),
                   song: draft.song ?? undefined,
                   photos: draft.photos ?? e.photos,
                   doodles: draft.doodles ?? e.doodles,
                   updatedAt: new Date().toISOString(),
+                  e2eeIVs: draft.e2eeIVs ?? e.e2eeIVs,
                 }
               : e
           ),

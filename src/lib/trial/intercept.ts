@@ -59,8 +59,8 @@ export function installTrialFetch(): () => void {
     // Apply mutations to the store and patch the response id.
     if (base === '/api/entries' && method === 'POST') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any }
-      const id = store.createEntry({ text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles })
+      const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any; e2eeIVs?: any; textPreview?: string }
+      const id = store.createEntry({ text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles, e2eeIVs: d.e2eeIVs ?? null, textPreview: d.textPreview })
       // Re-read after mutation — captured `store` snapshot is stale post-createEntry.
       const createdAt = useTrialStore.getState().entries.find(e => e.id === id)?.createdAt
       return json(201, { id, createdAt })
@@ -68,8 +68,8 @@ export function installTrialFetch(): () => void {
     if (base.startsWith('/api/entries/') && method === 'PUT') {
       const id = base.slice('/api/entries/'.length)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any }
-      store.updateEntry(id, { text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles })
+      const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any; e2eeIVs?: any; textPreview?: string }
+      store.updateEntry(id, { text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles, e2eeIVs: d.e2eeIVs ?? null, textPreview: d.textPreview })
       return json(200, { id })
     }
 

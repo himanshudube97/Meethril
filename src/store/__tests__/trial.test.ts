@@ -35,4 +35,11 @@ describe('trial store', () => {
     const b = useTrialStore.getState().createEntry({ text: '<p>b</p>', song: null })
     expect(a).not.toBe(b)
   })
+  it('preserves e2eeIVs and ciphertext text for encrypted entries', () => {
+    const id = useTrialStore.getState().createEntry({ text: 'CIPHERTEXT', song: null, e2eeIVs: { text: 'iv123' } })
+    const e = useTrialStore.getState().entries.find(x => x.id === id)!
+    expect(e.text).toBe('CIPHERTEXT')
+    expect(e.e2eeIVs).toEqual({ text: 'iv123' })
+    expect(e.textPreview).toBeUndefined()
+  })
 })
