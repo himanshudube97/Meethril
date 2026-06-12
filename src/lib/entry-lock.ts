@@ -23,7 +23,15 @@ export function utcInstantForLocalDate(
   day: number,
   tz: string = 'UTC',
 ): Date {
-  let guess = Date.UTC(year, month0, day, 0, 0, 0, 0)
+  // `target` is the wall-clock midnight reinterpreted as UTC; it stays fixed.
+  // We want the instant T whose wall clock in `tz` equals `target`, i.e.
+  // T = target - offset(T). Iterate: recompute the offset at the latest guess
+  // and re-derive T from the FIXED target each pass (NOT from the running
+  // guess — subtracting from the guess double-applies the offset and overshoots
+  // for every non-UTC tz). Two passes cover a DST transition straddling the
+  // boundary; it converges in one for a constant offset.
+  const target = Date.UTC(year, month0, day, 0, 0, 0, 0)
+  let guess = target
   for (let i = 0; i < 2; i++) {
     let parts: Record<string, string>
     try {
@@ -54,8 +62,9 @@ export function utcInstantForLocalDate(
       parseInt(parts.second),
     )
     const offsetMs = localAsUTC - guess
-    if (offsetMs === 0) break
-    guess = guess - offsetMs
+    const next = target - offsetMs
+    if (next === guess) break
+    guess = next
   }
   return new Date(guess)
 }

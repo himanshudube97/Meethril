@@ -22,17 +22,8 @@
       "WebSearch",
       "mcp__ide__getDiagnostics",
       "mcp__plugin_context7_context7__resolve-library-id",
-      "mcp__plugin_context7_context7__query-docs",
-      "mcp__serena__get_symbols_overview",
-      "mcp__serena__find_symbol",
-      "mcp__serena__find_referencing_symbols",
-      "mcp__serena__find_declaration",
-      "mcp__serena__find_implementations",
-      "mcp__serena__list_memories",
-      "mcp__serena__read_memory",
-      "mcp__serena__get_current_config",
-      "mcp__serena__get_diagnostics_for_file",
-      "mcp__serena__activate_project"
+      "mcp__plugin_context7_context7__query-docs"
+
     ]
   },
   "hooks": {
@@ -44,6 +35,17 @@
             "type": "command",
             "statusMessage": "Linting changed file...",
             "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in */feel_good/hearth/*) case \"$f\" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs) cd /Users/himanshut4d/Documents/Personal_projects/feel_good/hearth && out=$(./node_modules/.bin/eslint \"$f\" 2>&1) || { echo \"ESLint errors:\" >&2; echo \"$out\" >&2; exit 2; } ;; esac ;; esac"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Running regression gate (vitest + typecheck)...",
+            "command": ".claude/hooks/stop-check.sh"
           }
         ]
       }

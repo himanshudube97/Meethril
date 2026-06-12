@@ -55,6 +55,43 @@ npm run build    # Production build
 npm run lint     # ESLint check
 ```
 
+## Development Workflow & Quality Gates
+
+Goal: build features end-to-end with full context and no regressions. The
+`/feature <description>` command drives the whole loop; the short version:
+
+1. **Context first** — read CLAUDE.md + relevant `docs/` (always
+   `docs/encryption-strategy.md` for journal/letter/scrapbook/photo/doodle/profile
+   work). Use the `feature-dev:code-explorer` agent to map the area before coding.
+2. **Brainstorm → spec → plan** via the superpowers skills (`brainstorming`,
+   `writing-plans`). Don't skip the design step, even for "small" changes.
+3. **Implement test-first on critical paths.** Encryption, entry-lock,
+   billing/quota, and other pure data-rule logic get a Vitest test **before** the
+   implementation. UI is exempt (manual verify instead). House style lives in
+   `src/__tests__/`.
+4. **Run the gates before claiming done** (always in Docker — host node_modules is
+   partial and gives false failures):
+   - `docker compose exec app npx vitest run`
+   - `docker compose exec app npx tsc --noEmit` (`/typecheck`)
+   A **Stop hook** (`.claude/hooks/stop-check.sh`) runs both automatically when a
+   turn ends and TS changed; it blocks on failure and skips cleanly if the
+   container is down. **Lint is NOT a gate** — the repo carries a large
+   pre-existing `npm run lint` backlog (~130 errors); only fix lint on lines you
+   touch. (A per-file ESLint PostToolUse hook still runs on edits.)
+5. **Hearth review** — dispatch the `hearth-reviewer` agent on the diff. It
+   encodes this repo's regression traps (dual-editor parity, E2EE tiers,
+   entry-lock append-only, theme-awareness, photo adapter, additive migrations).
+   Resolve every 🔴/🟠 finding.
+6. **Manual verify** on the running app with the `.dev-creds.local` test account,
+   on the active theme + one contrasting theme.
+
+### Testing
+Vitest is the test runner (`npm test` / `test:watch` / `test:ui`); config in
+`vitest.config.ts`, setup in `src/test-setup.ts`. Critical-path logic is tested
+(`encryption`, `entry-lock`, `billing/limits`, `billing/quota` windows); UI is
+verified manually, not unit-tested. Tests run **in the container** because the
+host's generated Prisma client is stale/partial.
+
 ## Architecture Overview
 
 ### Tech Stack

@@ -9,6 +9,7 @@ vi.mock('@/lib/db', () => ({
     pushSubscription: {
       upsert: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }))
@@ -95,11 +96,11 @@ describe('DELETE /api/push/subscribe', () => {
     expect(res.status).toBe(401)
   })
 
-  it('deletes by endpoint and returns 200', async () => {
+  it('deletes by endpoint scoped to the user and returns 200', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({
       id: 'u1', email: 'a@b.c', name: null, avatar: null, provider: 'dev',
     })
-    vi.mocked(prisma.pushSubscription.delete).mockResolvedValue({} as any)
+    vi.mocked(prisma.pushSubscription.deleteMany).mockResolvedValue({ count: 1 } as any)
     const req = new Request('http://localhost/api/push/subscribe', {
       method: 'DELETE',
       body: JSON.stringify({ endpoint: 'https://fcm.example/abc' }),
@@ -107,8 +108,9 @@ describe('DELETE /api/push/subscribe', () => {
     })
     const res = await DELETE(req)
     expect(res.status).toBe(200)
-    expect(prisma.pushSubscription.delete).toHaveBeenCalledWith({
-      where: { endpoint: 'https://fcm.example/abc' },
+    // Deletion is scoped by userId so one user can't unsubscribe another.
+    expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { endpoint: 'https://fcm.example/abc', userId: 'u1' },
     })
   })
 })

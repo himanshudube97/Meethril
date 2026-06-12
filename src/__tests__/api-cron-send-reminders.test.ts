@@ -10,9 +10,11 @@ vi.mock('@/lib/db', () => ({
     },
     journalEntry: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }))
@@ -47,6 +49,10 @@ beforeEach(() => {
   }
   // Default: nothing to auto-pause unless a test overrides
   vi.mocked(prisma.pushSubscription.updateMany).mockResolvedValue({ count: 0 } as any)
+  // The route batch-fetches users + latest entries; default to empty so tests
+  // that don't care about them don't crash on `.map` of undefined.
+  vi.mocked(prisma.user.findMany).mockResolvedValue([] as any)
+  vi.mocked(prisma.journalEntry.findMany).mockResolvedValue([] as any)
 })
 
 function makeReq() {
@@ -72,7 +78,7 @@ describe('GET /api/cron/send-reminders', () => {
         consecutiveIgnored: 0, pausedAt: null,
       },
     ] as any)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1', profile: {} } as any)
+    vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1', profile: {} }] as any)
     const res = await GET(makeReq())
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -91,8 +97,11 @@ describe('GET /api/cron/send-reminders', () => {
         consecutiveIgnored: 0, pausedAt: null,
       },
     ] as any)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1', profile: { reminderTime: '20:00' } } as any)
-    vi.mocked(prisma.journalEntry.findFirst).mockResolvedValue({ id: 'e1' } as any)
+    vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1', profile: { reminderTime: '20:00' } }] as any)
+    // Latest entry is earlier today (>= start of local day) → already journaled.
+    vi.mocked(prisma.journalEntry.findMany).mockResolvedValue([
+      { userId: 'u1', createdAt: new Date('2026-05-03T08:00:00Z') },
+    ] as any)
     const res = await GET(makeReq())
     const body = await res.json()
     expect(body.fired).toBe(0)
@@ -110,8 +119,8 @@ describe('GET /api/cron/send-reminders', () => {
         consecutiveIgnored: 0, pausedAt: null,
       },
     ] as any)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1', profile: { reminderTime: '20:00' } } as any)
-    vi.mocked(prisma.journalEntry.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1', profile: { reminderTime: '20:00' } }] as any)
+    vi.mocked(prisma.journalEntry.findMany).mockResolvedValue([] as any)
     const res = await GET(makeReq())
     const body = await res.json()
     expect(body.fired).toBe(1)
