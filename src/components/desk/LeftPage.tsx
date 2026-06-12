@@ -118,6 +118,11 @@ interface LeftPageProps {
   isNewEntry: boolean
   onPageFull?: (overflowText: string, cursorStaysOnLeft: boolean) => void
   onNavigateRight?: (targetLeft?: number) => void
+  // Read-only override for the existing-entry view: explicit left-page plain
+  // text computed by measurement upstream (shelf reader). When provided it
+  // replaces the htmlToSplitPlainText boundary so the page can't clip. Ignored
+  // in the new-entry (editor) branch.
+  viewLeftOverride?: string
 }
 
 export interface LeftPageHandle {
@@ -131,6 +136,7 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
   isNewEntry,
   onPageFull,
   onNavigateRight,
+  viewLeftOverride,
 }: LeftPageProps, ref) {
   const { theme } = useThemeStore()
   const colors = getGlassDiaryColors(theme)
@@ -445,7 +451,10 @@ const LeftPage = memo(forwardRef<LeftPageHandle, LeftPageProps>(function LeftPag
   // Viewing existing entry — uses the persisted page-break marker when
   // present so the boundary matches what the user saw while typing.
   const [leftPlainText] = htmlToSplitPlainText(entry?.text || '')
-  const plainText = leftPlainText
+  // Prefer the measured split from the shelf reader (guarantees the left page
+  // fits the entry's real font); fall back to the stored marker/heuristic
+  // boundary on /write and anywhere the override isn't supplied.
+  const plainText = viewLeftOverride !== undefined ? viewLeftOverride : leftPlainText
 
   return (
     <motion.div

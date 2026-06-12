@@ -14,6 +14,9 @@ import { JournalEntry } from '@/store/journal'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
 import { monthLabel, toRoman } from './shelfPalette'
 import ShelfMobileBook from './ShelfMobileBook'
+import { htmlToPlainText } from '@/lib/text-utils'
+import { measureSplit } from '@/lib/measure-split'
+import { parseStyle, resolveFontFamily, resolveFontSize } from '@/lib/entry-style'
 
 const HTMLFlipBook = dynamic(() => import('react-pageflip'), { ssr: false })
 
@@ -139,6 +142,42 @@ export default function ShelfBookSpread({
   // — a loading hint takes the book frame's place.
   const days = useMemo(() => groupByDay(entries ?? []), [entries])
   const totalSpreads = days.length || 1
+
+  // Measured left/right split per entry. The stored page-break boundary is
+  // unreliable for mobile-written / legacy entries (no marker → font-blind
+  // heuristic), which overflowed the fixed left page and clipped the bottom
+  // lines (issue #59). Here we measure the real rendered height with the
+  // entry's own font so the left page always fits and the true remainder flows
+  // to the right page. Keyed by entry id; recomputed when the month's entries
+  // change.
+  const splitByEntry = useMemo(() => {
+    const map = new Map<string, [string, string]>()
+    const CONTENT_H = PAGE_HEIGHT - 40 // page minus 20px top + 20px bottom padding
+    const LABEL_H = 18 // "Write your thoughts" label + margin
+    const SAFETY = 16 // half a line of slack so we under-fill rather than clip
+    const WIDTH = PAGE_WIDTH - 70 // left page minus 50px gutter + 20px outer padding
+    for (const day of days) {
+      const entry = day[0]
+      if (!entry) continue
+      // Song section is taller when absent (the 150px vinyl placeholder) than
+      // when a song is embedded (~76px) — account for it so no-song entries
+      // don't overflow.
+      const songH = entry.song ? 76 : 158
+      const heightPx = Math.max(0, CONTENT_H - songH - LABEL_H - SAFETY)
+      const style = parseStyle(entry.style ?? null)
+      map.set(
+        entry.id,
+        measureSplit(htmlToPlainText(entry.text || ''), {
+          widthPx: WIDTH,
+          heightPx,
+          fontFamily: resolveFontFamily(style.font),
+          fontSize: resolveFontSize(style.font, 21),
+          lineHeight: 32,
+        }),
+      )
+    }
+    return map
+  }, [days])
   const isLoading = entries === null
   const isEmpty = entries !== null && entries.length === 0
 
@@ -359,6 +398,7 @@ export default function ShelfBookSpread({
           >
             {days.flatMap((day) => {
               const entry = day[0]
+              const split = splitByEntry.get(entry.id)
               // Narrow JournalEntry to the local Entry shapes that LeftPage and
               // RightPage expect (song must be string|null, not string|undefined;
               // photo position must be 1|2, not number; doodles only need strokes).
@@ -383,13 +423,14 @@ export default function ShelfBookSpread({
               }
               return [
                 <PageWrapper key={`${entry.id}-L`} side="left">
-                  <LeftPage entry={entryForLeft} isNewEntry={false} />
+                  <LeftPage entry={entryForLeft} isNewEntry={false} viewLeftOverride={split?.[0]} />
                 </PageWrapper>,
                 <PageWrapper key={`${entry.id}-R`} side="right">
                   <RightPage
                     entry={entryForRight}
                     isNewEntry={false}
                     photos={narrowedPhotos}
+                    viewRightOverride={split?.[1]}
                   />
                 </PageWrapper>,
               ]

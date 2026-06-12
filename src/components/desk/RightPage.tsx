@@ -63,6 +63,10 @@ interface RightPageProps {
   onPhotoRemove?: (position: 1 | 2) => void
   onNavigateLeft?: (targetLeft?: number) => void
   onBackspaceAcrossSpine?: () => void
+  // Read-only override for the existing-entry view: explicit right-page plain
+  // text (the measured remainder) from the shelf reader. Replaces the
+  // htmlToSplitPlainText boundary. Ignored in the new-entry (editor) branch.
+  viewRightOverride?: string
 }
 
 export interface RightPageHandle {
@@ -134,6 +138,7 @@ const RightPage = memo(forwardRef<RightPageHandle, RightPageProps>(function Righ
   onPhotoRemove,
   onNavigateLeft,
   onBackspaceAcrossSpine,
+  viewRightOverride,
 }: RightPageProps, ref) {
   const { theme } = useThemeStore()
   const colors = getGlassDiaryColors(theme)
@@ -416,7 +421,9 @@ const RightPage = memo(forwardRef<RightPageHandle, RightPageProps>(function Righ
   // Viewing existing entry — uses the persisted page-break marker when
   // present so the boundary matches what the user saw while typing.
   const [, rightPlainText] = htmlToSplitPlainText(entry?.text || '')
-  const plainText = rightPlainText
+  // Prefer the measured remainder from the shelf reader; fall back to the
+  // stored marker/heuristic boundary elsewhere.
+  const plainText = viewRightOverride !== undefined ? viewRightOverride : rightPlainText
 
   const entryPhotos = entry?.photos || []
   const entryDoodle = entry?.doodles?.[0]
