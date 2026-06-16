@@ -8,13 +8,13 @@ import { useTrialStore } from '@/store/trial'
 /**
  * Gentle, persistent "make it permanent" invite shown over the trial scenes.
  * Subtle while the visitor is exploring; warms up once they've written their
- * first entry (entryCount > 0) — the moment they've felt the product. No hard
- * wall: Hearth's tone is an invitation, not a paywall. Anonymous → links to
- * /login to create a real (E2EE) account.
+ * first journal entry (journalCount > 0) — the moment they've felt the product.
+ * No hard wall: Hearth's tone is an invitation, not a paywall. Anonymous → links
+ * to /login to create a real (E2EE) account.
  */
 export default function TryInvite() {
   const { theme } = useThemeStore()
-  const written = useTrialStore(s => s.entryCount) > 0
+  const written = useTrialStore(s => s.journalCount) > 0
 
   return (
     <motion.div

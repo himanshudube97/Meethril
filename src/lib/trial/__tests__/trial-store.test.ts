@@ -74,4 +74,24 @@ describe('trial store caps', () => {
     useTrialStore.getState().promptSignup('letter')
     expect(useTrialStore.getState().signupPrompt).toBe('letter')
   })
+
+  it('updateEntry edits text in place', () => {
+    const id = useTrialStore.getState().createEntry({ text: '<p>a</p>', song: null })
+    useTrialStore.getState().updateEntry(id, { text: '<p>b</p>', song: null })
+    expect(useTrialStore.getState().entries.find(e => e.id === id)!.text).toBe('<p>b</p>')
+  })
+
+  it('dates successive entries on distinct calendar days', () => {
+    const ids = [0, 1, 2, 3].map(i => useTrialStore.getState().createEntry({ text: `<p>${i}</p>`, song: null }))
+    const days = ids.map(id => useTrialStore.getState().entries.find(e => e.id === id)!.createdAt.slice(0, 10))
+    expect(new Set(days).size).toBe(4)
+  })
+
+  it('preserves e2eeIVs + ciphertext and skips the plaintext preview for encrypted entries', () => {
+    const id = useTrialStore.getState().createEntry({ text: 'CIPHERTEXT', song: null, e2eeIVs: { text: 'iv123' } })
+    const e = useTrialStore.getState().entries.find(x => x.id === id)!
+    expect(e.text).toBe('CIPHERTEXT')
+    expect(e.e2eeIVs).toEqual({ text: 'iv123' })
+    expect(e.textPreview).toBeUndefined()
+  })
 })
