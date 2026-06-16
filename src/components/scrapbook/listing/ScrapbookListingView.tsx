@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
 import ScrapbookDesktopOnly from '../ScrapbookDesktopOnly'
 import ScrapbookTokens from './ScrapbookTokens'
@@ -32,13 +32,12 @@ import { useLimitPromptStore } from '@/store/limit-prompt'
  */
 export default function ScrapbookListingView() {
   const router = useRouter()
+  const pathname = usePathname()
+  // Same component renders at /scrapbook and /try/scrapbook; keep navigation
+  // inside whichever shell we're in so the trial doesn't escape to real routes.
+  const base = pathname.startsWith('/try') ? '/try/scrapbook' : '/scrapbook'
   const today = useMemo(() => new Date(), [])
   const layoutMode = useLayoutMode()
-
-  // Scrapbook is a desktop craft surface; on phones we show a soft
-  // "open on desktop" page instead of trying to cram the canvas onto
-  // a narrow screen. Listing route hits this just like the canvas does.
-  if (layoutMode === 'mobile') return <ScrapbookDesktopOnly />
 
   const [books, setBooks] = useState<ScrapbookSummary[] | null>(null)
   const [year, setYear] = useState(today.getFullYear())
@@ -63,6 +62,11 @@ export default function ScrapbookListingView() {
 
   const grouped = useMemo(() => groupByMonth(books ?? []), [books])
   const bounds = useMemo(() => pickerBounds(books ?? []), [books])
+
+  // Scrapbook is a desktop craft surface; on phones we show a soft "open on
+  // desktop" page. Placed after all hooks so hook order stays unconditional.
+  if (layoutMode === 'mobile') return <ScrapbookDesktopOnly />
+
   const currentBooks = grouped[year]?.[monthIdx] ?? []
   const count = currentBooks.length
 
@@ -78,7 +82,7 @@ export default function ScrapbookListingView() {
   function handleCardClick(id: string) {
     setActiveId(id)
     // Brief visual pop, then navigate.
-    setTimeout(() => router.push(`/scrapbook/${id}`), 150)
+    setTimeout(() => router.push(`${base}/${id}`), 150)
   }
 
   async function handleCreate() {
@@ -100,6 +104,10 @@ export default function ScrapbookListingView() {
         }),
       })
       if (!res.ok) {
+        // Trial per-feature cap returns 403 and surfaces its own "make it
+        // permanent" modal (TryLimitModal); don't also flash a raw error here.
+        // (Real usage limits use 429 limit_reached, handled just below.)
+        if (res.status === 403) { setCreating(false); return }
         const limit = await parseLimitError(res)
         if (limit) {
           useLimitPromptStore.getState().show(limit)
@@ -109,7 +117,7 @@ export default function ScrapbookListingView() {
         throw new Error(`HTTP ${res.status}`)
       }
       const created = await res.json()
-      router.push(`/scrapbook/${created.id}`)
+      router.push(`${base}/${created.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setCreating(false)

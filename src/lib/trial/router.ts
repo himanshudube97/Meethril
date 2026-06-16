@@ -69,7 +69,10 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
       unlockDate: l.unlockDate,
       isViewed: l.isViewed,
       encryptionType: 'e2ee',
-      e2eeIVs: l.contentIVs,
+      // Reveal decrypts via decryptEntryFromServer, which looks up ivs['text']
+      // (STRING_FIELDS). The real route synthesizes that key from contentIVs.content
+      // (see lib/letters/dual-read.ts). Mirror it or the letter reveals blank.
+      e2eeIVs: { ...l.contentIVs, text: l.contentIVs.content },
       text: l.contentCiphertext,
     }))
     return { status: 200, body: { letters } }
@@ -101,6 +104,9 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
       recipientEmail: l.recipientEmail,
       encryptionType: 'e2ee',
       e2eeIVs: l.contentIVs,
+      // useMemories reads l.text + l.e2eeIVs.content; without text the self-letter
+      // is dropped from the memory pool even though it counts toward the gate.
+      text: l.contentCiphertext,
       hasArrived: true,
     }))
     return { status: 200, body: { letters } }
@@ -113,18 +119,31 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
       unlockDate: l.unlockDate,
       letterLocation: null,
       encryptionType: 'e2ee',
-      e2eeIVs: l.contentIVs,
+      e2eeIVs: { ...l.contentIVs, text: l.contentIVs.content },
     }))
     return { status: 200, body: { letters, count: letters.length } }
   }
   if (p === '/api/letters/self' && m === 'POST') return { status: 201, body: { id: '__PENDING__' } }
   if (p === '/api/letters/friend' && m === 'POST') return { status: 201, body: { id: '__PENDING__' } }
-  if (p === '/api/letters/drafts') return { status: 200, body: { letters: [] } }
+  // Draft lifecycle: the desktop ComposeView autosaves a draft and refuses to seal
+  // without the draftLetterId it gets back from POST /drafts. The trial doesn't
+  // persist drafts — it just hands back a stable id so the seal can proceed (the
+  // self/friend POST handlers ignore draftLetterId). GET returns a benign wire so
+  // the friend seal (reads draftDoodles) and resume-by-id don't 404.
+  if (p === '/api/letters/drafts' && m === 'GET') return { status: 200, body: { letters: [] } }
+  if (p === '/api/letters/drafts' && m === 'POST') return { status: 201, body: { id: `trial-draft-${crypto.randomUUID()}` } }
+  if (p.startsWith('/api/letters/drafts/')) {
+    const id = p.slice('/api/letters/drafts/'.length)
+    if (m === 'PUT') return { status: 200, body: { id } }
+    return { status: 200, body: { id, createdAt: new Date().toISOString(), draftDoodles: [] } }
+  }
   if (p.startsWith('/api/letters/') && (p.endsWith('/viewed') || p.endsWith('/read'))) return { status: 200, body: { ok: true } }
 
   // ---- Scrapbooks ----
   if (p === '/api/scrapbooks' && m === 'GET') {
-    return { status: 200, body: snap.scrapbooks.map(s => ({ id: s.id, title: s.title, itemCount: 0, createdAt: s.createdAt, updatedAt: s.updatedAt })) }
+    // Mirror the real route's list shape: title is null (the card falls back to
+    // the date label; the board page decrypts the real title), itemCount is null.
+    return { status: 200, body: snap.scrapbooks.map(s => ({ id: s.id, title: null, e2eeIVs: s.e2eeIVs, itemCount: null, createdAt: s.createdAt, updatedAt: s.updatedAt })) }
   }
   if (p === '/api/scrapbooks' && m === 'POST') {
     return { status: 201, body: { id: '__PENDING__' } }

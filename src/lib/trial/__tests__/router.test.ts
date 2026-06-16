@@ -35,13 +35,14 @@ describe('trial router reads', () => {
     expect(typeof r.body.id).toBe('string')
   })
 
-  it('inbox returns self letters as arrived (unlockDate=now, e2ee passthrough)', () => {
+  it('inbox returns self letters with the text-keyed IV the reveal decryptor needs', () => {
     const r = routeTrialRequest('GET', '/api/letters/inbox', null, snap)
     expect(r.status).toBe(200)
     expect(r.body.letters).toHaveLength(1)
     expect(r.body.letters[0].id).toBe('l1')
     expect(r.body.letters[0].text).toBe('CT')
-    expect(r.body.letters[0].e2eeIVs).toEqual({ content: 'IV' })
+    // decryptEntryFromServer looks up ivs['text']; the router must alias content→text.
+    expect(r.body.letters[0].e2eeIVs).toEqual({ content: 'IV', text: 'IV' })
   })
 
   it('sent returns friend letters as delivered stamps', () => {
@@ -51,22 +52,42 @@ describe('trial router reads', () => {
     expect(r.body.stamps[0].isDelivered).toBe(true)
   })
 
-  it('mine returns self letters flagged hasArrived', () => {
+  it('mine returns self letters with text (so memory can decrypt them) + hasArrived', () => {
     const r = routeTrialRequest('GET', '/api/letters/mine', null, snap)
     expect(r.body.letters[0].hasArrived).toBe(true)
     expect(r.body.letters[0].recipientEmail).toBeNull()
+    // useMemories needs both l.text and l.e2eeIVs.content or it drops the letter.
+    expect(r.body.letters[0].text).toBe('CT')
+    expect(r.body.letters[0].e2eeIVs.content).toBe('IV')
   })
 
-  it('arrived returns unviewed self letters with ciphertext text', () => {
+  it('arrived returns unviewed self letters with ciphertext text + text-keyed IV', () => {
     const r = routeTrialRequest('GET', '/api/letters/arrived', null, snap)
     expect(r.body.letters[0].text).toBe('CT')
+    expect(r.body.letters[0].e2eeIVs.text).toBe('IV')
     expect(r.body.count).toBe(1)
   })
 
-  it('scrapbooks list returns summaries', () => {
+  it('scrapbooks list mirrors the real shape (title/itemCount null, e2eeIVs present)', () => {
     const r = routeTrialRequest('GET', '/api/scrapbooks', null, snap)
     expect(Array.isArray(r.body)).toBe(true)
     expect(r.body[0].id).toBe('s1')
+    expect(r.body[0].title).toBeNull()
+    expect(r.body[0].itemCount).toBeNull()
+    expect(r.body[0].e2eeIVs.items).toBe('SIV')
+  })
+
+  it('letter draft POST returns an id so desktop compose can seal', () => {
+    const r = routeTrialRequest('POST', '/api/letters/drafts', null, snap)
+    expect(r.status).toBe(201)
+    expect(typeof r.body.id).toBe('string')
+    expect(r.body.id.length).toBeGreaterThan(0)
+  })
+
+  it('letter draft GET by id returns a benign wire with draftDoodles', () => {
+    const r = routeTrialRequest('GET', '/api/letters/drafts/abc', null, snap)
+    expect(r.status).toBe(200)
+    expect(r.body.draftDoodles).toEqual([])
   })
 
   it('scrapbook by id returns the full encrypted board', () => {
