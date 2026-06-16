@@ -14,6 +14,8 @@ import LimitReachedModal from '@/components/billing/LimitReachedModal'
 import FullscreenButton from '@/components/FullscreenButton'
 import LockDiaryButton from '@/components/LockDiaryButton'
 import FullscreenPrompt from '@/components/FullscreenPrompt'
+import TryInvite from '@/components/try/TryInvite'
+import TryLimitModal from '@/components/try/TryLimitModal'
 import { useThemeStore } from '@/store/theme'
 import { useApplyCursorStyles } from '@/hooks/useApplyCursorStyles'
 import { useLayoutMode } from '@/hooks/useMediaQuery'
@@ -71,7 +73,8 @@ export default function LayoutContent({
   // like a moment, not another tab.
   // /try routes share the same full-bleed treatment — no nav/gear/avatar,
   // just the themed Background + ambience so the sandbox feels immersive.
-  const isOnboardingPage = pathname.startsWith('/onboarding') || pathname.startsWith('/try')
+  const isOnboardingPage = pathname.startsWith('/onboarding')
+  const isTryPage = pathname.startsWith('/try')
   // /letter/[token] is the public friend-letter recipient flow. It's a
   // cinematic full-bleed scene and must NOT inherit the nav bar or the
   // pt-20 main padding — both would push the letter scene down and break
@@ -163,6 +166,35 @@ export default function LayoutContent({
     // no nav, no gear, no install prompt — just the letter scene the page
     // renders on its own.
     return <>{children}</>
+  }
+
+  if (isTryPage) {
+    // /try mirrors the real authed shell: full themed chrome + nav, plus the
+    // trial-only conversion surfaces (floating invite + cap modal). The trial
+    // memory diary uses the same fade-on-open behavior as the real /memory.
+    return (
+      <>
+        <Background />
+        <AmbientSoundLayer />
+        <main className="relative z-10 min-h-screen pt-20 pb-8 px-4">
+          <PageTransition>
+            {children}
+          </PageTransition>
+        </main>
+        <motion.div
+          animate={{ opacity: diaryOpen ? 0 : 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          style={{ pointerEvents: diaryOpen ? 'none' : undefined }}
+        >
+          <TopChromeBackdrop />
+          <FullscreenButton />
+          <DeskSettingsPanel />
+          <Navigation />
+        </motion.div>
+        <TryInvite />
+        <TryLimitModal />
+      </>
+    )
   }
 
   return (
