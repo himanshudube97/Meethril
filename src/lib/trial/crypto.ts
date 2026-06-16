@@ -9,6 +9,8 @@
 // real session is present, so overwriting the key slot is safe.
 
 import { useE2EEStore } from '@/store/e2ee'
+import { useTrialStore } from '@/store/trial'
+import { clearBlobs } from './blob-store'
 
 export async function primeTrialCrypto(): Promise<() => void> {
   const store = useE2EEStore.getState()
@@ -23,6 +25,13 @@ export async function primeTrialCrypto(): Promise<() => void> {
   // otherwise generate a fresh extractable AES-GCM key and persist it.
   let key = await store.loadMasterKey()
   if (!key) {
+    // No persisted key. Either this is the first visit, or the visitor left
+    // /try earlier and restore() cleared the key. Any trial content still in
+    // sessionStorage was encrypted under that now-gone key and can NEVER
+    // decrypt — leaving it would surface "[Decryption failed]" in memory /
+    // letters / scrapbook. Discard it and start clean before minting the key.
+    useTrialStore.getState().reset()
+    void clearBlobs()
     key = await crypto.subtle.generateKey(
       { name: 'AES-GCM', length: 256 },
       true, // extractable — storeMasterKey serializes it to sessionStorage

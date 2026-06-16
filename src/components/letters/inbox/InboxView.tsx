@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import PostalSky from './PostalSky'
 import Lamp from './Lamp'
 import Postbox from './Postbox'
@@ -22,6 +22,10 @@ interface Props {
 
 export default function InboxView({ onUnreadCountChange }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
+  // Keep letter-compose navigation inside the current shell (/try vs real) so
+  // the trial doesn't push to the real /letters/write route (anonymous → /login).
+  const base = pathname.startsWith('/try') ? '/try' : ''
   const [letters, setLetters] = useState<InboxLetter[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -38,7 +42,7 @@ export default function InboxView({ onUnreadCountChange }: Props) {
     try {
       const res = await fetch('/api/letters/drafts')
       if (!res.ok) {
-        router.push('/letters/write')
+        router.push(`${base}/letters/write`)
         return
       }
       const data = (await res.json()) as {
@@ -51,7 +55,7 @@ export default function InboxView({ onUnreadCountChange }: Props) {
       }
       const drafts = data.drafts ?? []
       if (drafts.length === 0) {
-        router.push('/letters/write')
+        router.push(`${base}/letters/write`)
         return
       }
       setDraftPrompt(
@@ -63,7 +67,7 @@ export default function InboxView({ onUnreadCountChange }: Props) {
         })),
       )
     } catch {
-      router.push('/letters/write')
+      router.push(`${base}/letters/write`)
     }
   }
 
@@ -216,11 +220,11 @@ export default function InboxView({ onUnreadCountChange }: Props) {
         drafts={draftPrompt}
         onResume={(id) => {
           setDraftPrompt(null)
-          router.push(`/letters/write?id=${id}`)
+          router.push(`${base}/letters/write?id=${id}`)
         }}
         onStartNew={() => {
           setDraftPrompt(null)
-          router.push('/letters/write')
+          router.push(`${base}/letters/write`)
         }}
         onClose={() => setDraftPrompt(null)}
       />

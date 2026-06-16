@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useThemeStore } from '@/store/theme'
 import { useE2EEStore } from '@/store/e2ee'
 import { useJournalStore, StrokeData } from '@/store/journal'
@@ -50,6 +50,8 @@ interface Photo {
 export default function MobileLetterCompose() {
   const { theme } = useThemeStore()
   const router = useRouter()
+  const pathname = usePathname()
+  const lettersBase = pathname.startsWith('/try') ? '/try/letters' : '/letters'
   const { masterKey, isUnlocked, isEnabled } = useE2EEStore()
   const { currentDoodleStrokes, setDoodleStrokes, resetCurrentEntry } = useJournalStore()
 
@@ -227,7 +229,7 @@ export default function MobileLetterCompose() {
       setSealPhase('folding')
       setTimeout(() => {
         setSealPhase('sealed')
-        setTimeout(() => router.push('/letters'), 1900)
+        setTimeout(() => router.push(lettersBase), 1900)
       }, 1300)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.')

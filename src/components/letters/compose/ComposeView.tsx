@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { RecipientPicker } from './RecipientPicker'
 import { PostcardFront } from './PostcardFront'
 import { PostcardBack } from './PostcardBack'
@@ -27,6 +27,10 @@ type Phase = 'picker' | 'front' | 'back'
 export default function ComposeView() {
   const router = useRouter()
   const params = useSearchParams()
+  const pathname = usePathname()
+  // Stay inside the current shell (/try vs real) when leaving the composer so
+  // the trial doesn't bounce to the real /letters route.
+  const lettersBase = pathname.startsWith('/try') ? '/try/letters' : '/letters'
   const draftId = params.get('id')
 
   const { fetchProfile } = useProfileStore()
@@ -110,7 +114,7 @@ export default function ComposeView() {
       try {
         const res = await fetch(`/api/letters/drafts/${draftId}`)
         if (!res.ok) {
-          router.replace('/letters')
+          router.replace(lettersBase)
           return
         }
         const wire = (await res.json()) as LetterDraftWire
@@ -155,7 +159,7 @@ export default function ComposeView() {
         setLoading(false)
       } catch (err) {
         console.error('Failed to resume letter draft:', err)
-        router.replace('/letters')
+        router.replace(lettersBase)
       }
     })()
   }, [draftId, router, isE2EEEnabled, isE2EEInitialized, isE2EEReady, masterKey])
@@ -242,7 +246,7 @@ export default function ComposeView() {
           setCreatedAt(new Date())
           setPhase('front')
         }}
-        onCancel={() => router.push('/letters')}
+        onCancel={() => router.push(lettersBase)}
       />
     )
   }
@@ -490,7 +494,7 @@ export default function ComposeView() {
             body={bodyFront}
             onBodyChange={setBodyFront}
             onTurnOver={() => setPhase('back')}
-            onCancel={() => router.push('/letters')}
+            onCancel={() => router.push(lettersBase)}
             createdAt={createdAt}
           />
 
@@ -518,7 +522,7 @@ export default function ComposeView() {
         <SealModal
           recipient={recipient.recipient}
           onClose={() => setShowSeal(false)}
-          onSealed={() => router.push('/letters?tab=sent')}
+          onSealed={() => router.push(`${lettersBase}?tab=sent`)}
           onSeal={handleSeal}
         />
       )}
