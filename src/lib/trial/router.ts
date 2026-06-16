@@ -7,10 +7,12 @@
 // empty 200 so a scene's inline fetch never throws.
 
 import type { JournalEntry } from '@/store/journal'
+import type { TrialLetter, TrialScrapbook } from '@/store/trial'
 
 export interface TrialSnapshot {
   entries: JournalEntry[]
-  letters: { id: string; text: string; recipientName: string | null; createdAt: string; unlockDate: string | null; isViewed: boolean }[]
+  letters: TrialLetter[]
+  scrapbooks: TrialScrapbook[]
 }
 
 export interface TrialResponse {
@@ -29,11 +31,15 @@ function param(url: string, key: string): string | null {
   return new URLSearchParams(url.slice(q + 1)).get(key)
 }
 
+const selfLetters = (snap: TrialSnapshot) => snap.letters.filter(l => l.type === 'self')
+const friendLetters = (snap: TrialSnapshot) => snap.letters.filter(l => l.type === 'friend')
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function routeTrialRequest(method: string, url: string, body: any, snap: TrialSnapshot): TrialResponse {
   const p = path(url)
   const m = method.toUpperCase()
 
+  // ---- Entries ----
   if (p === '/api/entries' && m === 'GET') {
     const limit = Number(param(url, 'limit') ?? 50)
     const month = param(url, 'month')
@@ -54,13 +60,90 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
     return { status: 200, body: { id } }
   }
 
-  if (p === '/api/letters/inbox') return { status: 200, body: { letters: [] } }
-  if (p === '/api/letters/sent') return { status: 200, body: { stamps: [] } }
-  if (p === '/api/letters/mine') return { status: 200, body: { letters: [] } }
-  if (p === '/api/letters/arrived') return { status: 200, body: { letters: [], count: 0 } }
-  if (p.startsWith('/api/letters/') && p.endsWith('/viewed')) return { status: 200, body: { ok: true } }
+  // ---- Letters (instant reveal: unlockDate already = createdAt in the store) ----
+  if (p === '/api/letters/inbox') {
+    const letters = selfLetters(snap).map(l => ({
+      id: l.id,
+      recipientName: l.recipientName,
+      sealedAt: l.createdAt,
+      unlockDate: l.unlockDate,
+      isViewed: l.isViewed,
+      encryptionType: 'e2ee',
+      e2eeIVs: l.contentIVs,
+      text: l.contentCiphertext,
+    }))
+    return { status: 200, body: { letters } }
+  }
+  if (p === '/api/letters/sent') {
+    const stamps = friendLetters(snap).map(l => ({
+      id: l.id,
+      recipientName: l.recipientName,
+      sealedAt: l.createdAt,
+      unlockDate: l.unlockDate,
+      isDelivered: true,
+      letterPeekedAt: null,
+      firstReadAt: null,
+      savedByRecipientAt: null,
+      bouncedAt: null,
+      bouncedReason: null,
+      encryptionType: 'e2ee',
+      e2eeIVs: l.contentIVs,
+    }))
+    return { status: 200, body: { stamps } }
+  }
+  if (p === '/api/letters/mine') {
+    const letters = selfLetters(snap).map(l => ({
+      id: l.id,
+      createdAt: l.createdAt,
+      unlockDate: l.unlockDate,
+      isSealed: true,
+      recipientName: l.recipientName,
+      recipientEmail: l.recipientEmail,
+      encryptionType: 'e2ee',
+      e2eeIVs: l.contentIVs,
+      hasArrived: true,
+    }))
+    return { status: 200, body: { letters } }
+  }
+  if (p === '/api/letters/arrived') {
+    const letters = selfLetters(snap).filter(l => !l.isViewed).map(l => ({
+      id: l.id,
+      text: l.contentCiphertext,
+      createdAt: l.createdAt,
+      unlockDate: l.unlockDate,
+      letterLocation: null,
+      encryptionType: 'e2ee',
+      e2eeIVs: l.contentIVs,
+    }))
+    return { status: 200, body: { letters, count: letters.length } }
+  }
+  if (p === '/api/letters/self' && m === 'POST') return { status: 201, body: { id: '__PENDING__' } }
+  if (p === '/api/letters/friend' && m === 'POST') return { status: 201, body: { id: '__PENDING__' } }
+  if (p === '/api/letters/drafts') return { status: 200, body: { letters: [] } }
+  if (p.startsWith('/api/letters/') && (p.endsWith('/viewed') || p.endsWith('/read'))) return { status: 200, body: { ok: true } }
 
+  // ---- Scrapbooks ----
+  if (p === '/api/scrapbooks' && m === 'GET') {
+    return { status: 200, body: snap.scrapbooks.map(s => ({ id: s.id, title: s.title, itemCount: 0, createdAt: s.createdAt, updatedAt: s.updatedAt })) }
+  }
+  if (p === '/api/scrapbooks' && m === 'POST') {
+    return { status: 201, body: { id: '__PENDING__' } }
+  }
+  if (p.startsWith('/api/scrapbooks/')) {
+    const id = p.slice('/api/scrapbooks/'.length)
+    if (m === 'PUT') return { status: 200, body: { id } }
+    const sb = snap.scrapbooks.find(s => s.id === id)
+    return sb ? { status: 200, body: sb } : { status: 404, body: {} }
+  }
+
+  // ---- Profile ----
+  if (p === '/api/profile' && m === 'GET') return { status: 200, body: { profile: {} } }
+  if (p === '/api/profile' && m === 'PUT') return { status: 200, body: { ok: true } }
   if (p === '/api/me/profile-flags') return { status: 200, body: { reminderOptIn: false, hasSeenTour: true } }
+
+  // ---- Stranger notes (lights) — empty but valid so the tab renders ----
+  if (p.startsWith('/api/stranger-notes/inbox')) return { status: 200, body: { threads: [], nextCursor: null } }
+  if (p.startsWith('/api/stranger-notes')) return { status: 200, body: { ok: true } }
 
   return { status: 200, body: {} }
 }
