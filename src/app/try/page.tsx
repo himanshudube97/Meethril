@@ -1,6 +1,5 @@
-import TryModeProvider from '@/components/try/TryModeProvider'
-import TryEntryScreen from '@/components/try/TryEntryScreen'
+import { redirect } from 'next/navigation'
 
 export default function TryPage() {
-  return <TryModeProvider><TryEntryScreen /></TryModeProvider>
+  redirect('/try/write')
 }
