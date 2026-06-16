@@ -12,6 +12,29 @@ const snap: TrialSnapshot = {
 }
 
 describe('trial router reads', () => {
+  it('entries GET returns the array with a pagination envelope', () => {
+    const r = routeTrialRequest('GET', '/api/entries?limit=50', null, snap)
+    expect(r.status).toBe(200)
+    expect(r.body.entries).toHaveLength(1)
+    expect(r.body.pagination).toEqual({ hasMore: false, nextCursor: null, limit: 50 })
+  })
+
+  it('entries GET filters by month', () => {
+    const month = now.slice(0, 7)
+    expect(routeTrialRequest('GET', `/api/entries?month=${month}`, null, snap).body.entries).toHaveLength(1)
+    expect(routeTrialRequest('GET', '/api/entries?month=1999-01', null, snap).body.entries).toHaveLength(0)
+  })
+
+  it('entries stats derives totalEntries from the snapshot', () => {
+    expect(routeTrialRequest('GET', '/api/entries/stats', null, snap).body.totalEntries).toBe(1)
+  })
+
+  it('entries POST echoes a pending row with 201', () => {
+    const r = routeTrialRequest('POST', '/api/entries', { text: 'hi' }, snap)
+    expect(r.status).toBe(201)
+    expect(typeof r.body.id).toBe('string')
+  })
+
   it('inbox returns self letters as arrived (unlockDate=now, e2ee passthrough)', () => {
     const r = routeTrialRequest('GET', '/api/letters/inbox', null, snap)
     expect(r.status).toBe(200)
