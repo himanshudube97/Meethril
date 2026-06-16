@@ -37,7 +37,7 @@ export function installTrialFetch(): () => void {
 
     // Photo bytes → IndexedDB
     if (base === '/api/photos' && method === 'POST') {
-      const handle = `trial-photo-${Math.abs(hashString(path + store.entryCount + store.entries.length))}-${cheapNonce()}`
+      const handle = `trial-photo-${Math.abs(hashString(path + store.journalCount + store.entries.length))}-${cheapNonce()}`
       const bytes = await new Response(init?.body as BodyInit).arrayBuffer()
       await putBlob(handle, bytes)
       return json(200, { handle })
@@ -54,14 +54,15 @@ export function installTrialFetch(): () => void {
     if (init?.body && typeof init.body === 'string') {
       try { parsedBody = JSON.parse(init.body) } catch { parsedBody = null }
     }
-    const res = routeTrialRequest(method, path, parsedBody, { entries: store.entries, letters: store.letters })
+    const snap = { entries: store.entries, letters: store.letters, scrapbooks: store.scrapbooks }
+    const res = routeTrialRequest(method, path, parsedBody, snap)
 
-    // Apply mutations to the store and patch the response id.
+    // ---- Entry mutations ----
     if (base === '/api/entries' && method === 'POST') {
+      if (store.atLimit('journal')) { store.promptSignup('journal'); return json(403, { error: 'trial_limit' }) }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any; e2eeIVs?: any; textPreview?: string }
       const id = store.createEntry({ text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles, e2eeIVs: d.e2eeIVs ?? null, textPreview: d.textPreview })
-      // Re-read after mutation — captured `store` snapshot is stale post-createEntry.
       const createdAt = useTrialStore.getState().entries.find(e => e.id === id)?.createdAt
       return json(201, { id, createdAt })
     }
@@ -70,6 +71,43 @@ export function installTrialFetch(): () => void {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = parsedBody as { text: string; song: string | null; photos?: any; doodles?: any; e2eeIVs?: any; textPreview?: string }
       store.updateEntry(id, { text: d.text, song: d.song ?? null, photos: d.photos, doodles: d.doodles, e2eeIVs: d.e2eeIVs ?? null, textPreview: d.textPreview })
+      return json(200, { id })
+    }
+
+    // ---- Letter mutations (instant reveal) ----
+    if (base === '/api/letters/self' && method === 'POST') {
+      if (store.atLimit('letter')) { store.promptSignup('letter'); return json(403, { error: 'trial_limit' }) }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = parsedBody as { contentCiphertext: string; contentIVs: Record<string, string> }
+      const id = store.createLetter({ type: 'self', contentCiphertext: d.contentCiphertext, contentIVs: d.contentIVs, recipientName: null, recipientEmail: null })
+      return json(201, { id })
+    }
+    if (base === '/api/letters/friend' && method === 'POST') {
+      if (store.atLimit('letter')) { store.promptSignup('letter'); return json(403, { error: 'trial_limit' }) }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = parsedBody as { transientCiphertext: string; transientIV: string; recipientName: string; recipientEmail: string }
+      const id = store.createLetter({ type: 'friend', contentCiphertext: d.transientCiphertext, contentIVs: { content: d.transientIV }, recipientName: d.recipientName ?? null, recipientEmail: d.recipientEmail ?? null })
+      return json(201, { id })
+    }
+    if (base.startsWith('/api/letters/') && (base.endsWith('/viewed') || base.endsWith('/read')) && method === 'POST') {
+      const id = base.split('/')[3]
+      store.revealLetter(id)
+      return json(200, { ok: true })
+    }
+
+    // ---- Scrapbook mutations ----
+    if (base === '/api/scrapbooks' && method === 'POST') {
+      if (store.atLimit('scrapbook')) { store.promptSignup('scrapbook'); return json(403, { error: 'trial_limit' }) }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = parsedBody as { items: string; e2eeIVs: { items: string; title?: string }; title?: string | null }
+      const id = store.createScrapbook({ items: d.items, e2eeIVs: d.e2eeIVs, title: d.title ?? null })
+      return json(201, { id })
+    }
+    if (base.startsWith('/api/scrapbooks/') && method === 'PUT') {
+      const id = base.slice('/api/scrapbooks/'.length)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = parsedBody as { title?: string | null; items: string; e2eeIVs: { items: string; title?: string } }
+      store.updateScrapbook(id, { title: d.title ?? null, items: d.items, e2eeIVs: d.e2eeIVs })
       return json(200, { id })
     }
 
