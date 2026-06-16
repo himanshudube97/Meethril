@@ -197,9 +197,21 @@ export const useTrialStore = create<TrialState>()(
     }),
     {
       name: 'meethril-trial',
+      version: 2,
       storage: createJSONStorage(() =>
         typeof sessionStorage !== 'undefined' ? sessionStorage : (undefined as unknown as Storage)
       ),
+      // Trial data is throwaway. A session that started on an older shape (e.g.
+      // v1's `entryCount`/plaintext letters, before a mid-session code deploy)
+      // would otherwise rehydrate stale fields and let the per-feature caps be
+      // bypassed (journalCount missing → atLimit always false). Start clean on
+      // any version mismatch instead of carrying the old slice forward.
+      migrate: (_persisted, version) => {
+        if (version !== 2) {
+          return { version: 2, entries: [], letters: [], scrapbooks: [], journalCount: 0, letterCount: 0, scrapbookCount: 0 } as unknown as TrialState
+        }
+        return _persisted as TrialState
+      },
       partialize: (s) => ({
         version: s.version,
         entries: s.entries,
