@@ -71,9 +71,9 @@ export default function LayoutContent({
   // /onboarding is a forced flow: themed Background, no Navigation, no
   // padded main wrapper — the page lays itself out full-bleed so it feels
   // like a moment, not another tab.
-  // /try routes share the same full-bleed treatment — no nav/gear/avatar,
-  // just the themed Background + ambience so the sandbox feels immersive.
   const isOnboardingPage = pathname.startsWith('/onboarding')
+  // /try is the real app shell on the trial data layer: it gets the FULL
+  // authed chrome (nav, gear, padded main) — see the isTryPage branch below.
   const isTryPage = pathname.startsWith('/try')
   // /letter/[token] is the public friend-letter recipient flow. It's a
   // cinematic full-bleed scene and must NOT inherit the nav bar or the
