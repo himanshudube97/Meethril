@@ -35,7 +35,8 @@ export default function ScrapbookListingView() {
   const pathname = usePathname()
   // Same component renders at /scrapbook and /try/scrapbook; keep navigation
   // inside whichever shell we're in so the trial doesn't escape to real routes.
-  const base = pathname.startsWith('/try') ? '/try/scrapbook' : '/scrapbook'
+  const isTrial = pathname.startsWith('/try')
+  const base = isTrial ? '/try/scrapbook' : '/scrapbook'
   const today = useMemo(() => new Date(), [])
   const layoutMode = useLayoutMode()
 
@@ -106,8 +107,9 @@ export default function ScrapbookListingView() {
       if (!res.ok) {
         // Trial per-feature cap returns 403 and surfaces its own "make it
         // permanent" modal (TryLimitModal); don't also flash a raw error here.
+        // Scoped to /try so the real app's 403 handling is unchanged.
         // (Real usage limits use 429 limit_reached, handled just below.)
-        if (res.status === 403) { setCreating(false); return }
+        if (isTrial && res.status === 403) { setCreating(false); return }
         const limit = await parseLimitError(res)
         if (limit) {
           useLimitPromptStore.getState().show(limit)
