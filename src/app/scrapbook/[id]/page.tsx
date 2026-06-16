@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, usePathname } from 'next/navigation'
 import ScrapbookCanvas from '@/components/scrapbook/ScrapbookCanvas'
 import type { ScrapbookItem } from '@/lib/scrapbook'
 import { useE2EEStore } from '@/store/e2ee'
@@ -38,12 +38,17 @@ async function decryptScrapbookIfNeeded(
 export default function ScrapbookBoardPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const pathname = usePathname()
+  // Same page renders at /scrapbook/[id] and /try/scrapbook/[id]; keep the back
+  // button inside whichever shell we're in so /try doesn't escape to real routes.
+  const listingPath = pathname.startsWith('/try') ? '/try/scrapbook' : '/scrapbook'
   const [board, setBoard] = useState<BoardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const masterKey = useE2EEStore((s) => s.masterKey)
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing: reset error on param/key change before refetch
     setError(null)
     fetch(`/api/scrapbooks/${params.id}`)
       .then(async (res) => {
@@ -67,7 +72,7 @@ export default function ScrapbookBoardPage() {
         </div>
         <div style={{ marginTop: 6, fontSize: 14 }}>{error}</div>
         <button
-          onClick={() => router.push('/scrapbook')}
+          onClick={() => router.push(listingPath)}
           style={{
             marginTop: 16,
             padding: '6px 14px',
@@ -95,7 +100,7 @@ export default function ScrapbookBoardPage() {
     <div style={{ width: '100%' }}>
       <div style={{ padding: '8px 24px' }}>
         <button
-          onClick={() => router.push('/scrapbook')}
+          onClick={() => router.push(listingPath)}
           style={{
             padding: '4px 12px',
             border: '1px solid rgba(58,52,41,0.22)',
