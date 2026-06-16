@@ -5,14 +5,16 @@ import { useE2EE } from '@/hooks/useE2EE'
 import { useE2EEStore } from '@/store/e2ee'
 import { decryptSelfLetterContent } from '@/lib/letters/self-letter-client'
 import { pickDailyItems } from '@/lib/memory/daily'
+import { computeMemoryStatus, REQUIRED_JOURNALS, REQUIRED_TOTAL } from '@/lib/memory/gate'
+import { useTryMode } from '@/components/try/TryModeProvider'
 import type { JournalEntry } from '@/store/journal'
 
 // Gate (issue #37): the memory page unlocks once you have at least
 // REQUIRED_JOURNALS journal entries, OR REQUIRED_TOTAL entries total
 // (journals + delivered letters). Until then it shows a locked, silhouette
-// state with progress.
-export const REQUIRED_JOURNALS = 14
-export const REQUIRED_TOTAL = 20
+// state with progress. The pure decision + thresholds live in @/lib/memory/gate;
+// re-exported here so existing importers keep working.
+export { REQUIRED_JOURNALS, REQUIRED_TOTAL } from '@/lib/memory/gate'
 // How many memories surface per day. Fixed for the whole calendar day; a
 // fresh set rotates in the next day (see lib/memory/daily.ts).
 export const DAILY_MEMORY_COUNT = 5
@@ -59,6 +61,10 @@ export function useMemories(): UseMemoriesResult {
   const { decryptEntriesFromServer, isE2EEReady } = useE2EE()
   const masterKey = useE2EEStore((s) => s.masterKey)
 
+  const trial = useTryMode()
+  const requiredJournals = trial ? 1 : REQUIRED_JOURNALS
+  const requiredTotal = trial ? 1 : REQUIRED_TOTAL
+
   const [status, setStatus] = useState<MemoryStatus>('loading')
   const [items, setItems] = useState<JournalEntry[]>([])
   const [progress, setProgress] = useState<MemoryProgress>({
@@ -93,12 +99,12 @@ export function useMemories(): UseMemoriesResult {
       setProgress({
         journals: journalCount,
         total,
-        requiredJournals: REQUIRED_JOURNALS,
-        requiredTotal: REQUIRED_TOTAL,
+        requiredJournals,
+        requiredTotal,
       })
 
-      const unlocked = journalCount >= REQUIRED_JOURNALS || total >= REQUIRED_TOTAL
-      if (!unlocked) {
+      const gate = computeMemoryStatus(journalCount, total, requiredJournals, requiredTotal)
+      if (gate === 'locked') {
         setItems([])
         setStatus('locked')
         return
@@ -156,7 +162,7 @@ export function useMemories(): UseMemoriesResult {
       console.error('Failed to load memories:', err)
       setStatus('error')
     }
-  }, [decryptEntriesFromServer, masterKey])
+  }, [decryptEntriesFromServer, masterKey, requiredJournals, requiredTotal])
 
   useEffect(() => {
     load()
