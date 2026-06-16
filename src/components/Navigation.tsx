@@ -41,11 +41,14 @@ export default function Navigation() {
   const nickname = profile.nickname
   const avatarLetter = nickname?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'
 
+  const isTrial = pathname.startsWith('/try')
+  const navTabs = isTrial ? tabs.map(t => ({ ...t, href: `/try${t.href}` })) : tabs
+
   // On the Memory page the opened diary drops a dark scrim over the scene, and
   // the translucent glass pill reads as a floaty, mismatched chip on top. Give
   // the navbar the diary's own opaque paper tone there so it belongs with the
   // open journal. Derived from the theme, so it stays correct on every theme.
-  const isMemoryPage = pathname === '/memory'
+  const isMemoryPage = pathname === '/memory' || pathname === '/try/memory'
   const diaryColors = getGlassDiaryColors(theme)
   const navBg = isMemoryPage ? diaryColors.pageBgSolid : theme.glass.bg
   const navBorder = isMemoryPage ? diaryColors.pageBorder : theme.glass.border
@@ -63,7 +66,7 @@ export default function Navigation() {
         }}
         aria-label="Primary navigation"
       >
-        {tabs.map(tab => {
+        {navTabs.map(tab => {
           const isActive = pathname === tab.href
           return (
             <Link key={tab.href} href={tab.href} aria-label={tab.label} data-tour={`nav-${tab.label.toLowerCase()}`}>
@@ -88,7 +91,18 @@ export default function Navigation() {
           aria-hidden
         />
 
-        {user && (
+        {isTrial ? (
+          <Link href="/login" aria-label="Sign up">
+            <motion.div
+              whileTap={{ scale: 0.92 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="px-3 h-9 rounded-full flex items-center justify-center text-xs font-medium"
+              style={{ background: `${theme.accent.primary}30`, color: theme.text.primary }}
+            >
+              Sign up
+            </motion.div>
+          </Link>
+        ) : user ? (
           <Link href="/me" aria-label={nickname || user.email || 'Profile'}>
             <motion.div
               whileTap={{ scale: 0.92 }}
@@ -108,7 +122,7 @@ export default function Navigation() {
               {avatarLetter}
             </motion.div>
           </Link>
-        )}
+        ) : null}
       </nav>
     )
   }
@@ -131,7 +145,7 @@ export default function Navigation() {
           border: `1px solid ${navBorder}`,
         }}
       >
-        {tabs.map((tab) => {
+        {navTabs.map((tab) => {
           const isActive = pathname === tab.href
           return (
             <Link key={tab.href} href={tab.href} data-tour={`nav-${tab.label.toLowerCase()}`}>
@@ -159,7 +173,22 @@ export default function Navigation() {
           )
         })}
 
-        {user && (
+        {isTrial ? (
+          <>
+            <div className="w-px h-6 mx-1" style={{ background: theme.glass.border }} />
+            <Link href="/login">
+              <motion.div
+                className="relative px-4 py-2 rounded-full text-sm font-medium"
+                style={{ background: `${theme.accent.primary}30`, color: theme.text.primary }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              >
+                Sign up
+              </motion.div>
+            </Link>
+          </>
+        ) : user ? (
           <>
             <div
               className="w-px h-6 mx-1"
@@ -188,7 +217,7 @@ export default function Navigation() {
               </motion.div>
             </Link>
           </>
-        )}
+        ) : null}
       </div>
     </nav>
     </>
