@@ -4,11 +4,18 @@ import { useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useThemeStore } from '@/store/theme'
 import CameraModal from '@/components/desk/CameraModal'
+import { usePhotoSrc } from '@/hooks/usePhotoSrc'
 
 interface CollagePhotoProps {
   position: 'top-right' | 'bottom-left'
   photo: string | null
   onPhotoChange: (dataUrl: string | null) => void
+  /** E2EE ref fields for an existing entry photo. Every real entry photo is
+   *  E2EE (no plaintext `url`), so callers that render saved photos must pass
+   *  these — usePhotoSrc decrypts the ref into a blob URL. Omitted for the
+   *  compose/just-picked dataURL path, which flows through `photo`. */
+  encryptedRef?: string
+  encryptedRefIV?: string
   /** Compact / letter-slot mode: renders in normal flow instead of using
    *  the large absolute offsets tuned for the journal desk layout.
    *  Existing callers that omit this prop are unaffected. */
@@ -74,11 +81,18 @@ async function processImage(file: File): Promise<string> {
   })
 }
 
-export default function CollagePhoto({ position, photo, onPhotoChange, compact = false }: CollagePhotoProps) {
+export default function CollagePhoto({ position, photo, onPhotoChange, encryptedRef, encryptedRefIV, compact = false }: CollagePhotoProps) {
   const { theme } = useThemeStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+
+  // Resolve the display src across all three photo shapes:
+  //   - `photo` data:/blob: string (compose or just-picked) → returned as-is
+  //   - `photo` "/api/photos/{handle}" (non-E2EE) → fetched into a blob URL
+  //   - `encryptedRef` (E2EE saved entry photo) → decrypted into a blob URL
+  const resolvedSrc = usePhotoSrc({ url: photo ?? undefined, encryptedRef, encryptedRefIV })
+  const hasPhoto = !!photo || !!encryptedRef
 
   const rotation = position === 'top-right' ? 7 : -7
 
@@ -108,7 +122,7 @@ export default function CollagePhoto({ position, photo, onPhotoChange, compact =
     if (fileInputRef.current) fileInputRef.current.value = ''
   }, [onPhotoChange])
 
-  if (photo) {
+  if (hasPhoto) {
     return (
       <motion.div
         style={positionStyle}
@@ -132,7 +146,7 @@ export default function CollagePhoto({ position, photo, onPhotoChange, compact =
           title="Remove photo"
         >
           <div className="w-full overflow-hidden rounded-sm" style={{ height: compact ? 'calc(100% - 14px)' : undefined, aspectRatio: compact ? undefined : '4/5' }}>
-            <img src={photo} alt="Collage photo" className="w-full h-full object-cover" />
+            {resolvedSrc && <img src={resolvedSrc} alt="Collage photo" className="w-full h-full object-cover" />}
           </div>
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-sm">
             <span className="text-white text-lg font-light">x</span>

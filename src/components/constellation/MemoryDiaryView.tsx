@@ -161,6 +161,11 @@ export function MemoryDiaryView({ entry, theme, onClose }: Props) {
     photos: (entry.photos || []).map((p) => ({
       id: p.id,
       url: p.url,
+      // Carry the E2EE ref fields through — every real entry photo is E2EE
+      // (no plaintext `url`), so dropping these left usePhotoSrc with nothing
+      // to decrypt and the polaroid rendered empty in the memory reveal.
+      encryptedRef: p.encryptedRef,
+      encryptedRefIV: p.encryptedRefIV,
       rotation: p.rotation,
       position: (p.position === 2 ? 2 : 1) as 1 | 2,
     })),

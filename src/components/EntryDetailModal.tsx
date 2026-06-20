@@ -20,7 +20,10 @@ interface EntryDetailModalProps {
 
 interface EntryPhoto {
   id?: string
-  url: string
+  // Optional: E2EE photos have no plaintext `url`, only the encrypted ref.
+  url?: string
+  encryptedRef?: string
+  encryptedRefIV?: string
   rotation: number
   position: number
   spread: number
@@ -370,11 +373,15 @@ export default function EntryDetailModal({ entryId, onClose, onUpdated }: EntryD
                   <CollagePhoto
                     position="top-right"
                     photo={existingPhotoTopRight?.url || photoTopRight}
+                    encryptedRef={existingPhotoTopRight?.encryptedRef}
+                    encryptedRefIV={existingPhotoTopRight?.encryptedRefIV}
                     onPhotoChange={existingPhotoTopRight ? () => {} : setPhotoTopRight}
                   />
                   <CollagePhoto
                     position="bottom-left"
                     photo={existingPhotoBottomLeft?.url || photoBottomLeft}
+                    encryptedRef={existingPhotoBottomLeft?.encryptedRef}
+                    encryptedRefIV={existingPhotoBottomLeft?.encryptedRefIV}
                     onPhotoChange={existingPhotoBottomLeft ? () => {} : setPhotoBottomLeft}
                   />
                 </motion.div>
