@@ -61,6 +61,8 @@ interface TrialState {
   signupPrompt: TrialFeature | null
 
   reset: () => void
+  /** Populate a fresh session with mock content (see lib/trial/seed.ts). */
+  seed: (data: { entries: JournalEntry[]; letters: TrialLetter[]; journalCount: number; letterCount: number }) => void
   newestDate: () => string
   atLimit: (f: TrialFeature) => boolean
   promptSignup: (f: TrialFeature) => void
@@ -94,8 +96,16 @@ export const useTrialStore = create<TrialState>()(
       signupPrompt: null,
 
       reset: () => {
-        // No seed — the visitor's own writing fills the scenes. Empty = real empty states.
         set({ version: 2, entries: [], letters: [], scrapbooks: [], strangerThreads: [], journalCount: 0, letterCount: 0, scrapbookCount: 0, signupPrompt: null })
+      },
+
+      seed: (data) => {
+        set({
+          entries: data.entries,
+          letters: data.letters,
+          journalCount: data.journalCount,
+          letterCount: data.letterCount,
+        })
       },
 
       newestDate: () => {

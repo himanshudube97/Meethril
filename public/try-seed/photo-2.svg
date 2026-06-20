@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="600" viewBox="0 0 480 600">
+  <defs>
+    <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b3a67"/>
+      <stop offset="55%" stop-color="#3f5b8c"/>
+      <stop offset="100%" stop-color="#6d8bbf"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="600" fill="url(#sky2)"/>
+  <circle cx="150" cy="160" r="52" fill="#eef3ff" opacity="0.92"/>
+  <circle cx="170" cy="150" r="52" fill="#3f5b8c"/>
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="320" cy="120" r="2.5"/>
+    <circle cx="380" cy="200" r="2"/>
+    <circle cx="270" cy="230" r="1.8"/>
+    <circle cx="410" cy="300" r="2.2"/>
+    <circle cx="90" cy="300" r="1.8"/>
+  </g>
+  <path d="M0 440 Q120 410 240 440 T480 435 V600 H0 Z" fill="#22305c" opacity="0.9"/>
+  <path d="M0 500 Q160 475 320 500 T480 495 V600 H0 Z" fill="#16213f"/>
+</svg>

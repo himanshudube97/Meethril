@@ -4,8 +4,10 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth'
 import { useTrialStore } from '@/store/trial'
+import { useE2EEStore } from '@/store/e2ee'
 import { installTrialFetch } from '@/lib/trial/intercept'
 import { primeTrialCrypto } from '@/lib/trial/crypto'
+import { buildTrialSeed } from '@/lib/trial/seed'
 import { clearBlobs } from '@/lib/trial/blob-store'
 
 const TryModeContext = createContext(false)
@@ -33,13 +35,31 @@ export default function TryModeProvider({ children }: { children: React.ReactNod
     // just set (the throwaway key + store priming live in shared global state).
     let active = true
     let restore: () => void = () => {}
-    // Seed ONLY on a fresh tab. The trial store persists to sessionStorage, so on
+    // Act ONLY on a fresh tab. The trial store persists to sessionStorage, so on
     // reload/navigation within the session it's already populated — reset()ing
     // here would wipe entries the visitor just wrote. Empty entries ⇒ first visit.
-    if (useTrialStore.getState().entries.length === 0) useTrialStore.getState().reset()
+    const freshSession = useTrialStore.getState().entries.length === 0
+    if (freshSession) useTrialStore.getState().reset()
     const uninstall = installTrialFetch()
-    primeTrialCrypto().then(r => {
+    primeTrialCrypto().then(async (r) => {
       restore = r
+      if (!active) return
+      // Drop in the mock diary (past journals + delivered letters) before
+      // revealing the scenes, so the visitor lands in a lived-in space rather
+      // than an empty one. Letters are encrypted with the just-primed session
+      // key. Only on a fresh session, and only if nothing slipped in meanwhile.
+      if (freshSession && useTrialStore.getState().entries.length === 0) {
+        const masterKey = useE2EEStore.getState().masterKey
+        if (masterKey) {
+          try {
+            const seedData = await buildTrialSeed(masterKey)
+            if (!active) return
+            useTrialStore.getState().seed(seedData)
+          } catch (err) {
+            console.error('[try] seed failed', err)
+          }
+        }
+      }
       if (active) setReady(true)
     })
 
