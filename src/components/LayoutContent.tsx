@@ -187,15 +187,19 @@ export default function LayoutContent({
       <>
         <Background />
         <AmbientSoundLayer />
-        {isTryFullBleed ? (
-          children
-        ) : (
-          <main className="relative z-10 min-h-screen pt-20 pb-8 px-4">
-            <PageTransition>
-              {children}
-            </PageTransition>
-          </main>
-        )}
+        {/* ONE stable wrapper for every /try page (main > PageTransition >
+            children). Full-bleed scenes just drop the min-height + top/bottom
+            padding so they don't overflow into a phantom scrollbar; the tree
+            structure stays identical across pages. That stability matters:
+            toggling the wrapper shape would remount TryModeProvider when moving
+            between a full-bleed page and a padded one (scrapbook listing -> a
+            board), and the remount clears the throwaway key + wipes the
+            in-memory trial store — which made a just-created board 404. */}
+        <main className={isTryFullBleed ? 'relative z-10' : 'relative z-10 min-h-screen pt-20 pb-8 px-4'}>
+          <PageTransition>
+            {children}
+          </PageTransition>
+        </main>
         <motion.div
           animate={{ opacity: diaryOpen ? 0 : 1 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
