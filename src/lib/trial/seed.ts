@@ -80,13 +80,16 @@ const SEED_ENTRIES: JournalEntry[] = [
     song: song('The Night We Met', 'Lord Huron', 4),
     photos: [photo(4, 1), photo(2, 2)],
     left: [
-      "Last full day, and nobody said it out loud, but we all packed a little slower this morning. 🎒 I woke to the whole hillside wrapped in cloud — couldn't see twenty feet in any direction, the pines just dissolving into a soft white nothing. 🌫️",
-      "Everyone else wanted to wait it out, but I pulled on a jacket and slipped out anyway, and I'm so glad I did. The old stone path was slick and shining, and out of the mist came a man on a white horse, completely unhurried, like something walking straight out of an old story. We nodded at each other. He vanished back into the fog. 🐎",
-      "Sounds go strange in that kind of cloud — a dog barking somewhere far below, a temple bell I never managed to find, my own footsteps arriving a half-beat behind me. I wasn't lonely out there. If anything I felt held, tucked inside something larger and kinder than the usual noise. 🔔",
+      "Last full day, and nobody said it out loud, but every one of us packed a little slower than usual this morning. 🎒",
+      "I woke to the whole hillside wrapped in thick cloud — couldn't see twenty feet in any direction, the pines just dissolving softly into white nothing. Everyone else wanted to wait it out, but I pulled on a jacket and slipped out anyway, and I am so glad I did. 🌫️",
+      "The old stone path was slick and shining, and out of the mist came a man on a white horse, completely unhurried, like something walking straight out of an old story. We nodded at each other. He vanished back into the fog. I'm still not entirely convinced he was real. 🐎",
+      "Sounds go strange in that kind of cloud — a dog barking somewhere far below, a temple bell I never managed to find, my own footsteps arriving a half-beat behind me. I wasn't lonely out there at all. If anything I felt held, tucked inside something larger and kinder. 🔔",
+      "By noon the sun had burned all of it clean off, and the whole valley came roaring back into colour like someone had quietly turned a dial — green hills, blue water, red rooftops, the whole lot. ☀️",
     ],
     right: [
-      "By noon the sun had burned it all off, so we climbed up to Tiffin Top and sat on the warm stone with the whole valley below and the lake shrunk to a single bright coin. We bought roasted corn from a man who'd hauled his little coal stove the entire way up the hill, and charred with lime and chilli and salt it was, I swear, the best thing I've eaten in months. 🌽",
-      "At home a day just vanishes and I can never say where it went. Here a single ordinary morning holds a misty walk, a horse out of a dream, a climb, and corn on a rock — and still has room left over. Tomorrow we drive back down into the noise, but I'm folding some of this quiet up and carrying it home behind the ribs. Next one already. 💛✨",
+      "We climbed up to Tiffin Top and sat on the warm stone with the lake shrunk to a single bright coin far below us. We bought roasted corn from a man who'd hauled his little coal stove the entire way up the hill, and charred with lime and chilli and salt it was, I swear, the best thing I've eaten in months. 🌽",
+      "At home a day just vanishes and I can never say where it went. Here a single ordinary morning somehow holds a misty walk, a horse out of a dream, a climb, and corn on a rock — and still has room left over. ⏳",
+      "Tomorrow we drive back down into the noise of everything, but I'm folding some of this quiet up small and carrying it home tucked behind the ribs, where I can reach for it on the loud days. Next one already. 💛✨",
     ],
   }),
   // ── Day 2 — the big hike ──
@@ -95,13 +98,16 @@ const SEED_ENTRIES: JournalEntry[] = [
     song: song('Holocene', 'Bon Iver', 1),
     photos: [photo(5, 1), photo(1, 2)],
     left: [
-      "Today was THE day. 🥾 We were up before the sun, the air sharp enough to wake you better than any coffee, and we set off through the pine forest with the light coming down in long gold bars and the whole floor soft and quiet under fallen needles. 🌲",
-      "The first hour was pure joy. Nobody complained about a single thing. We were, if I'm honest, completely insufferable about how deeply we were \"connecting with nature\" — right up until the second hour, when the trail turned vertical and all of that talk stopped rather abruptly. 😅",
-      "It became the kind of climb where you stop talking entirely and just listen to your own breathing and the crunch of your boots on loose stone. Near the top we found a tiny tea shack — a tarp, a kettle, and a man who has simply chosen to live where the views are this good. Best cup of the whole trip. ☕",
+      "Today was THE day. 🥾 We were up well before the sun, the air cold and sharp enough to wake you far better than any coffee ever could.",
+      "We set off through the pine forest with the early light coming down in long gold bars between the trunks, the whole floor soft and silent under years of fallen needles. Every single breath was all resin and cold rain. 🌲",
+      "The first hour was pure, uncomplicated joy. Nobody complained about anything at all. We were, if I'm honest, utterly insufferable about how deeply we were \"connecting with nature\" — right up until the second hour, when the trail turned vertical and every last bit of that talk stopped rather abruptly. 😅",
+      "It became the kind of climb where you stop talking entirely and just listen to your own breathing and the steady crunch of your boots on loose stone. Near the top we found a tiny tea shack — a tarp, a kettle, and a man who has simply chosen to live where the views are this good. Best cup of the whole trip. ☕",
+      "My legs lodged a formal complaint somewhere around the halfway mark, then a second, more strongly worded one shortly after. I ignored them both completely, and they are, as I write this, still entirely furious with me — but I would do the whole brutal climb again tomorrow without a moment's hesitation. 🦵",
     ],
     right: [
-      "And then the trees just ended. We stepped out onto the ridge and the world dropped away on every side — range after range of blue mountains stacked all the way to the horizon, the clouds sitting below us for once instead of above. I actually laughed out loud. ⛰️",
-      "You climb for hours staring at your own feet, and then without warning the sky just hands you everything at once. Nobody checked the time. There was no next thing to rush off to — only the cold clean air and the people I love, out of breath and grinning at each other like idiots. Some days you earn, and this was one of them. 💛✨",
+      "And then the trees just ended. We stepped out onto the open ridge and the whole world dropped away on every side — range after range of blue mountains stacked all the way to the horizon, the clouds sitting below us for once instead of above. ⛰️",
+      "I actually laughed out loud. You climb for hours staring down at your own feet, and then without any warning at all the sky just hands you everything at once. 🦅",
+      "Nobody checked the time. There was no next thing to rush off to — only the cold clean air and the people I love, out of breath and grinning at each other like idiots. Some days you earn, and this was very much one of them — the kind you tuck in your back pocket for the grey days. 💛✨",
     ],
   }),
   // ── Day 1 — arrival ──
@@ -110,13 +116,16 @@ const SEED_ENTRIES: JournalEntry[] = [
     song: song('Home', 'Edward Sharpe & The Magnetic Zeros', 6),
     photos: [photo(3, 1), photo(6, 2)],
     left: [
-      "Day one, and somehow we actually made it — eight hours of switchbacks, two genuinely wrong turns, and one roadside samosa that is best left unexamined. Then the road bent, the valley cracked open, and there it was: Naini lake, sitting in the green like something cupped carefully in two hands. 💚",
-      "The whole car went quiet. Even Rohit stopped talking, which is a thing I did not previously believe was physically possible. 😄 We didn't even bother to unpack — we just dropped the bags at the guesthouse and ran straight down to the water like a pack of kids let out of school.",
-      "We took one of the old wooden boats out, and our boatman, who has apparently been rowing this exact lake for forty years, rowed us in a slow and perfectly bored circle while the four of us quietly lost our minds over the view. The hills went green, then blue, then very nearly black. 🛶",
+      "Day one, and somehow we actually made it — eight hours of switchbacks, two genuinely wrong turns, and one roadside samosa that is best left politely unexamined. ☕",
+      "Then the road bent, the whole valley cracked open, and there it was: Naini lake, sitting low in the green like something cupped carefully in two hands. The entire car went quiet. Even Rohit stopped talking, which is a thing I did not previously believe was physically possible. 😄",
+      "We didn't even bother to unpack. We just dropped the bags at the little guesthouse and ran straight down to the water like a pack of kids let out of school for the summer. 💚",
+      "We took one of the old wooden boats out, and our boatman — who has apparently been rowing this exact lake for forty unbothered years — rowed us in a slow, perfectly bored circle while the four of us quietly lost our minds over the view. The hills went green, then blue, then very nearly black. 🛶",
+      "I had forgotten that places like this simply exist, quietly, whether or not I ever come to see them — that right this second the lake is sitting there in the dark, holding the lights of the whole town on its back, and will keep doing it long after we've gone home. 🌌",
     ],
     right: [
-      "Lights came on one by one along the shore, and the boats scattered across the water looked like someone had spilled a handful of them. Afterwards we found a tea stall up on the Mall Road and Priya declared it \"the best chai of her entire life\" — a thing she says roughly twice a year, but this time she might genuinely be right. ☕",
-      "I keep waiting for the usual itch to check my phone, and it just hasn't come. Maybe I left it back in the city — the itch, I mean; the phone is sadly right here in my pocket. 📵 Tomorrow we attempt the big hike. Tonight there is only more chai and absolutely zero plans of any kind. 💛",
+      "Lights came on one by one along the far shore, and the boats scattered across the water looked exactly like someone had spilled a handful of them. 🚣",
+      "Afterwards we found a tea stall up on the Mall Road and Priya solemnly declared it \"the best chai of her entire life\" — a thing she says roughly twice a year, but this time, in this thin mountain air, she might genuinely be right. ☕",
+      "I keep waiting for the usual itch to check my phone, and it just hasn't come. Maybe I left it back down in the city — the itch, I mean; the phone is sadly right here in my pocket. 📵 Tomorrow we attempt the big hike. Tonight, only more chai, a deck of cards someone wisely packed, and absolutely zero plans of any kind. 💛",
     ],
   }),
 ]
@@ -136,7 +145,10 @@ const SEED_LETTER_DRAFTS: Array<{ daysAgo: number; draft: SelfLetterDraft }> = [
         "See you on the next trail. 🥾\n— past you, from a warm rock above Naini lake 🪨",
       ].join('\n\n'),
       song: song('Bookends', 'Simon & Garfunkel', 6),
-      photos: [{ url: IMG(6), position: 1, spread: 1, rotation: 5 }],
+      photos: [
+        { url: IMG(6), position: 1, spread: 1, rotation: 5 },
+        { url: IMG(3), position: 2, spread: 1, rotation: -5 },
+      ],
     },
   },
   {
@@ -150,7 +162,10 @@ const SEED_LETTER_DRAFTS: Array<{ daysAgo: number; draft: SelfLetterDraft }> = [
         "None of it is as heavy as it feels at midnight. You have carried far heavier things than this and you are still standing, still here, still reading. Keep going. Gently. We've got mountains left to climb. 🏔️\n— past you ✨",
       ].join('\n\n'),
       song: song('The Night We Met', 'Lord Huron', 2),
-      photos: [{ url: IMG(2), position: 1, spread: 1, rotation: -5 }],
+      photos: [
+        { url: IMG(2), position: 1, spread: 1, rotation: 5 },
+        { url: IMG(5), position: 2, spread: 1, rotation: -5 },
+      ],
     },
   },
 ]
