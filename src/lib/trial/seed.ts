@@ -84,7 +84,7 @@ const SEED_ENTRIES: JournalEntry[] = [
       "I woke to the whole hillside wrapped in thick cloud — couldn't see twenty feet in any direction, the pines just dissolving softly into white nothing. Everyone else wanted to wait it out, but I pulled on a jacket and slipped out anyway, and I am so glad I did. 🌫️",
       "The old stone path was slick and shining, and out of the mist came a man on a white horse, completely unhurried, like something walking straight out of an old story. We nodded at each other. He vanished back into the fog. I'm still not entirely convinced he was real. 🐎",
       "Sounds go strange in that kind of cloud — a dog barking somewhere far below, a temple bell I never managed to find, my own footsteps arriving a half-beat behind me. I wasn't lonely out there at all. If anything I felt held, tucked inside something larger and kinder. 🔔",
-      "By noon the sun had burned all of it clean off, and the whole valley came roaring back into colour like someone had quietly turned a dial — green hills, blue water, red rooftops, the whole lot. ☀️",
+      "By noon the sun had burned all of it clean off, and the whole valley came roaring back into colour like someone had quietly turned a dial. ☀️",
     ],
     right: [
       "We climbed up to Tiffin Top and sat on the warm stone with the lake shrunk to a single bright coin far below us. We bought roasted corn from a man who'd hauled his little coal stove the entire way up the hill, and charred with lime and chilli and salt it was, I swear, the best thing I've eaten in months. 🌽",
@@ -102,12 +102,12 @@ const SEED_ENTRIES: JournalEntry[] = [
       "We set off through the pine forest with the early light coming down in long gold bars between the trunks, the whole floor soft and silent under years of fallen needles. Every single breath was all resin and cold rain. 🌲",
       "The first hour was pure, uncomplicated joy. Nobody complained about anything at all. We were, if I'm honest, utterly insufferable about how deeply we were \"connecting with nature\" — right up until the second hour, when the trail turned vertical and every last bit of that talk stopped rather abruptly. 😅",
       "It became the kind of climb where you stop talking entirely and just listen to your own breathing and the steady crunch of your boots on loose stone. Near the top we found a tiny tea shack — a tarp, a kettle, and a man who has simply chosen to live where the views are this good. Best cup of the whole trip. ☕",
-      "My legs lodged a formal complaint somewhere around the halfway mark, then a second, more strongly worded one shortly after. I ignored them both completely, and they are, as I write this, still entirely furious with me — but I would do the whole brutal climb again tomorrow without a moment's hesitation. 🦵",
+      "My legs lodged a formal complaint somewhere around the halfway mark, then a second, more strongly worded one shortly after. I ignored them both completely, and they are, as I write this, still entirely furious with me. 🦵",
     ],
     right: [
       "And then the trees just ended. We stepped out onto the open ridge and the whole world dropped away on every side — range after range of blue mountains stacked all the way to the horizon, the clouds sitting below us for once instead of above. ⛰️",
       "I actually laughed out loud. You climb for hours staring down at your own feet, and then without any warning at all the sky just hands you everything at once. 🦅",
-      "Nobody checked the time. There was no next thing to rush off to — only the cold clean air and the people I love, out of breath and grinning at each other like idiots. Some days you earn, and this was very much one of them — the kind you tuck in your back pocket for the grey days. 💛✨",
+      "Nobody checked the time. There was no next thing to rush off to — only the cold clean air and the people I love, out of breath and grinning at each other like idiots. Some days you earn, and this was very much one of them. 💛✨",
     ],
   }),
   // ── Day 1 — arrival ──
@@ -120,7 +120,7 @@ const SEED_ENTRIES: JournalEntry[] = [
       "Then the road bent, the whole valley cracked open, and there it was: Naini lake, sitting low in the green like something cupped carefully in two hands. The entire car went quiet. Even Rohit stopped talking, which is a thing I did not previously believe was physically possible. 😄",
       "We didn't even bother to unpack. We just dropped the bags at the little guesthouse and ran straight down to the water like a pack of kids let out of school for the summer. 💚",
       "We took one of the old wooden boats out, and our boatman — who has apparently been rowing this exact lake for forty unbothered years — rowed us in a slow, perfectly bored circle while the four of us quietly lost our minds over the view. The hills went green, then blue, then very nearly black. 🛶",
-      "I had forgotten that places like this simply exist, quietly, whether or not I ever come to see them — that right this second the lake is sitting there in the dark, holding the lights of the whole town on its back, and will keep doing it long after we've gone home. 🌌",
+      "I had forgotten that places like this simply exist, quietly, whether or not I am ever there to see them. 🌌",
     ],
     right: [
       "Lights came on one by one along the far shore, and the boats scattered across the water looked exactly like someone had spilled a handful of them. 🚣",
