@@ -29,6 +29,16 @@ describe('trial router reads', () => {
     expect(routeTrialRequest('GET', '/api/entries/stats', null, snap).body.totalEntries).toBe(1)
   })
 
+  it('entries stats aggregates years/months so the shelf can place entries', () => {
+    const body = routeTrialRequest('GET', '/api/entries/stats', null, snap).body
+    const year = Number(now.slice(0, 4))
+    const monthKey = now.slice(0, 7)
+    expect(body.years).toHaveLength(1)
+    expect(body.years[0].year).toBe(year)
+    expect(body.years[0].entryCount).toBe(1)
+    expect(body.years[0].months[0]).toEqual({ month: monthKey, entryCount: 1, daysWithEntries: 1 })
+  })
+
   it('entries POST echoes a pending row with 201', () => {
     const r = routeTrialRequest('POST', '/api/entries', { text: 'hi' }, snap)
     expect(r.status).toBe(201)

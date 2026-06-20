@@ -35,7 +35,10 @@ export type { AutosaveStatus }
 
 export interface UseAutosaveLetterDraftResult {
   draftId: string | null
-  flush: () => Promise<void>
+  /** Forces a pending save and resolves with the draft id (from the ref, not
+   *  React state) so callers can seal immediately after a first save without
+   *  waiting for a re-render. */
+  flush: () => Promise<string | null>
   reset: (nextDraftId?: string | null) => void
   trigger: (payload: LetterDraftAutosavePayload) => void
 }
@@ -260,12 +263,22 @@ export function useAutosaveLetterDraft(
     }, DEBOUNCE_MS)
   }, [])
 
-  const flush = useCallback(async () => {
+  const flush = useCallback(async (): Promise<string | null> => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
     await performSaveRef.current?.(0)
+    // If a create POST was already in flight, performSave deferred rather than
+    // starting a second one — wait briefly for that in-flight create to set the
+    // id (resolves in ms against the local trial interceptor / fast server).
+    for (let i = 0; i < 40 && !draftIdRef.current && inFlightRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    // Return the id from the ref — performSave sets draftIdRef synchronously on
+    // the POST response, before React commits setDraftId. Callers (seal) can use
+    // this immediately without waiting for a re-render.
+    return draftIdRef.current
   }, [])
 
   const reset = useCallback((nextDraftId: string | null = null) => {
@@ -282,6 +295,12 @@ export function useAutosaveLetterDraft(
   }, [])
 
   useEffect(() => {
+    // Set true on mount, not just false on unmount: under React StrictMode the
+    // dev double-invoke runs mount → cleanup(false) → remount, and without
+    // re-setting true here mountedRef stays false forever — which silently
+    // dropped the create-POST's draft id (`if (data?.id && mountedRef.current)`),
+    // so seal saw no draftId ("Draft has not been saved yet").
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
       if (timeoutRef.current) clearTimeout(timeoutRef.current)

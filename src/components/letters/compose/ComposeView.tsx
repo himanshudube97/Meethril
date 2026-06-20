@@ -271,8 +271,9 @@ export default function ComposeView() {
     // recipient state. autosave.draftId becomes available only after the
     // first POST completes — if the user types and immediately taps seal,
     // the debounce hasn't fired yet.
-    await autosave.flush()
-    const draftLetterId = autosave.draftId
+    // flush() returns the id from the ref (set synchronously on the POST
+    // response), so a first-save-then-seal works without a re-render in between.
+    const draftLetterId = (await autosave.flush()) ?? autosave.draftId
     if (!draftLetterId) {
       throw new Error('Draft has not been saved yet — please add some text.')
     }

@@ -51,7 +51,39 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
     return { status: 201, body: { id: '__PENDING__', ...(body ?? {}), createdAt: new Date(0).toISOString() } }
   }
   if (p === '/api/entries/stats') {
-    return { status: 200, body: { totalEntries: snap.entries.length, years: [], firstEntryDate: null, lastEntryDate: null, currentStreak: 0, longestStreak: 0 } }
+    // The shelf builds its month spines from years→months→entryCount; an empty
+    // `years` (the old stub) meant written entries never appeared on the shelf.
+    // Aggregate the trial entries into the same shape the real route returns.
+    const byYear = new Map<number, Map<string, Set<string>>>() // year → "YYYY-MM" → set of "YYYY-MM-DD"
+    for (const e of snap.entries) {
+      const ymd = e.createdAt.slice(0, 10)
+      const year = Number(ymd.slice(0, 4))
+      const monthKey = ymd.slice(0, 7)
+      if (!byYear.has(year)) byYear.set(year, new Map())
+      const months = byYear.get(year)!
+      if (!months.has(monthKey)) months.set(monthKey, new Set())
+      months.get(monthKey)!.add(ymd)
+    }
+    const years = [...byYear.entries()]
+      .map(([year, months]) => {
+        const monthStats = [...months.entries()]
+          .map(([month, days]) => ({ month, entryCount: days.size, daysWithEntries: days.size }))
+          .sort((a, b) => b.month.localeCompare(a.month))
+        return { year, entryCount: monthStats.reduce((s, mo) => s + mo.entryCount, 0), months: monthStats }
+      })
+      .sort((a, b) => b.year - a.year)
+    const dates = snap.entries.map(e => e.createdAt).sort()
+    return {
+      status: 200,
+      body: {
+        totalEntries: snap.entries.length,
+        years,
+        firstEntryDate: dates[0] ?? null,
+        lastEntryDate: dates[dates.length - 1] ?? null,
+        currentStreak: 0,
+        longestStreak: 0,
+      },
+    }
   }
   if (p.startsWith('/api/entries/') && (m === 'PUT' || m === 'GET')) {
     const id = p.slice('/api/entries/'.length)
