@@ -33,11 +33,27 @@ export interface TrialScrapbook {
   updatedAt: string
 }
 
+/**
+ * A note released "to a stranger" in the trial. The real feature encrypts the
+ * text server-side (Tier 2) for moderation and matches it to another user; the
+ * trial has neither a server nor other users, so we store plaintext locally and
+ * leave the thread `unmatched` (sent, awaiting a stranger) — enough for the
+ * sender's own note to show up on the right under "your letters".
+ */
+export interface TrialStrangerThread {
+  id: string
+  body: string
+  countryCode: string | null
+  stateName: string | null
+  createdAt: string
+}
+
 interface TrialState {
   version: number
   entries: JournalEntry[]
   letters: TrialLetter[]
   scrapbooks: TrialScrapbook[]
+  strangerThreads: TrialStrangerThread[]
   journalCount: number
   letterCount: number
   scrapbookCount: number
@@ -58,6 +74,8 @@ interface TrialState {
 
   createScrapbook: (s: { items: string; e2eeIVs: { items: string; title?: string }; title?: string | null }) => string
   updateScrapbook: (id: string, s: { title?: string | null; items: string; e2eeIVs: { items: string; title?: string } }) => void
+
+  createStrangerNote: (n: { body: string; countryCode?: string | null; stateName?: string | null }) => string
 }
 
 const nextId = () => `trial-${crypto.randomUUID()}`
@@ -69,6 +87,7 @@ export const useTrialStore = create<TrialState>()(
       entries: [],
       letters: [],
       scrapbooks: [],
+      strangerThreads: [],
       journalCount: 0,
       letterCount: 0,
       scrapbookCount: 0,
@@ -76,7 +95,7 @@ export const useTrialStore = create<TrialState>()(
 
       reset: () => {
         // No seed — the visitor's own writing fills the scenes. Empty = real empty states.
-        set({ version: 2, entries: [], letters: [], scrapbooks: [], journalCount: 0, letterCount: 0, scrapbookCount: 0, signupPrompt: null })
+        set({ version: 2, entries: [], letters: [], scrapbooks: [], strangerThreads: [], journalCount: 0, letterCount: 0, scrapbookCount: 0, signupPrompt: null })
       },
 
       newestDate: () => {
@@ -194,6 +213,17 @@ export const useTrialStore = create<TrialState>()(
           ),
         }))
       },
+
+      createStrangerNote: (n) => {
+        const id = nextId()
+        set(s => ({
+          strangerThreads: [
+            { id, body: n.body, countryCode: n.countryCode ?? null, stateName: n.stateName ?? null, createdAt: new Date().toISOString() },
+            ...s.strangerThreads,
+          ],
+        }))
+        return id
+      },
     }),
     {
       name: 'meethril-trial',
@@ -208,7 +238,7 @@ export const useTrialStore = create<TrialState>()(
       // any version mismatch instead of carrying the old slice forward.
       migrate: (_persisted, version) => {
         if (version !== 2) {
-          return { version: 2, entries: [], letters: [], scrapbooks: [], journalCount: 0, letterCount: 0, scrapbookCount: 0 } as unknown as TrialState
+          return { version: 2, entries: [], letters: [], scrapbooks: [], strangerThreads: [], journalCount: 0, letterCount: 0, scrapbookCount: 0 } as unknown as TrialState
         }
         return _persisted as TrialState
       },
@@ -217,6 +247,7 @@ export const useTrialStore = create<TrialState>()(
         entries: s.entries,
         letters: s.letters,
         scrapbooks: s.scrapbooks,
+        strangerThreads: s.strangerThreads,
         journalCount: s.journalCount,
         letterCount: s.letterCount,
         scrapbookCount: s.scrapbookCount,

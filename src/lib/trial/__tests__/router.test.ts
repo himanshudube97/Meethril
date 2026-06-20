@@ -9,6 +9,7 @@ const snap: TrialSnapshot = {
     { id: 'l2', type: 'friend', contentCiphertext: 'CT2', contentIVs: { content: 'IV2' }, recipientName: 'Sam', recipientEmail: 's@x.com', createdAt: now, unlockDate: now, isViewed: false },
   ],
   scrapbooks: [{ id: 's1', title: null, items: 'SCT', e2eeIVs: { items: 'SIV' }, createdAt: now, updatedAt: now }],
+  strangerThreads: [{ id: 'st1', body: 'a kind word', countryCode: null, stateName: null, createdAt: now }],
 }
 
 describe('trial router reads', () => {
@@ -111,9 +112,31 @@ describe('trial router reads', () => {
     expect(r.body).toEqual({ profile: {} })
   })
 
-  it('stranger-notes inbox returns empty threads', () => {
+  it('stranger-notes inbox surfaces the sender\'s own released note', () => {
     const r = routeTrialRequest('GET', '/api/stranger-notes/inbox?filter=all', null, snap)
-    expect(r.body).toEqual({ threads: [], nextCursor: null })
+    expect(r.body.threads).toHaveLength(1)
+    const t = r.body.threads[0]
+    expect(t.id).toBe('st1')
+    expect(t.status).toBe('unmatched')
+    expect(t.preview).toEqual({ isMine: true, encryptionTier: 'server', body: 'a kind word' })
+  })
+
+  it('stranger-notes penpals filter is empty (trial notes never match)', () => {
+    const r = routeTrialRequest('GET', '/api/stranger-notes/inbox?filter=penpals', null, snap)
+    expect(r.body.threads).toEqual([])
+  })
+
+  it('stranger-notes thread detail returns the single outgoing message', () => {
+    const r = routeTrialRequest('GET', '/api/stranger-notes/threads/st1', null, snap)
+    expect(r.status).toBe(200)
+    expect(r.body.iAmThreadSender).toBe(true)
+    expect(r.body.messages).toHaveLength(1)
+    expect(r.body.messages[0]).toMatchObject({ isMine: true, encryptionTier: 'server', body: 'a kind word' })
+  })
+
+  it('stranger-notes thread detail 404s for an unknown id', () => {
+    const r = routeTrialRequest('GET', '/api/stranger-notes/threads/nope', null, snap)
+    expect(r.status).toBe(404)
   })
 
   it('unknown path returns benign 200', () => {

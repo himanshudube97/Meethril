@@ -7,12 +7,13 @@
 // empty 200 so a scene's inline fetch never throws.
 
 import type { JournalEntry } from '@/store/journal'
-import type { TrialLetter, TrialScrapbook } from '@/store/trial'
+import type { TrialLetter, TrialScrapbook, TrialStrangerThread } from '@/store/trial'
 
 export interface TrialSnapshot {
   entries: JournalEntry[]
   letters: TrialLetter[]
   scrapbooks: TrialScrapbook[]
+  strangerThreads: TrialStrangerThread[]
 }
 
 export interface TrialResponse {
@@ -33,6 +34,57 @@ function param(url: string, key: string): string | null {
 
 const selfLetters = (snap: TrialSnapshot) => snap.letters.filter(l => l.type === 'self')
 const friendLetters = (snap: TrialSnapshot) => snap.letters.filter(l => l.type === 'friend')
+
+// A trial stranger note → the InboxThread shape CorrespondenceList renders. It's
+// always the sender's own unmatched note (`isMine: true`, server tier), shown
+// under "your letters" as "you: …".
+function strangerThreadToInbox(t: TrialStrangerThread) {
+  return {
+    id: t.id,
+    status: 'unmatched' as const,
+    partnerDisplayName: 'a stranger',
+    myDisplayName: 'you',
+    lastActivityAt: t.createdAt,
+    messageCount: 1,
+    unreadCount: 0,
+    waveEligible: false,
+    waveOfferedToMe: false,
+    myWaveCast: false,
+    pendingKeyExchange: false,
+    myWrappedKey: null,
+    preview: { isMine: true, encryptionTier: 'server' as const, body: t.body },
+  }
+}
+
+// A trial stranger note → the ThreadDetail shape ThreadView renders: a single
+// outgoing, server-tier (already-decrypted) message, waiting to be delivered.
+function strangerThreadToDetail(t: TrialStrangerThread) {
+  return {
+    id: t.id,
+    status: 'unmatched' as const,
+    partnerDisplayName: 'a stranger',
+    myDisplayName: 'you',
+    partnerUserId: null,
+    iAmThreadSender: true,
+    waveEligible: false,
+    waveOfferedToMe: false,
+    myWaveCast: false,
+    pendingKeyExchange: false,
+    myWrappedKey: null,
+    partnerWrappedKey: null,
+    messages: [
+      {
+        id: `${t.id}-m`,
+        isMine: true,
+        encryptionTier: 'server' as const,
+        body: t.body,
+        countryCode: t.countryCode,
+        stateName: t.stateName,
+        createdAt: t.createdAt,
+      },
+    ],
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function routeTrialRequest(method: string, url: string, body: any, snap: TrialSnapshot): TrialResponse {
@@ -192,8 +244,23 @@ export function routeTrialRequest(method: string, url: string, body: any, snap: 
   if (p === '/api/profile' && m === 'PUT') return { status: 200, body: { ok: true } }
   if (p === '/api/me/profile-flags') return { status: 200, body: { reminderOptIn: false, hasSeenTour: true } }
 
-  // ---- Stranger notes (lights) — empty but valid so the tab renders ----
-  if (p.startsWith('/api/stranger-notes/inbox')) return { status: 200, body: { threads: [], nextCursor: null } }
+  // ---- Stranger notes (lights) ----
+  // The trial has no server matching and no other users, so a released note
+  // stays `unmatched` (sent, awaiting a stranger). We still surface it in the
+  // sender's own correspondence so "release into the night" isn't a no-op.
+  if (p.startsWith('/api/stranger-notes/inbox') && m === 'GET') {
+    const filter = param(url, 'filter')
+    // Every trial note is the sender's own unmatched note — it never becomes a
+    // pen pal, so the "penpals" tab is genuinely empty.
+    const threads = filter === 'penpals' ? [] : snap.strangerThreads.map(strangerThreadToInbox)
+    return { status: 200, body: { threads, nextCursor: null } }
+  }
+  const threadMatch = p.match(/^\/api\/stranger-notes\/threads\/([^/]+)$/)
+  if (threadMatch && m === 'GET') {
+    const t = snap.strangerThreads.find(x => x.id === decodeURIComponent(threadMatch[1]))
+    if (!t) return { status: 404, body: { error: 'not_found' } }
+    return { status: 200, body: strangerThreadToDetail(t) }
+  }
   if (p.startsWith('/api/stranger-notes')) return { status: 200, body: { ok: true } }
 
   return { status: 200, body: {} }

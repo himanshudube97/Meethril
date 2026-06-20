@@ -54,7 +54,7 @@ export function installTrialFetch(): () => void {
     if (init?.body && typeof init.body === 'string') {
       try { parsedBody = JSON.parse(init.body) } catch { parsedBody = null }
     }
-    const snap = { entries: store.entries, letters: store.letters, scrapbooks: store.scrapbooks }
+    const snap = { entries: store.entries, letters: store.letters, scrapbooks: store.scrapbooks, strangerThreads: store.strangerThreads }
     const res = routeTrialRequest(method, path, parsedBody, snap)
 
     // ---- Entry mutations ----
@@ -103,6 +103,14 @@ export function installTrialFetch(): () => void {
       const id = store.createScrapbook({ items: d.items, e2eeIVs: d.e2eeIVs, title: d.title ?? null })
       return json(201, { id })
     }
+    // ---- Stranger notes: store the released note so it shows in the sender's
+    // own correspondence (right side). No cap — stranger notes are uncapped.
+    if (base === '/api/stranger-notes' && method === 'POST') {
+      const d = parsedBody as { content: string; country?: string | null; state?: string | null }
+      const id = store.createStrangerNote({ body: d.content, countryCode: d.country ?? null, stateName: d.state ?? null })
+      return json(201, { id, status: 'unmatched' })
+    }
+
     if (base.startsWith('/api/scrapbooks/') && method === 'PUT') {
       const id = base.slice('/api/scrapbooks/'.length)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
