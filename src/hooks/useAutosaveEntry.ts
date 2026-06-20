@@ -326,6 +326,15 @@ export function useAutosaveEntry(initialEntryId: string | null = null): UseAutos
   // Cancel pending save on unmount AND mark unmounted so any in-flight fetch
   // that resolves after this point skips its state writes.
   useEffect(() => {
+    // Set true on mount, not just false on unmount: under React StrictMode the
+    // dev double-invoke runs mount → cleanup(false) → remount, and without
+    // re-setting true here mountedRef stays false forever — which silently
+    // dropped the create-POST's entry id (`if (data?.id && mountedRef.current)`),
+    // so every subsequent autosave re-POSTed and created a duplicate entry
+    // (one per keystroke-batch). The server's one-entry-per-day 409 masks this
+    // in the real app; the /try trial store has no such guard, so it surfaced
+    // there as "memory shows N identical entries from one writing session".
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
