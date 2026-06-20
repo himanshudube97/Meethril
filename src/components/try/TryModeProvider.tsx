@@ -47,8 +47,15 @@ export default function TryModeProvider({ children }: { children: React.ReactNod
       // Drop in the mock diary (past journals + delivered letters) before
       // revealing the scenes, so the visitor lands in a lived-in space rather
       // than an empty one. Letters are encrypted with the just-primed session
-      // key. Only on a fresh session, and only if nothing slipped in meanwhile.
-      if (freshSession && useTrialStore.getState().entries.length === 0) {
+      // key.
+      //
+      // Gate on emptiness AFTER priming, not on the pre-prime `freshSession`
+      // snapshot: primeTrialCrypto() resets the store whenever the throwaway
+      // key is gone (it's cleared on every /try exit, and dropped on dev
+      // restarts). So a tab that still had entries a moment ago can be empty
+      // by the time we get here — checking the live count is what lets a wiped
+      // tab re-seed itself instead of getting stuck on an empty Shelf/Memory.
+      if (useTrialStore.getState().entries.length === 0) {
         const masterKey = useE2EEStore.getState().masterKey
         if (masterKey) {
           try {

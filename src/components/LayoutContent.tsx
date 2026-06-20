@@ -172,15 +172,30 @@ export default function LayoutContent({
     // /try mirrors the real authed shell: full themed chrome + nav, plus the
     // trial-only conversion surfaces (floating invite + cap modal). The trial
     // memory diary uses the same fade-on-open behavior as the real /memory.
+    //
+    // Match the real app's per-page wrapper decision: write / letters /
+    // scrapbook-listing are full-bleed scenes that lay themselves out (no
+    // padded <main>). Wrapping those in the pt-20 pb-8 min-h-screen main —
+    // as every /try page used to — stacks padding on top of an already
+    // 100vh scene and produces a phantom scrollbar the real app never has.
+    const tryInner = pathname.replace(/^\/try/, '') || '/'
+    const isTryFullBleed =
+      tryInner === '/write' ||
+      tryInner.startsWith('/letters') ||
+      tryInner === '/scrapbook'
     return (
       <>
         <Background />
         <AmbientSoundLayer />
-        <main className="relative z-10 min-h-screen pt-20 pb-8 px-4">
-          <PageTransition>
-            {children}
-          </PageTransition>
-        </main>
+        {isTryFullBleed ? (
+          children
+        ) : (
+          <main className="relative z-10 min-h-screen pt-20 pb-8 px-4">
+            <PageTransition>
+              {children}
+            </PageTransition>
+          </main>
+        )}
         <motion.div
           animate={{ opacity: diaryOpen ? 0 : 1 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}

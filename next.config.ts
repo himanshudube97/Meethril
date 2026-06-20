@@ -43,6 +43,17 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["jose", "@prisma/client", ".prisma/client"],
   turbopack: {},
+  async redirects() {
+    // /try is just an entry point — the real first screen is the writing desk.
+    // Redirect at the routing layer (HTTP 307) instead of via a redirect() call
+    // inside the page component: a render-time redirect() throws mid-render and
+    // React 19's dev perf tracker then chokes on the aborted "TryPage" render
+    // ("Failed to execute 'measure'… cannot have a negative time stamp" + a
+    // follow-on insertBefore DOM error). A route redirect never renders the page.
+    return [
+      { source: '/try', destination: '/try/write', permanent: false },
+    ]
+  },
   async headers() {
     // Baseline security headers. CSP is intentionally omitted from this
     // first pass — locking it down requires walking the app for inline

@@ -8,6 +8,7 @@ import { PostcardFront } from '../compose/PostcardFront'
 import { PostcardBack } from '../compose/PostcardBack'
 import type { Photo } from '@/components/desk/PhotoBlock'
 import type { StrokeData, JournalEntry } from '@/store/journal'
+import { useMemoryViewStore } from '@/store/memoryView'
 
 interface Props {
   letter: InboxLetter | null
@@ -33,6 +34,14 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
   const [face, setFace] = useState<'front' | 'back'>('front')
   const [cardScale, setCardScale] = useState(1)
   const { decryptEntryFromServer, isE2EEReady } = useE2EE()
+  // Fade the page chrome (nav, gear, fullscreen) out while a letter is open so
+  // the reveal reads full-screen — same immersive treatment as a memory diary.
+  const setDiaryOpen = useMemoryViewStore((s) => s.setDiaryOpen)
+  useEffect(() => {
+    if (!letter) return
+    setDiaryOpen(true)
+    return () => setDiaryOpen(false)
+  }, [letter, setDiaryOpen])
 
   // Uniformly scale the postcard to fit the viewport (same approach as the
   // journal / compose view) so its 760×860 aspect ratio never distorts.
@@ -243,10 +252,9 @@ export default function RevealModal({ letter, onClose, onMarkRead }: Props) {
           display: none;
           align-items: center;
           justify-content: center;
-          background:
-            radial-gradient(ellipse at center, rgba(50, 30, 18, 0.55) 0%, rgba(15, 10, 6, 0.94) 90%);
-          backdrop-filter: blur(14px) saturate(140%);
-          -webkit-backdrop-filter: blur(14px) saturate(140%);
+          background: rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
           perspective: 1600px;
         }
         .reveal-overlay.open { display: flex; }
