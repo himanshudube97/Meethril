@@ -357,10 +357,12 @@ export default function MobileLetterCompose() {
 
 function CompactHeader() {
   const { theme } = useThemeStore()
+  const pathname = usePathname()
+  const lettersBase = pathname.startsWith('/try') ? '/try/letters' : '/letters'
   return (
     <div className="flex items-center justify-between px-12">
       <Link
-        href="/letters"
+        href={lettersBase}
         className="text-xs px-3 py-1.5 rounded-full transition"
         style={{
           background: theme.glass.bg,

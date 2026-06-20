@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useThemeStore } from '@/store/theme'
 import MobileLetterReader from './MobileLetterReader'
 import LightsView from './lights/LightsView'
@@ -14,6 +15,8 @@ import type { InboxLetter, SentStamp, LettersTab } from './letterTypes'
  */
 export default function MobileLettersView() {
   const { theme } = useThemeStore()
+  const pathname = usePathname()
+  const base = pathname.startsWith('/try') ? '/try' : ''
   const [tab, setTab] = useState<LettersTab>('inbox')
 
   return (
@@ -31,7 +34,7 @@ export default function MobileLettersView() {
             Letters
           </h1>
           <Link
-            href="/letters/write"
+            href={`${base}/letters/write`}
             className="text-xs px-3 py-1.5 rounded-full transition"
             style={{
               background: `${theme.accent.primary}30`,

@@ -2,7 +2,7 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useEntries, useEntryStats } from '@/hooks/useEntries'
 import { localMonthKey } from '@/lib/entry-lock-client'
 import ShelfHeader from './ShelfHeader'
@@ -39,6 +39,10 @@ function buildMonths(
 export default function ShelfScene() {
   const router = useRouter()
   const search = useSearchParams()
+  const pathname = usePathname()
+  // Same scene renders at /shelf and /try/shelf; keep year/month query writes on
+  // the current shell so /try interactions don't rewrite history to the real route.
+  const shelfBase = pathname.startsWith('/try') ? '/try/shelf' : '/shelf'
 
   const { stats, loading: statsLoading } = useEntryStats()
   const currentYear = new Date().getFullYear()
@@ -76,9 +80,9 @@ export default function ShelfScene() {
       else if (next.month !== undefined) params.set('month', String(next.month + 1))
       params.delete('open')
       const qs = params.toString()
-      router.replace(qs ? `/shelf?${qs}` : '/shelf', { scroll: false })
+      router.replace(qs ? `${shelfBase}?${qs}` : shelfBase, { scroll: false })
     },
-    [router, search],
+    [router, search, shelfBase],
   )
 
   const handleMonthClick = useCallback(

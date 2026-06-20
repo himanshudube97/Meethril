@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useThemeStore } from '@/store/theme'
 
 /**
@@ -12,6 +13,8 @@ import { useThemeStore } from '@/store/theme'
  */
 export default function ScrapbookDesktopOnly() {
   const { theme } = useThemeStore()
+  const pathname = usePathname()
+  const writeBase = pathname.startsWith('/try') ? '/try/write' : '/write'
   return (
     <div className="fixed inset-0 z-30 overflow-y-auto">
       <div
@@ -57,7 +60,7 @@ export default function ScrapbookDesktopOnly() {
             your scrapbook — everything you&apos;ve already pinned is safe.
           </p>
           <Link
-            href="/write"
+            href={writeBase}
             className="inline-block px-5 py-2.5 rounded-full text-sm transition"
             style={{
               background: `${theme.accent.primary}30`,
